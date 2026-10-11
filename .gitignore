@@ -3,3 +3,6 @@
 /.vscode
 /.vagrant
 .phpunit.result.cache
+/core/.import.lock
+/core/.import-*/
+.DS_Store
