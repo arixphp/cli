@@ -1,0 +1,41 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use App\Core\Source;
+
+if (PHP_VERSION_ID < 80401) {
+    fwrite(STDERR, "Core import requires PHP >= 8.4.1.\n");
+
+    exit(1);
+}
+
+$arguments = array_slice($argv, 1);
+
+if ($arguments === ['--help']) {
+    fwrite(STDOUT, "Usage: ./source [--package=http-foundation]\nImports HttpFoundation and required dependencies from vendor into core.\n");
+
+    exit(0);
+}
+
+if ($arguments !== [] && $arguments !== ['--package=http-foundation']) {
+    fwrite(STDERR, "Only --package=http-foundation is supported in task 1.\n");
+
+    exit(1);
+}
+
+try {
+    $manifest = new Source()->import(
+        __DIR__ . DIRECTORY_SEPARATOR .'vendor',
+        __DIR__ . DIRECTORY_SEPARATOR .'core'
+    );
+
+    fwrite(STDOUT, 'Imported ' . count($manifest['packages'])." packages into core.\n");
+} catch (Throwable $exception) {
+    fwrite(STDERR, 'Core import failed: '.$exception->getMessage()."\n");
+
+    exit(1);
+}
