@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arix\Runtime;
 
+use Arix\Constants\HttpMethod;
 use Arix\Constants\HttpStatusCode;
 use Arix\Http\ErrorResponder;
 use Arix\Http\HttpException;
@@ -23,12 +24,12 @@ class HttpRuntime
         'cgi-fcgi',
         'fpm-fcgi',
         'frankenphp',
-        'litespeed'
+        'litespeed',
     ];
 
     private readonly ErrorResponder $errors;
 
-    public function __construct(bool $debug = false, ?Closure $logger = null)
+    public function __construct(bool $debug = false, null|Closure $logger = null)
     {
         $this->errors = new ErrorResponder($debug, $logger);
     }
@@ -36,7 +37,7 @@ class HttpRuntime
     public function handle(Closure $bootstrap, string $sapi = PHP_SAPI): Response
     {
         if (! in_array($sapi, self::SUPPORTED_SAPIS, true)) {
-            return $this->failure(new HttpException(HttpStatusCode::SERVICE_UNAVAILABLE->value, 'This PHP runtime is not supported.'));
+            return $this->failure(new HttpException(HttpStatusCode::SERVICE_UNAVAILABLE, 'This PHP runtime is not supported.'));
         }
 
         try {
@@ -72,7 +73,7 @@ class HttpRuntime
 
     private function failure(Throwable $exception): Response
     {
-        $method = ($_SERVER['REQUEST_METHOD'] ?? '') === 'HEAD' ? 'HEAD' : 'GET';
+        $method = ($_SERVER['REQUEST_METHOD'] ?? '') === HttpMethod::HEAD->value ? HttpMethod::HEAD->value : HttpMethod::GET->value;
         $request = new Request(server: ['REQUEST_METHOD' => $method], content: '');
 
         return $this->errors->respond($exception)->prepare($request);

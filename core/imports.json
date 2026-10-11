@@ -6,6 +6,11 @@
             "version": "v8.1.8",
             "destination": "HttpFoundation",
             "namespace": "Arix\\HttpFoundation"
+        },
+        "nikic/fast-route": {
+            "version": "1.3.1",
+            "destination": "Routing",
+            "namespace": "Arix\\Routing"
         }
     },
     "files": {
@@ -125,6 +130,26 @@
         "HttpFoundation/Test/Constraint/ResponseStatusCodeSame.php": "99d97a94e2dc02fce477831e083f343cc521894694ab71cef15ad5f1d5b66fe3",
         "HttpFoundation/Test/Constraint/SessionHasFlashMessage.php": "9137255529a2f818853b76c4eba39990b6b6171603ae7c165129e5d3d457033f",
         "HttpFoundation/UriSigner.php": "bb3903fb00dae41d7722fb2287a55da956330e1f35fae370dbe96a4275684575",
-        "HttpFoundation/UrlHelper.php": "e70932973c3d56c1533bc790cad26d4c65c164965a77828f2fcfeb894645fac9"
+        "HttpFoundation/UrlHelper.php": "e70932973c3d56c1533bc790cad26d4c65c164965a77828f2fcfeb894645fac9",
+        "Routing/BadRouteException.php": "2832d06d8cfade8b5f7281a4bfbe5b8da28deb0929a3e9a0507aefece1a3e063",
+        "Routing/DataGenerator.php": "0f78ec2bc2157d14517af03fe656204e7757905668c6e76a69e41d9c58eead96",
+        "Routing/DataGenerator/CharCountBased.php": "053bd78b223abb4a9becd10c4a78224870cab3960aea5df4eb3a99a02e122d48",
+        "Routing/DataGenerator/GroupCountBased.php": "c57a944a3ce1ba132c3e11c6fa31a34e3f483824f0d20af6e1a2efb36d683918",
+        "Routing/DataGenerator/GroupPosBased.php": "79491b84d26f393b69b6c12c92e2b39756dc52a59e19ee1bbf3cb13f182d3e14",
+        "Routing/DataGenerator/MarkBased.php": "8d74d586dfafbfb3c060ebf322379828bee36aaa2af7febba34472241118f5c4",
+        "Routing/DataGenerator/RegexBasedAbstract.php": "97fa300d14cc0a267d02fd92540b5175d12e1fbb2880669daa71a007ac1b27fb",
+        "Routing/Dispatcher.php": "c01c42fb60b538c0af2bf0126f21044df56722f606915d288db10f992cdf19d8",
+        "Routing/Dispatcher/CharCountBased.php": "c9e90c6d791ef329443a0a14aacb1a306729705ba35c715c059201bf505e2f10",
+        "Routing/Dispatcher/GroupCountBased.php": "22b0eb409c2b43299a2757f47341873082ce43d43b3c851d021526c68a23d66f",
+        "Routing/Dispatcher/GroupPosBased.php": "fffefbada237a6f861039d9a9cf16e9d7ca09c12b727b55d82a5c57c7c28451f",
+        "Routing/Dispatcher/MarkBased.php": "8030e244397735827f5595e4130187409e1ca72ca9967244d9f14bf764d5c290",
+        "Routing/Dispatcher/RegexBasedAbstract.php": "7b1ba01fc2f968665ce8b4301e9860f97f7301f4f2612044117dcb72c7da6ab7",
+        "Routing/LICENSE": "c6ec05e0bd21f917b21e67a1eda248fb8a45c501a9cb727b7f7c132974dd0220",
+        "Routing/Route.php": "987b037cdb2cdaf1b7a82e5c68f2b789943609fc32554bc4f596aba2fa05df42",
+        "Routing/RouteCollector.php": "3be893dfef5cb84f039f67cd1fbd15ce72787c1348cb54c528f4246aea23a16c",
+        "Routing/RouteParser.php": "13b57f872bdcdcb828b849e48693cc4b4d034900854e72a30bcac13d83906bb6",
+        "Routing/RouteParser/Std.php": "5d61fbb4ed38eede6c3d6560f2d99c666437ecd5eae2d4e7a96baff2340b601c",
+        "Routing/bootstrap.php": "b53e5d648b6a60bdfd832412934e6c73b29c26ef98b8345d918558b0d81b162e",
+        "Routing/functions.php": "3cca74946cbcc9af98a6ba9d718858cbe5bfdb6696ba7ff7d592607f52926990"
     }
 }

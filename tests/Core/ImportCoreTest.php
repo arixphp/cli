@@ -34,7 +34,11 @@ class ImportCoreTest extends TestCase
 
         $this->assertFileExists($core.DIRECTORY_SEPARATOR.'HttpFoundation'.DIRECTORY_SEPARATOR.'LICENSE');
         $this->assertDirectoryDoesNotExist($core.DIRECTORY_SEPARATOR.'Dependencies');
-        $this->assertSame(['symfony/http-foundation'], array_keys($first['packages']));
+        $this->assertSame(['symfony/http-foundation', 'nikic/fast-route'], array_keys($first['packages']));
+        $this->assertFileExists($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'RouteCollector.php');
+        $this->assertDirectoryDoesNotExist($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'src');
+        $this->assertSame(file_get_contents($vendor.DIRECTORY_SEPARATOR.'nikic'.DIRECTORY_SEPARATOR.'fast-route'.DIRECTORY_SEPARATOR.'LICENSE'), file_get_contents($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'LICENSE'));
+        $this->assertStringNotContainsString('FastRoute', file_get_contents($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'functions.php'));
         $this->assertSame(file_get_contents($vendor.DIRECTORY_SEPARATOR.'symfony'.DIRECTORY_SEPARATOR.'http-foundation'.DIRECTORY_SEPARATOR.'LICENSE'), file_get_contents($core.DIRECTORY_SEPARATOR.'HttpFoundation'.DIRECTORY_SEPARATOR.'LICENSE'));
 
         $source = file_get_contents($core.DIRECTORY_SEPARATOR.'HttpFoundation'.DIRECTORY_SEPARATOR.'Request.php');
@@ -55,13 +59,17 @@ class ImportCoreTest extends TestCase
         mkdir($this->directory.DIRECTORY_SEPARATOR.'core');
         file_put_contents($this->directory.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'keep.txt', 'keep');
 
+        $error = null;
+
         try {
             (new Source)->import($this->directory.DIRECTORY_SEPARATOR.'missing', $this->directory.DIRECTORY_SEPARATOR.'core');
-            $this->fail('Missing vendor must fail.');
-        } catch (RuntimeException) {
-            $this->assertSame('keep', file_get_contents($this->directory.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'keep.txt'));
-            $this->assertFileDoesNotExist($this->directory.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'imports.json');
+        } catch (RuntimeException $exception) {
+            $error = $exception;
         }
+
+        $this->assertInstanceOf(RuntimeException::class, $error);
+        $this->assertSame('keep', file_get_contents($this->directory.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'keep.txt'));
+        $this->assertFileDoesNotExist($this->directory.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'imports.json');
     }
 
     #[Test]
@@ -71,17 +79,23 @@ class ImportCoreTest extends TestCase
         $core = $this->directory.DIRECTORY_SEPARATOR.'core';
         $packages = [
             'symfony/http-foundation' => 'HttpFoundation',
+            'nikic/fast-route' => 'Routing',
         ];
         $excluded = ['README.md', 'composer.json', 'NOTICE', '.gitignore', 'LICENSE.txt', 'example.php.txt', 'UPPER.PHP'];
 
         foreach ($packages as $package => $_) {
-            mkdir($vendor.DIRECTORY_SEPARATOR.$package.DIRECTORY_SEPARATOR.'nested', 0755, true);
+            $source = $vendor.DIRECTORY_SEPARATOR.$package.($package === 'nikic/fast-route' ? DIRECTORY_SEPARATOR.'src' : '');
+            mkdir($source.DIRECTORY_SEPARATOR.'nested', 0755, true);
             file_put_contents($vendor.DIRECTORY_SEPARATOR.$package.DIRECTORY_SEPARATOR.'LICENSE', 'License text');
-            file_put_contents($vendor.DIRECTORY_SEPARATOR.$package.DIRECTORY_SEPARATOR.'nested'.DIRECTORY_SEPARATOR.'Example.php', '<?php // source');
+            file_put_contents($source.DIRECTORY_SEPARATOR.'nested'.DIRECTORY_SEPARATOR.'Example.php', '<?php // source');
+
+            if ($package === 'nikic/fast-route') {
+                file_put_contents($vendor.DIRECTORY_SEPARATOR.$package.DIRECTORY_SEPARATOR.'not-in-src.php', '<?php // not source');
+            }
 
             foreach ($excluded as $name) {
                 file_put_contents($vendor.DIRECTORY_SEPARATOR.$package.DIRECTORY_SEPARATOR.$name, 'Excluded content');
-                file_put_contents($vendor.DIRECTORY_SEPARATOR.$package.DIRECTORY_SEPARATOR.'nested'.DIRECTORY_SEPARATOR.$name, 'Excluded nested content');
+                file_put_contents($source.DIRECTORY_SEPARATOR.'nested'.DIRECTORY_SEPARATOR.$name, 'Excluded nested content');
             }
         }
 
@@ -99,7 +113,8 @@ class ImportCoreTest extends TestCase
             }
         }
 
-        $this->assertCount(2, $manifest['files']);
+        $this->assertCount(4, $manifest['files']);
+        $this->assertFileDoesNotExist($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'not-in-src.php');
         $this->assertSame([], array_values(array_filter(array_keys($manifest['files']), static fn (string $file): bool => str_starts_with($file, 'Dependencies'.DIRECTORY_SEPARATOR))));
         $this->assertDirectoryDoesNotExist($core.DIRECTORY_SEPARATOR.'Dependencies');
     }
@@ -136,13 +151,157 @@ class ImportCoreTest extends TestCase
     #[Test]
     public function it_source_binary_help_uses_current_name_and_invalid_options_fail(): void
     {
-        foreach ([['--help', 0, 'Usage: ./source'], ['--package=routing', 1, 'Only --package=http-foundation']] as [$argument, $status, $message]) {
+        foreach ([['--help', 0, 'Usage: ./source'], ['--package=unknown', 1, 'Unsupported source option']] as [$argument, $status, $message]) {
             $process = proc_open([dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'source', $argument], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $this->directory);
             $output = stream_get_contents($pipes[1]).stream_get_contents($pipes[2]);
             fclose($pipes[1]);
             fclose($pipes[2]);
             $this->assertSame($status, proc_close($process), $output);
             $this->assertStringContainsString($message, $output);
+        }
+    }
+
+    #[Test]
+    public function it_upgrades_a_historical_manifest_and_protects_new_and_modified_components(): void
+    {
+        $core = $this->directory.DIRECTORY_SEPARATOR.'core';
+        mkdir($core.DIRECTORY_SEPARATOR.'HttpFoundation', 0755, true);
+        file_put_contents($core.DIRECTORY_SEPARATOR.'HttpFoundation'.DIRECTORY_SEPARATOR.'LICENSE', 'old license');
+        $manifest = ['format' => 1, 'packages' => ['symfony/http-foundation' => ['destination' => 'HttpFoundation']], 'files' => ['HttpFoundation'.DIRECTORY_SEPARATOR.'LICENSE' => hash('sha256', 'old license')]];
+        file_put_contents($core.DIRECTORY_SEPARATOR.'imports.json', json_encode($manifest));
+        $vendor = dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'vendor';
+        mkdir($core.DIRECTORY_SEPARATOR.'Routing');
+        file_put_contents($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'keep.txt', 'keep');
+
+        $error = null;
+
+        try {
+            new Source()->import($vendor, $core);
+        } catch (RuntimeException $exception) {
+            $error = $exception;
+        }
+
+        $this->assertInstanceOf(RuntimeException::class, $error);
+        $this->assertSame('keep', file_get_contents($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'keep.txt'));
+
+        $this->remove($core.DIRECTORY_SEPARATOR.'Routing');
+        $updated = new Source()->import($vendor, $core);
+        $this->assertArrayHasKey('nikic/fast-route', $updated['packages']);
+        file_put_contents($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'Dispatcher.php', 'local edits');
+        $this->expectException(RuntimeException::class);
+
+        try {
+            new Source()->import($vendor, $core);
+        } finally {
+            $this->assertSame('local edits', file_get_contents($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'Dispatcher.php'));
+        }
+    }
+
+    #[Test]
+    public function it_restores_components_and_manifest_when_an_install_move_fails(): void
+    {
+        $core = $this->directory.DIRECTORY_SEPARATOR.'core';
+        $vendor = dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'vendor';
+        $first = new Source()->import($vendor, $core);
+        file_put_contents($core.DIRECTORY_SEPARATOR.'handwritten.php', '<?php // preserve');
+        $importer = new class extends Source
+        {
+            protected function move(string $from, string $to): bool
+            {
+                if (basename($to) === 'Routing' && str_starts_with(basename(dirname($from)), '.import-')) {
+                    return false;
+                }
+
+                return parent::move($from, $to);
+            }
+        };
+
+        $error = null;
+
+        try {
+            $importer->import($vendor, $core);
+        } catch (RuntimeException $exception) {
+            $error = $exception;
+        }
+
+        $this->assertInstanceOf(RuntimeException::class, $error);
+        $this->assertSame('Cannot install Routing', $error->getMessage());
+        $this->assertSame($first, json_decode(file_get_contents($core.DIRECTORY_SEPARATOR.'imports.json'), true));
+
+        foreach ($first['files'] as $name => $hash) {
+            $this->assertSame($hash, hash_file('sha256', $core.DIRECTORY_SEPARATOR.$name));
+        }
+
+        $this->assertSame('<?php // preserve', file_get_contents($core.DIRECTORY_SEPARATOR.'handwritten.php'));
+        $this->assertSame($first, new Source()->import($vendor, $core));
+        $this->assertSame([], glob($core.DIRECTORY_SEPARATOR.'.import-*'));
+    }
+
+    #[Test]
+    public function it_rejects_a_linked_fastroute_package_root_before_changing_core(): void
+    {
+        $vendor = $this->directory.DIRECTORY_SEPARATOR.'vendor';
+        mkdir($vendor.DIRECTORY_SEPARATOR.'symfony'.DIRECTORY_SEPARATOR.'http-foundation', 0755, true);
+        file_put_contents($vendor.DIRECTORY_SEPARATOR.'symfony'.DIRECTORY_SEPARATOR.'http-foundation'.DIRECTORY_SEPARATOR.'LICENSE', 'license');
+        mkdir($vendor.DIRECTORY_SEPARATOR.'nikic', 0755, true);
+        symlink(dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'vendor'.DIRECTORY_SEPARATOR.'nikic'.DIRECTORY_SEPARATOR.'fast-route', $vendor.DIRECTORY_SEPARATOR.'nikic'.DIRECTORY_SEPARATOR.'fast-route');
+        $core = $this->directory.DIRECTORY_SEPARATOR.'core';
+        $error = null;
+
+        try {
+            new Source()->import($vendor, $core);
+        } catch (RuntimeException $exception) {
+            $error = $exception;
+        }
+
+        $this->assertInstanceOf(RuntimeException::class, $error);
+        $this->assertFileDoesNotExist($core.DIRECTORY_SEPARATOR.'imports.json');
+        $this->assertDirectoryDoesNotExist($core.DIRECTORY_SEPARATOR.'Routing');
+    }
+
+    #[Test]
+    public function it_preserves_http_foundation_bytes_during_manifest_upgrade(): void
+    {
+        $core = $this->directory.DIRECTORY_SEPARATOR.'core';
+        $vendor = dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'vendor';
+        $manifest = new Source()->import($vendor, $core);
+        unset($manifest['packages']['nikic/fast-route']);
+        $manifest['files'] = array_filter($manifest['files'], static fn (string $name): bool => str_starts_with($name, 'HttpFoundation'.DIRECTORY_SEPARATOR), ARRAY_FILTER_USE_KEY);
+        $this->remove($core.DIRECTORY_SEPARATOR.'Routing');
+        file_put_contents($core.DIRECTORY_SEPARATOR.'imports.json', json_encode($manifest));
+        $before = file_get_contents($core.DIRECTORY_SEPARATOR.'HttpFoundation'.DIRECTORY_SEPARATOR.'Request.php');
+        $updated = new Source()->import($vendor, $core);
+        $this->assertSame($before, file_get_contents($core.DIRECTORY_SEPARATOR.'HttpFoundation'.DIRECTORY_SEPARATOR.'Request.php'));
+
+        foreach ($manifest['files'] as $name => $hash) {
+            $this->assertSame($hash, $updated['files'][$name]);
+        }
+    }
+
+    #[Test]
+    public function it_imports_the_full_bundle_for_both_cli_package_aliases(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $vendor = $this->directory.DIRECTORY_SEPARATOR.'vendor';
+        mkdir($vendor.DIRECTORY_SEPARATOR.'symfony'.DIRECTORY_SEPARATOR.'http-foundation', 0755, true);
+        mkdir($vendor.DIRECTORY_SEPARATOR.'nikic'.DIRECTORY_SEPARATOR.'fast-route'.DIRECTORY_SEPARATOR.'src', 0755, true);
+        file_put_contents($vendor.DIRECTORY_SEPARATOR.'autoload.php', '<?php require '.var_export($root.DIRECTORY_SEPARATOR.'vendor'.DIRECTORY_SEPARATOR.'autoload.php', true).';');
+        file_put_contents($vendor.DIRECTORY_SEPARATOR.'symfony'.DIRECTORY_SEPARATOR.'http-foundation'.DIRECTORY_SEPARATOR.'LICENSE', 'license');
+        file_put_contents($vendor.DIRECTORY_SEPARATOR.'nikic'.DIRECTORY_SEPARATOR.'fast-route'.DIRECTORY_SEPARATOR.'LICENSE', 'license');
+        file_put_contents($vendor.DIRECTORY_SEPARATOR.'nikic'.DIRECTORY_SEPARATOR.'fast-route'.DIRECTORY_SEPARATOR.'src'.DIRECTORY_SEPARATOR.'Example.php', '<?php namespace FastRoute;');
+        $source = $this->directory.DIRECTORY_SEPARATOR.'source';
+        copy($root.DIRECTORY_SEPARATOR.'source', $source);
+
+        foreach (['--package=http-foundation', '--package=routing'] as $argument) {
+            $process = proc_open([PHP_BINARY, $source, $argument], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            $output = stream_get_contents($pipes[1]);
+            $errors = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $this->assertSame(0, proc_close($process), $errors);
+            $this->assertStringContainsString('Imported 2 packages', $output);
+            $this->assertFileExists($this->directory.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'Example.php');
+            $this->assertFileExists($this->directory.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'HttpFoundation'.DIRECTORY_SEPARATOR.'LICENSE');
         }
     }
 

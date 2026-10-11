@@ -11,12 +11,12 @@ use RuntimeException;
 class HttpException extends RuntimeException
 {
     public function __construct(
-        public readonly int $status,
+        public readonly HttpStatusCode $status,
         string $message,
         public readonly array $headers = []
     ) {
-        if ($status < HttpStatusCode::BAD_REQUEST->value || $status > HttpStatusCode::INTERNAL_SERVER_ERROR->value) {
-            throw new InvalidArgumentException('HTTP error status must be between 400 and 599.');
+        if ($status->value < HttpStatusCode::BAD_REQUEST->value) {
+            throw new InvalidArgumentException('HTTP error status must represent a client or server error.');
         }
 
         parent::__construct($message);

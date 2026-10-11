@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Core;
 
+use Arix\Constants\HttpStatusCode;
 use Arix\Http\HttpException;
 use Arix\Http\QueryPathValidator;
 use Arix\HttpFoundation\Request;
@@ -20,10 +21,10 @@ class QueryPathValidatorTest extends TestCase
         $request = new Request(server: ['REQUEST_URI' => $uri]);
 
         try {
-            (new QueryPathValidator)->path($request);
+            (new QueryPathValidator())->path($request);
             $this->fail('Invalid path must fail.');
         } catch (HttpException $exception) {
-            $this->assertSame(400, $exception->status);
+            $this->assertSame(HttpStatusCode::BAD_REQUEST, $exception->status);
         }
     }
 
@@ -46,7 +47,7 @@ class QueryPathValidatorTest extends TestCase
             $validator->path(new Request(server: ['REQUEST_URI' => '/site-other/page']));
             $this->fail('Different base prefix must fail.');
         } catch (HttpException $exception) {
-            $this->assertSame(404, $exception->status);
+            $this->assertSame(HttpStatusCode::NOT_FOUND, $exception->status);
         }
     }
 }

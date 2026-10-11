@@ -31,7 +31,7 @@ class QueryPathValidator
 
         if ($this->basePath !== '') {
             if ($path !== $this->basePath && ! str_starts_with($path, "{$this->basePath}/")) {
-                throw new HttpException(HttpStatusCode::NOT_FOUND->value, 'Page not found.');
+                throw new HttpException(HttpStatusCode::NOT_FOUND, 'Page not found.');
             }
 
             $path = substr($path, strlen($this->basePath));
@@ -43,23 +43,23 @@ class QueryPathValidator
     private function decode(string $raw): string
     {
         if (! str_starts_with($raw, '/') || preg_match('/%(?![a-f0-9]{2})|%(?:2f|5c)/i', $raw)) {
-            throw new HttpException(HttpStatusCode::BAD_REQUEST->value, 'Invalid path.');
+            throw new HttpException(HttpStatusCode::BAD_REQUEST, 'Invalid path.');
         }
 
         $path = rawurldecode($raw);
 
         if (preg_match('/[\x00-\x1f\x7f\\\\]/', $path) || ! preg_match('//u', $path)) {
-            throw new HttpException(HttpStatusCode::BAD_REQUEST->value, 'Invalid path.');
+            throw new HttpException(HttpStatusCode::BAD_REQUEST, 'Invalid path.');
         }
 
         foreach (explode('/', $path) as $segment) {
             if (str_starts_with($segment, '.')) {
-                throw new HttpException(HttpStatusCode::BAD_REQUEST->value, 'Invalid path.');
+                throw new HttpException(HttpStatusCode::BAD_REQUEST, 'Invalid path.');
             }
         }
 
         if (str_contains($path, '//')) {
-            throw new HttpException(HttpStatusCode::BAD_REQUEST->value, 'Ambiguous path.');
+            throw new HttpException(HttpStatusCode::BAD_REQUEST, 'Ambiguous path.');
         }
 
         return $path;

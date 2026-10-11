@@ -8,21 +8,27 @@ use RuntimeException;
 use Throwable;
 
 use function count;
+use function in_array;
+use function is_array;
 use function is_resource;
 use function strlen;
 
 class Source
 {
     private const array PACKAGES = [
-        'symfony/http-foundation' => ['HttpFoundation', 'Symfony\\Component\\HttpFoundation', 'Arix\\HttpFoundation'],
+        'symfony/http-foundation' => ['HttpFoundation', 'Symfony\\Component\\HttpFoundation', 'Arix\\HttpFoundation', ''],
+        'nikic/fast-route' => ['Routing', 'FastRoute', 'Arix\\Routing', 'src'],
     ];
 
     public function import(string $vendor, string $core): array
     {
         foreach (array_keys(self::PACKAGES) as $package) {
             $dirPackage = $vendor.DIRECTORY_SEPARATOR.$package;
+            $this->assertUnlinkedPath($dirPackage);
 
-            if (! is_dir($dirPackage) || ! is_file($dirPackage.DIRECTORY_SEPARATOR.'LICENSE')) {
+            $sourceRoot = self::PACKAGES[$package][3];
+
+            if (! is_dir($dirPackage) || ! is_file($dirPackage.DIRECTORY_SEPARATOR.'LICENSE') || ($sourceRoot !== '' && ! is_dir($dirPackage.DIRECTORY_SEPARATOR.$sourceRoot))) {
                 throw new RuntimeException("Missing package or license: {$package}");
             }
         }
@@ -58,8 +64,11 @@ class Source
             $manifest = ['format' => 1, 'php' => '>=8.4.1', 'packages' => [], 'files' => []];
             $versions = $this->versions($vendor);
 
-            foreach (self::PACKAGES as $package => [$destination, $from, $to]) {
-                $this->copy($vendor.DIRECTORY_SEPARATOR.$package, $stage.DIRECTORY_SEPARATOR.$destination, $from, $to);
+            foreach (self::PACKAGES as $package => [$destination, $from, $to, $sourceRoot]) {
+                $root = $vendor.DIRECTORY_SEPARATOR.$package;
+                $source = $sourceRoot === '' ? $root : $root.DIRECTORY_SEPARATOR.$sourceRoot;
+                $this->copy($source, $stage.DIRECTORY_SEPARATOR.$destination, $from, $to);
+                $this->copy($root.DIRECTORY_SEPARATOR.'LICENSE', $stage.DIRECTORY_SEPARATOR.$destination.DIRECTORY_SEPARATOR.'LICENSE', null, null);
 
                 $manifest['packages'][$package] = [
                     'version' => $versions[$package] ?? 'unknown',
@@ -74,16 +83,16 @@ class Source
 
             $this->write($stage.DIRECTORY_SEPARATOR.'imports.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n");
 
-            foreach (['HttpFoundation', 'imports.json'] as $name) {
+            foreach ([...$this->destinations(), 'imports.json'] as $name) {
                 if (file_exists($core.DIRECTORY_SEPARATOR.$name)) {
-                    if (! rename($core.DIRECTORY_SEPARATOR.$name, $stage.DIRECTORY_SEPARATOR.'previous'.DIRECTORY_SEPARATOR.$name)) {
+                    if (! $this->move($core.DIRECTORY_SEPARATOR.$name, $stage.DIRECTORY_SEPARATOR.'previous'.DIRECTORY_SEPARATOR.$name)) {
                         throw new RuntimeException("Cannot back up {$name}");
                     }
 
                     $backups[] = $name;
                 }
 
-                if (! rename($stage.DIRECTORY_SEPARATOR.$name, $core.DIRECTORY_SEPARATOR.$name)) {
+                if (! $this->move($stage.DIRECTORY_SEPARATOR.$name, $core.DIRECTORY_SEPARATOR.$name)) {
                     throw new RuntimeException("Cannot install {$name}");
                 }
 
@@ -97,7 +106,7 @@ class Source
             }
 
             foreach ($backups as $name) {
-                if (! rename($stage.DIRECTORY_SEPARATOR.'previous'.DIRECTORY_SEPARATOR.$name, $core.DIRECTORY_SEPARATOR.$name)) {
+                if (! $this->move($stage.DIRECTORY_SEPARATOR.'previous'.DIRECTORY_SEPARATOR.$name, $core.DIRECTORY_SEPARATOR.$name)) {
                     throw new RuntimeException("Import rollback failed; backup retained at {$stage}", previous: $exception);
                 }
             }
@@ -106,7 +115,7 @@ class Source
         } finally {
             if (is_dir($stage) && (scandir($stage.DIRECTORY_SEPARATOR.'previous') ?: []) === ['.', '..']) {
                 $this->remove($stage);
-            } elseif (count($installed) === 2) {
+            } elseif (count($installed) === count($this->destinations()) + 1) {
                 $this->remove($stage);
             }
 
@@ -117,13 +126,15 @@ class Source
 
     private function assertManaged(string $core): void
     {
-        foreach (['HttpFoundation', 'imports.json'] as $name) {
+        foreach ([...$this->destinations(), 'imports.json'] as $name) {
             $this->assertUnlinkedPath($core.DIRECTORY_SEPARATOR.$name);
         }
 
         if (! file_exists($core.DIRECTORY_SEPARATOR.'imports.json')) {
-            if (file_exists($core.DIRECTORY_SEPARATOR.'HttpFoundation')) {
-                throw new RuntimeException('Refusing to replace an unmanaged component.');
+            foreach ($this->destinations() as $name) {
+                if (file_exists($core.DIRECTORY_SEPARATOR.$name)) {
+                    throw new RuntimeException('Refusing to replace an unmanaged component.');
+                }
             }
 
             return;
@@ -131,13 +142,28 @@ class Source
 
         $manifest = json_decode(file_get_contents($core.DIRECTORY_SEPARATOR.'imports.json'), true, flags: JSON_THROW_ON_ERROR);
 
-        if (($manifest['format'] ?? null) !== 1 || ! is_array($manifest['files'] ?? null)) {
+        if (($manifest['format'] ?? null) !== 1 || ! is_array($manifest['files'] ?? null) || ! is_array($manifest['packages'] ?? null)) {
             throw new RuntimeException('Invalid import manifest.');
         }
 
         $actual = [];
+        $managed = [];
 
-        foreach (['HttpFoundation'] as $name) {
+        foreach ($manifest['packages'] as $package => $metadata) {
+            if (! isset(self::PACKAGES[$package]) || ! is_array($metadata) || ($metadata['destination'] ?? null) !== self::PACKAGES[$package][0]) {
+                throw new RuntimeException('Invalid managed package.');
+            }
+
+            $managed[] = $metadata['destination'];
+        }
+
+        foreach ($this->destinations() as $name) {
+            if (! in_array($name, $managed, true) && file_exists($core.DIRECTORY_SEPARATOR.$name)) {
+                throw new RuntimeException("Refusing to replace unmanaged component: {$name}");
+            }
+        }
+
+        foreach ($managed as $name) {
             if (! is_dir($core.DIRECTORY_SEPARATOR.$name)) {
                 throw new RuntimeException("Managed component is missing: {$name}");
             }
@@ -150,6 +176,16 @@ class Source
         if ($actual !== $manifest['files']) {
             throw new RuntimeException('Imported files have local changes; refusing to overwrite them.');
         }
+    }
+
+    private function destinations(): array
+    {
+        return array_column(self::PACKAGES, 0);
+    }
+
+    protected function move(string $from, string $to): bool
+    {
+        return rename($from, $to);
     }
 
     private function assertUnlinkedPath(string $path): void
@@ -169,7 +205,7 @@ class Source
         } while (true);
     }
 
-    private function copy(string $source, string $destination, string|null $from, string|null $to): void
+    private function copy(string $source, string $destination, null|string $from, null|string $to): void
     {
         if (is_link($source)) {
             throw new RuntimeException("Linked package source: {$source}");

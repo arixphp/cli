@@ -8,7 +8,7 @@ use LogicException;
 
 class ContainerContext
 {
-    private static ?Container $current = null;
+    private static null|Container $current = null;
 
     public static function current(): Container
     {

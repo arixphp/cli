@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Arix\Http;
 
+use Arix\Constants\HttpStatusCode;
 use Arix\HttpFoundation\Request;
 use InvalidArgumentException;
 use RuntimeException;
 
-use function is_string;
 use function is_resource;
+use function is_string;
 use function strlen;
 
 class RequestFactory
@@ -37,7 +38,7 @@ class RequestFactory
     }
 
     /**
-     * @param string|resource $content Raw bytes or a readable stream positioned at the beginning.
+     * @param  string|resource  $content  Raw bytes or a readable stream positioned at the beginning.
      */
     public function create(array $server, array $query = [], array $post = [], array $cookies = [], array $files = [], mixed $content = ''): Request
     {
@@ -82,7 +83,7 @@ class RequestFactory
         }
 
         if (strlen($body) > $this->maxBodyBytes) {
-            throw new HttpException(413, 'Request body is too large.');
+            throw new HttpException(HttpStatusCode::CONTENT_TOO_LARGE, 'Request body is too large.');
         }
 
         return $body;

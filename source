@@ -3,9 +3,10 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/vendor/autoload.php';
+require __DIR__.DIRECTORY_SEPARATOR.'vendor'.DIRECTORY_SEPARATOR.'autoload.php';
 
 use App\Core\Source;
+use Throwable;
 
 if (PHP_VERSION_ID < 80401) {
     fwrite(STDERR, "Core import requires PHP >= 8.4.1.\n");
@@ -16,24 +17,24 @@ if (PHP_VERSION_ID < 80401) {
 $arguments = array_slice($argv, 1);
 
 if ($arguments === ['--help']) {
-    fwrite(STDOUT, "Usage: ./source [--package=http-foundation]\nImports HttpFoundation and required dependencies from vendor into core.\n");
+    fwrite(STDOUT, "Usage: ./source [--package=http-foundation|--package=routing]\nImports the complete HttpFoundation and FastRoute bundle from vendor into core.\nPackage options are compatibility aliases for the full bundle, not selective imports.\n");
 
     exit(0);
 }
 
-if ($arguments !== [] && $arguments !== ['--package=http-foundation']) {
-    fwrite(STDERR, "Only --package=http-foundation is supported in task 1.\n");
+if ($arguments !== [] && $arguments !== ['--package=http-foundation'] && $arguments !== ['--package=routing']) {
+    fwrite(STDERR, "Unsupported source option. See ./source --help.\n");
 
     exit(1);
 }
 
 try {
     $manifest = new Source()->import(
-        __DIR__ . DIRECTORY_SEPARATOR .'vendor',
-        __DIR__ . DIRECTORY_SEPARATOR .'core'
+        __DIR__.DIRECTORY_SEPARATOR.'vendor',
+        __DIR__.DIRECTORY_SEPARATOR.'core'
     );
 
-    fwrite(STDOUT, 'Imported ' . count($manifest['packages'])." packages into core.\n");
+    fwrite(STDOUT, 'Imported '.count($manifest['packages'])." packages into core.\n");
 } catch (Throwable $exception) {
     fwrite(STDERR, 'Core import failed: '.$exception->getMessage()."\n");
 

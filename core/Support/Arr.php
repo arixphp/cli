@@ -123,7 +123,7 @@ class Arr extends ForbidInstance
         return $result;
     }
 
-    public static function pluck(array $array, string $value, ?string $key = null): array
+    public static function pluck(array $array, string $value, null|string $key = null): array
     {
         $results = [];
 
@@ -142,7 +142,7 @@ class Arr extends ForbidInstance
         return $results;
     }
 
-    public static function first(array $array, ?callable $callback = null, mixed $default = null): mixed
+    public static function first(array $array, null|callable $callback = null, mixed $default = null): mixed
     {
         if ($callback === null) {
             return $array === [] ? $default : reset($array);
@@ -157,7 +157,7 @@ class Arr extends ForbidInstance
         return $default;
     }
 
-    public static function last(array $array, ?callable $callback = null, mixed $default = null): mixed
+    public static function last(array $array, null|callable $callback = null, mixed $default = null): mixed
     {
         if ($callback === null) {
             return $array === [] ? $default : end($array);

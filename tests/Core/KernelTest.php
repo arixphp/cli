@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Core;
 
+use Arix\Constants\HttpStatusCode;
 use Arix\Container\Container;
 use Arix\Container\ContainerContext;
 use Arix\Contracts\RequestHandler;
@@ -33,7 +34,7 @@ class KernelTest extends TestCase
 
             return new Response($request->attributes->get('_arix_path'), 201, ['X-Arix' => 'ok']);
         }), configure: static function (Container $container): void {
-            $container->singleton('shared', static fn (): stdClass => new stdClass);
+            $container->singleton('shared', static fn (): stdClass => new stdClass());
         });
         $first = $kernel->handle(Request::create('/first'));
         $second = $kernel->handle(Request::create('/second'));
@@ -66,7 +67,7 @@ class KernelTest extends TestCase
     public function it_http_errors_preserve_status_and_headers_without_caching(): void
     {
         $kernel = new Kernel($this->handler(static function (): Response {
-            throw new HttpException(405, 'Method not allowed.', ['Allow' => 'GET, HEAD']);
+            throw new HttpException(HttpStatusCode::METHOD_NOT_ALLOWED, 'Method not allowed.', ['Allow' => 'GET, HEAD']);
         }));
         $response = $kernel->handle(Request::create('/'));
         $this->assertSame(405, $response->getStatusCode());
@@ -179,7 +180,7 @@ class KernelTest extends TestCase
                 // Changing the original stream must not change the captured request.
                 ftruncate($stream, 0);
 
-                return new Response($request->getContent().':'.$request->getContent());
+                return new Response($request->getContent() . ':' . $request->getContent());
             }), maxBodyBytes: 4);
             $this->assertSame('data:data', $kernel->handle($request)->getContent());
         } finally {

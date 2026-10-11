@@ -14,7 +14,7 @@ class ErrorResponder
 {
     public function __construct(
         private readonly bool $debug = false,
-        private readonly Closure|null $logger = null
+        private readonly null|Closure $logger = null
     ) {}
 
     public function respond(Throwable $exception): Response
@@ -22,7 +22,7 @@ class ErrorResponder
         $headers = [];
 
         if ($exception instanceof HttpException) {
-            $status = HttpStatusCode::from($exception->status);
+            $status = $exception->status;
             $message = $exception->getMessage();
             $headers = $exception->headers;
         } elseif ($exception instanceof RequestExceptionInterface) {

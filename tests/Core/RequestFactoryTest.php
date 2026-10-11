@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Core;
 
+use Arix\Constants\HttpStatusCode;
 use Arix\Http\HttpException;
 use Arix\Http\RequestFactory;
 use Arix\HttpFoundation\Request;
@@ -49,7 +50,7 @@ class RequestFactoryTest extends TestCase
             (new RequestFactory(4))->create(['CONTENT_LENGTH' => '1'], content: $stream);
             $this->fail('Oversized body must fail.');
         } catch (HttpException $exception) {
-            $this->assertSame(413, $exception->status);
+            $this->assertSame(HttpStatusCode::CONTENT_TOO_LARGE, $exception->status);
             $this->assertSame(5, ftell($stream));
         } finally {
             fclose($stream);
@@ -79,7 +80,7 @@ class RequestFactoryTest extends TestCase
     #[Test]
     public function it_capture_does_not_enable_method_override_or_trust_forwarded_headers(): void
     {
-        $request = (new RequestFactory)->create([
+        $request = (new RequestFactory())->create([
             'REQUEST_METHOD' => 'POST',
             'REQUEST_URI' => '/',
             'REMOTE_ADDR' => '127.0.0.1',
@@ -101,7 +102,7 @@ class RequestFactoryTest extends TestCase
             $_POST = ['name' => 'Arix'];
             $_COOKIE = [];
             $_FILES = [];
-            $request = (new RequestFactory)->fromGlobals();
+            $request = (new RequestFactory())->fromGlobals();
             $this->assertSame('Arix', $request->request->get('name'));
             $this->assertSame('', $request->getContent());
         } finally {
@@ -117,7 +118,7 @@ class RequestFactoryTest extends TestCase
         $request->headers->remove('User-Agent');
         $request->attributes->set('custom', 'value');
         $request->setRequestFormat('json');
-        (new RequestFactory)->capture($request);
+        (new RequestFactory())->capture($request);
         $this->assertSame('Bearer example', $request->headers->get('Authorization'));
         $this->assertFalse($request->headers->has('User-Agent'));
         $this->assertSame('value', $request->attributes->get('custom'));
