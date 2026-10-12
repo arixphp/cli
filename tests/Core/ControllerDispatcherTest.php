@@ -9,6 +9,7 @@ use Arix\Container\UnknownServiceException;
 use Arix\Routing\ControllerDispatcher;
 use Arix\Routing\RouteDefinition;
 use Arix\HttpFoundation\Request;
+use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
@@ -93,11 +94,33 @@ class ControllerDispatcherTest extends RoutingTestCase
     }
 
     #[Test]
-    public function it_does_not_construct_unbound_controllers(): void
+    public function it_constructs_unbound_controllers_without_required_parameters(): void
     {
-        $class = $this->controller('public function __construct() { throw new \\LogicException("must not construct"); } public function show(): Response { return new Response; }');
-        $this->expectException(UnknownServiceException::class);
+        $class = $this->controller('public function __construct() { throw new \\LogicException("constructed"); } public function show(): Response { return new Response; }');
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('constructed');
         new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container);
+    }
+
+    #[Test]
+    public function it_uses_default_values_for_optional_constructor_parameters(): void
+    {
+        $class = $this->controller('private string $mode = "fallback"; public function __construct(string $mode = "fallback") { $this->mode = $mode; } public function show(): Response { return new Response($this->mode); }');
+        $response = new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container);
+        $this->assertSame('fallback', $response->getContent());
+    }
+
+    #[Test]
+    public function it_requires_explicit_bindings_for_controllers_with_dependencies(): void
+    {
+        $class = $this->controller('public function __construct(private \\stdClass $dependency) {} public function show(): Response { return new Response; }');
+
+        try {
+            new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container);
+            $this->fail('Expected controller dependencies to require an explicit binding.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('register an explicit binding', $exception->getMessage());
+        }
     }
 
     #[Test]

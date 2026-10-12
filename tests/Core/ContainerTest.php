@@ -42,6 +42,20 @@ class ContainerTest extends TestCase
     }
 
     #[Test]
+    public function it_reports_registered_services(): void
+    {
+        $container = new Container;
+        $this->assertFalse($container->has(stdClass::class));
+        $container->bind('transient', static fn (): stdClass => new stdClass);
+        $container->singleton('shared', static fn (): stdClass => new stdClass);
+        $container->instance('concrete', new stdClass);
+        $this->assertTrue($container->has('transient'));
+        $this->assertTrue($container->has('shared'));
+        $this->assertTrue($container->has('concrete'));
+        $this->assertFalse($container->has('missing'));
+    }
+
+    #[Test]
     public function it_circular_resolution_is_detected_and_stack_recovers(): void
     {
         $container = new Container;
