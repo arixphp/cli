@@ -14,12 +14,14 @@ class ApplicationViewsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->directory = realpath(sys_get_temp_dir()).DIRECTORY_SEPARATOR.'arix-appviews-'.bin2hex(random_bytes(8));
+        $this->directory = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-appviews-' . bin2hex(random_bytes(8));
         mkdir($this->directory, 0755, true);
-        $reference = dirname(__DIR__, 4).DIRECTORY_SEPARATOR.'arix'.DIRECTORY_SEPARATOR.'app';
-        $this->copy($reference.DIRECTORY_SEPARATOR.'views', $this->directory.DIRECTORY_SEPARATOR.'views');
-        $this->copy($reference.DIRECTORY_SEPARATOR.'lang', $this->directory.DIRECTORY_SEPARATOR.'lang');
-        mkdir($this->directory.DIRECTORY_SEPARATOR.'cache', 0755, true);
+        $reference = dirname(__DIR__, 4) . DIRECTORY_SEPARATOR . 'arix' . DIRECTORY_SEPARATOR . 'app';
+        $this->copy($reference . DIRECTORY_SEPARATOR . 'views', $this->directory . DIRECTORY_SEPARATOR . 'views');
+        $this->copy($reference . DIRECTORY_SEPARATOR . 'lang', $this->directory . DIRECTORY_SEPARATOR . 'lang');
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'cache', 0755, true);
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config', 0755, true);
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', "<?php return ['name' => 'ArixPHP', 'locale' => 'en'];");
     }
 
     protected function tearDown(): void
@@ -31,15 +33,16 @@ class ApplicationViewsTest extends TestCase
     #[Test]
     public function it_renders_the_reference_application_views_without_composer(): void
     {
-        $autoload = dirname(__DIR__, 3).DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'autoload.php';
-        $program = 'require '.var_export($autoload, true).'; '.<<<'PHP'
+        $autoload = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $program = 'require ' . var_export($autoload, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
             PHP;
-        $program .= '$root = '.var_export($this->directory, true).'; '.<<<'PHP'
+        $program .= '$root = ' . var_export($this->directory, true) . '; ' . <<<'PHP'
             $render = static function (string $path, string $view, string $titleKey, string $descriptionKey) use ($root): string {
                 $request = Arix\HttpFoundation\Request::create($path);
                 $request->attributes->set('_arix_path', $path);
                 $container = new Arix\Container\Container;
+                Arix\Config\ConfigServices::register($container, $root.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'config');
                 Arix\Views\ViewServices::register($container, $root, $request, [
                     'app' => ['name' => 'ArixPHP', 'base_path' => '', 'locales' => ['es', 'en'], 'default_locale' => 'en'],
                     'cache' => ['path' => $root . '/cache', 'version' => '1'],
@@ -92,7 +95,7 @@ class ApplicationViewsTest extends TestCase
             mkdir($to, 0755, true);
 
             foreach (array_diff(scandir($from), ['.', '..']) as $entry) {
-                $this->copy($from.DIRECTORY_SEPARATOR.$entry, $to.DIRECTORY_SEPARATOR.$entry);
+                $this->copy($from . DIRECTORY_SEPARATOR . $entry, $to . DIRECTORY_SEPARATOR . $entry);
             }
         } else {
             copy($from, $to);
@@ -103,7 +106,7 @@ class ApplicationViewsTest extends TestCase
     {
         if (is_dir($path) && ! is_link($path)) {
             foreach (array_diff(scandir($path), ['.', '..']) as $entry) {
-                $this->remove($path.DIRECTORY_SEPARATOR.$entry);
+                $this->remove($path . DIRECTORY_SEPARATOR . $entry);
             }
 
             rmdir($path);

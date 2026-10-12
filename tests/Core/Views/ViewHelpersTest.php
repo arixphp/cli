@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Core\Views;
 
+use Arix\Config\ConfigServices;
 use Arix\Config\Repository;
 use Arix\Container\Container;
 use Arix\Container\ContainerContext;
@@ -25,12 +26,14 @@ class ViewHelpersTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->directory = realpath(sys_get_temp_dir()).DIRECTORY_SEPARATOR.'arix-helpers-'.bin2hex(random_bytes(8));
-        mkdir($this->directory.DIRECTORY_SEPARATOR.'views', 0755, true);
-        mkdir($this->directory.DIRECTORY_SEPARATOR.'lang', 0755, true);
-        mkdir($this->directory.DIRECTORY_SEPARATOR.'cache', 0755, true);
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'lang'.DIRECTORY_SEPARATOR.'en.php', "<?php declare(strict_types=1); return ['home' => ['title' => 'Welcome']];");
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'lang'.DIRECTORY_SEPARATOR.'es.php', "<?php declare(strict_types=1); return ['home' => ['title' => 'Bienvenido']];");
+        $this->directory = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-helpers-' . bin2hex(random_bytes(8));
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'views', 0755, true);
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'lang', 0755, true);
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'cache', 0755, true);
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config', 0755, true);
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', "<?php return ['name' => 'Test Site', 'locale' => 'en'];");
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'en.php', "<?php declare(strict_types=1); return ['home' => ['title' => 'Welcome']];");
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'es.php', "<?php declare(strict_types=1); return ['home' => ['title' => 'Bienvenido']];");
     }
 
     protected function tearDown(): void
@@ -56,7 +59,7 @@ class ViewHelpersTest extends TestCase
     #[Test]
     public function it_translates_with_default_locale_fallback(): void
     {
-        $translator = new Translator($this->directory.DIRECTORY_SEPARATOR.'lang', ['en', 'es'], 'en', 'es');
+        $translator = new Translator($this->directory . DIRECTORY_SEPARATOR . 'lang', ['en', 'es'], 'en', 'es');
 
         $this->assertSame('Bienvenido', $translator->get('home.title'));
         $this->assertSame('missing.key', $translator->get('missing.key'));
@@ -65,8 +68,8 @@ class ViewHelpersTest extends TestCase
     #[Test]
     public function it_replaces_translation_placeholders(): void
     {
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'lang'.DIRECTORY_SEPARATOR.'en.php', "<?php declare(strict_types=1); return ['hello' => 'Hello :name'];");
-        $translator = new Translator($this->directory.DIRECTORY_SEPARATOR.'lang', ['en'], 'en', 'en');
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'en.php', "<?php declare(strict_types=1); return ['hello' => 'Hello :name'];");
+        $translator = new Translator($this->directory . DIRECTORY_SEPARATOR . 'lang', ['en'], 'en', 'en');
 
         $this->assertSame('Hello Ada', $translator->get('hello', ['name' => 'Ada']));
     }
@@ -76,7 +79,7 @@ class ViewHelpersTest extends TestCase
     public function it_rejects_invalid_translator_configuration(array $locales, string $default, string $locale): void
     {
         $this->expectException(InvalidArgumentException::class);
-        new Translator($this->directory.DIRECTORY_SEPARATOR.'lang', $locales, $default, $locale);
+        new Translator($this->directory . DIRECTORY_SEPARATOR . 'lang', $locales, $default, $locale);
     }
 
     public static function invalidTranslators(): array
@@ -137,6 +140,23 @@ class ViewHelpersTest extends TestCase
     }
 
     #[Test]
+    public function it_does_not_replace_the_bootstrapped_configuration(): void
+    {
+        $container = new Container();
+        $repository = new Repository(['custom' => ['enabled' => true]]);
+        $container->instance(Repository::class, $repository);
+        ViewServices::register($container, $this->directory, Request::create('/'), [
+            'app' => ['locales' => ['en'], 'default_locale' => 'en'],
+            'cache' => [],
+            'views' => $this->directory . DIRECTORY_SEPARATOR . 'views',
+            'lang' => $this->directory . DIRECTORY_SEPARATOR . 'lang',
+        ]);
+
+        $this->assertSame($repository, $container->get(Repository::class));
+        $this->assertTrue($container->get(Repository::class)->get('custom.enabled'));
+    }
+
+    #[Test]
     public function it_registers_request_services_and_exposes_app_locale(): void
     {
         $container = $this->container('/about');
@@ -165,27 +185,28 @@ class ViewHelpersTest extends TestCase
     public function it_keys_compiled_templates_by_integration_and_deployment_versions(): void
     {
         $container = $this->container('/');
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR.'probe.arix.php', 'probe');
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'probe.arix.php', 'probe');
         $container->get(TemplateEngine::class)->render('probe');
-        $source = realpath($this->directory.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR.'probe.arix.php');
+        $source = realpath($this->directory . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'probe.arix.php');
         $code = file_get_contents($source);
-        $expected = $this->directory.DIRECTORY_SEPARATOR.'cache'.DIRECTORY_SEPARATOR.hash('sha256', TemplateEngine::VERSION."\0".'1'."\0".$source."\0".$code).'.php';
+        $expected = $this->directory . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . hash('sha256', TemplateEngine::VERSION . "\0" . '1' . "\0" . $source . "\0" . $code) . '.php';
 
         $this->assertFileExists($expected);
     }
 
     #[Test]
     public function it_rejects_misconfigured_view_services(): void
-    {        $request = Request::create('/');
+    {
+        $request = Request::create('/');
 
         foreach ([
             [],
             ['app' => [], 'cache' => [], 'views' => '', 'lang' => ''],
-            ['app' => ['locales' => ['en'], 'default_locale' => 'en', 'base_path' => ['/site']], 'cache' => ['path' => 'x', 'version' => '1'], 'views' => $this->directory.DIRECTORY_SEPARATOR.'views', 'lang' => $this->directory.DIRECTORY_SEPARATOR.'lang'],
-            ['app' => ['locales' => ['en'], 'default_locale' => 'en'], 'cache' => ['path' => 'x', 'version' => '1'], 'views' => $this->directory.DIRECTORY_SEPARATOR.'missing', 'lang' => $this->directory.DIRECTORY_SEPARATOR.'lang'],
+            ['app' => ['locales' => ['en'], 'default_locale' => 'en', 'base_path' => ['/site']], 'cache' => ['path' => 'x', 'version' => '1'], 'views' => $this->directory . DIRECTORY_SEPARATOR . 'views', 'lang' => $this->directory . DIRECTORY_SEPARATOR . 'lang'],
+            ['app' => ['locales' => ['en'], 'default_locale' => 'en'], 'cache' => ['path' => 'x', 'version' => '1'], 'views' => $this->directory . DIRECTORY_SEPARATOR . 'missing', 'lang' => $this->directory . DIRECTORY_SEPARATOR . 'lang'],
         ] as $configuration) {
             try {
-                ViewServices::register(new Container, $this->directory, $request, $configuration);
+                ViewServices::register(new Container(), $this->directory, $request, $configuration);
                 $this->fail('Misconfigured view services must be rejected.');
             } catch (InvalidArgumentException) {
             }
@@ -197,15 +218,16 @@ class ViewHelpersTest extends TestCase
     #[Test]
     public function it_exposes_helpers_without_composer(): void
     {
-        file_put_contents($this->views().'helper.arix.php', "{{ trans('home.title') }}|{{ config('app.name') }}|{{ url('/about') }}|{{ asset('styles/app.css') }}|{{ url()->current() }}|{{ url()->current_path() }}");
-        $autoload = dirname(__DIR__, 3).DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'autoload.php';
-        $program = 'require '.var_export($autoload, true).'; '.<<<'PHP'
+        file_put_contents($this->views() . 'helper.arix.php', "{{ trans('home.title') }}|{{ config('app.name') }}|{{ url('/about') }}|{{ asset('styles/app.css') }}|{{ url()->current() }}|{{ url()->currentPath() }}");
+        $autoload = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $program = 'require ' . var_export($autoload, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
             PHP;
-        $program .= '$root = '.var_export($this->directory, true).'; '.<<<'PHP'
+        $program .= '$root = ' . var_export($this->directory, true) . '; ' . <<<'PHP'
             $request = Arix\HttpFoundation\Request::create('/site/about');
             $request->attributes->set('_arix_path', '/about');
             $container = new Arix\Container\Container;
+            Arix\Config\ConfigServices::register($container, $root.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'config');
             Arix\Views\ViewServices::register($container, $root, $request, [
                 'app' => ['name' => 'Test Site', 'base_path' => '/site', 'locales' => ['en'], 'default_locale' => 'en'],
                 'cache' => ['path' => $root . '/cache', 'version' => '1'],
@@ -233,19 +255,20 @@ class ViewHelpersTest extends TestCase
 
     private function views(): string
     {
-        return $this->directory.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR;
+        return $this->directory . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;
     }
 
     private function container(string $path): Container
     {
-        $request = Request::create('/site'.$path);
+        $request = Request::create('/site' . $path);
         $request->attributes->set('_arix_path', $path);
-        $container = new Container;
+        $container = new Container();
+        ConfigServices::register($container, $this->directory . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config');
         ViewServices::register($container, $this->directory, $request, [
             'app' => ['name' => 'Test Site', 'base_path' => '/site', 'locales' => ['en', 'es'], 'default_locale' => 'en'],
-            'cache' => ['path' => $this->directory.DIRECTORY_SEPARATOR.'cache', 'version' => '1'],
-            'views' => $this->directory.DIRECTORY_SEPARATOR.'views',
-            'lang' => $this->directory.DIRECTORY_SEPARATOR.'lang',
+            'cache' => ['path' => $this->directory . DIRECTORY_SEPARATOR . 'cache', 'version' => '1'],
+            'views' => $this->directory . DIRECTORY_SEPARATOR . 'views',
+            'lang' => $this->directory . DIRECTORY_SEPARATOR . 'lang',
         ]);
 
         return $container;
@@ -255,7 +278,7 @@ class ViewHelpersTest extends TestCase
     {
         if (is_dir($path) && ! is_link($path)) {
             foreach (array_diff(scandir($path), ['.', '..']) as $entry) {
-                $this->remove($path.DIRECTORY_SEPARATOR.$entry);
+                $this->remove($path . DIRECTORY_SEPARATOR . $entry);
             }
 
             rmdir($path);

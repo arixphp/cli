@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Arix\Views;
 
-use Arix\Config\Repository;
 use Arix\Container\Container;
 use Arix\HttpFoundation\Request;
 use Arix\Localization\Translator;
@@ -69,14 +68,9 @@ class ViewServices
             $path = '/';
         }
 
-        $container->instance(Repository::class, new Repository([
-            'app' => array_replace($app, ['locale' => $defaultLocale]),
-            'cache' => $cache,
-        ]));
-
         $container->instance(Translator::class, new Translator($lang, $locales, $defaultLocale, $defaultLocale));
         $container->instance(UrlGenerator::class, new UrlGenerator($basePath, $path));
-        $container->instance(ViewFactory::class, new ViewFactory);
-        $container->instance(TemplateEngine::class, new TemplateEngine($views, $cachePath, TemplateEngine::VERSION."\0".$cacheVersion));
+        $container->instance(ViewFactory::class, new ViewFactory());
+        $container->instance(TemplateEngine::class, new TemplateEngine($views, $cachePath, TemplateEngine::VERSION . "\0" . $cacheVersion));
     }
 }
