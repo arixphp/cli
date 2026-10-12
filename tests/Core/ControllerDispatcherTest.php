@@ -156,4 +156,80 @@ class ControllerDispatcherTest extends RoutingTestCase
         $this->expectException(RuntimeException::class);
         new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container);
     }
+
+    #[Test]
+    public function it_renders_view_returns_as_html_responses(): void
+    {
+        $views = $this->views();
+        file_put_contents($views.DIRECTORY_SEPARATOR.'page.arix.php', '<h1>{{ $title }}</h1>');
+        $class = $this->controller('public function show(): \\Arix\\Views\\Contracts\\View { return new \\Arix\\Views\\View("page", ["title" => "Hi"]); }');
+        $container = new Container;
+        $container->bind($class, static fn (): object => new $class);
+        $container->instance(\Arix\Views\TemplateEngine::class, new \Arix\Views\TemplateEngine($views, $this->cache()));
+        $response = new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), $container);
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('<h1>Hi</h1>', $response->getContent());
+        $this->assertSame('text/html; charset=UTF-8', $response->headers->get('Content-Type'));
+    }
+
+    #[Test]
+    public function it_accepts_response_and_view_union_declarations(): void
+    {
+        $views = $this->views();
+        file_put_contents($views.DIRECTORY_SEPARATOR.'page.arix.php', '<h1>{{ $title }}</h1>');
+        $class = $this->controller('public function show(Request $request): \\Arix\\HttpFoundation\\Response|\\Arix\\Views\\Contracts\\View { return $request->attributes->get("asView") ? new \\Arix\\Views\\View("page", ["title" => "Hi"]) : new Response("plain"); }');
+        $container = new Container;
+        $container->bind($class, static fn (): object => new $class);
+        $container->instance(\Arix\Views\TemplateEngine::class, new \Arix\Views\TemplateEngine($views, $this->cache()));
+        $dispatcher = new ControllerDispatcher($this->directory);
+        $plain = Request::create('/');
+        $this->assertSame('plain', $dispatcher->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), $plain, $container)->getContent());
+        $asView = Request::create('/');
+        $asView->attributes->set('asView', true);
+        $response = $dispatcher->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), $asView, $container);
+        $this->assertSame('<h1>Hi</h1>', $response->getContent());
+        $this->assertSame('text/html; charset=UTF-8', $response->headers->get('Content-Type'));
+    }
+
+    #[Test]
+    public function it_rejects_nullable_view_declarations(): void
+    {
+        $class = $this->controller('public function show(): \\Arix\\Views\\Contracts\\View|null { return null; }');
+        $container = new Container;
+        $container->bind($class, static fn (): object => new $class);
+        $this->expectException(RuntimeException::class);
+        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), $container);
+    }
+
+    #[Test]
+    public function it_requires_view_services_for_view_returns(): void
+    {
+        $class = $this->controller('public function show(): \\Arix\\Views\\Contracts\\View { return new \\Arix\\Views\\View("page"); }');
+        $container = new Container;
+        $container->bind($class, static fn (): object => new $class);
+        $this->expectException(UnknownServiceException::class);
+        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), $container);
+    }
+
+    private function views(): string
+    {
+        $views = $this->directory.DIRECTORY_SEPARATOR.'views';
+
+        if (! is_dir($views)) {
+            mkdir($views, 0755, true);
+        }
+
+        return $views;
+    }
+
+    private function cache(): string
+    {
+        $cache = $this->directory.DIRECTORY_SEPARATOR.'cache'.DIRECTORY_SEPARATOR;
+
+        if (! is_dir($cache)) {
+            mkdir($cache, 0755, true);
+        }
+
+        return $cache;
+    }
 }
