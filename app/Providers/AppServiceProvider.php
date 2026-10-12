@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Core\Update\CoreDistribution;
 use App\Core\Update\CorePackager;
+use App\Css\Update\CssDistribution;
 use App\Js\Update\JsDistribution;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Support\ServiceProvider;
@@ -35,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(CoreDistribution::class, fn (): CoreDistribution => CoreDistribution::bundled($this->app->basePath()));
         $this->app->bind(JsDistribution::class, fn (): JsDistribution => JsDistribution::bundled($this->app->basePath()));
+        $this->app->bind(CssDistribution::class, fn (): CssDistribution => CssDistribution::bundled($this->app->basePath()));
         $this->app->bind(CorePackager::class, fn (): CorePackager => new CorePackager(
             $this->app->basePath('core'),
             $this->app->basePath('resources' . DIRECTORY_SEPARATOR . 'core.bundle'),

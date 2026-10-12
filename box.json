@@ -10,7 +10,12 @@
         "composer.json",
         "resources/core.bundle",
         "resources/js/arix.js",
-        "resources/js/manifest.json"
+        "resources/js/manifest.json",
+        "resources/css/base.css",
+        "resources/css/components.css",
+        "resources/css/tokens.css",
+        "resources/css/utilities.css",
+        "resources/css/manifest.json"
     ],
     "exclude-composer-files": false,
     "compression": "GZ",

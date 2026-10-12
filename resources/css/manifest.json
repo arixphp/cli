@@ -1,0 +1,11 @@
+{
+    "format": 1,
+    "releases": {
+        "1.0.0": {
+            "base.css": "c13d526bd4303354201144b54c0fefeff5828acc212cc6e0e17188088350c2ad",
+            "components.css": "62abc9d22cd093f129db443c35b7e8438660601ad3901c3339b3aaec772c3488",
+            "tokens.css": "e24dfd99fd22eb865f4925b701d4aba759e6a5169f938edf6941c144b1e55112",
+            "utilities.css": "ec35a2092997b45ce1992f456870a12fa0f49af3772ff9a78d5272b727258de0"
+        }
+    }
+}
