@@ -2,7 +2,7 @@
     "preset": "laravel",
     "exclude": [
         "core/HttpFoundation",
-        "core/Routing"
+        "core/FastRoute"
     ],
     "rules": {
         "new_with_parentheses": true,

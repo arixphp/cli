@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Arix\Facades;
 
-use Arix\Container\ContainerContext;
 use Arix\Constants\HttpMethod;
-use Arix\Http\Routing\RouteDefinition;
-use Arix\Http\Routing\RouteRegistry;
+use Arix\Container\ContainerContext;
+use Arix\Routing\RouteDefinition;
+use Arix\Routing\RouteRegistry;
 
 class Route
 {

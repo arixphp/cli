@@ -1,9 +1,9 @@
 <?php
 
-namespace Arix\Routing\RouteParser;
+namespace Arix\FastRoute\RouteParser;
 
-use Arix\Routing\BadRouteException;
-use Arix\Routing\RouteParser;
+use Arix\FastRoute\BadRouteException;
+use Arix\FastRoute\RouteParser;
 
 /**
  * Parses route strings of the following form:

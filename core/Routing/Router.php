@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Arix\Http\Routing;
+namespace Arix\Routing;
 
 use Arix\Constants\HttpMethod;
 use Arix\Constants\HttpStatusCode;
 use Arix\Http\HttpException;
-use Arix\Routing\Dispatcher;
+use Arix\FastRoute\Dispatcher;
 
 use function in_array;
 

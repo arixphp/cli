@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arix\Http\Routing;
+namespace Arix\Routing;
 
 use Arix\Container\Container;
 use Arix\HttpFoundation\Request;

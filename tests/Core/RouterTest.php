@@ -6,8 +6,8 @@ namespace Tests\Core;
 
 use Arix\Constants\HttpStatusCode;
 use Arix\Http\HttpException;
-use Arix\Http\Routing\Router;
-use Arix\Http\Routing\RouteRegistry;
+use Arix\Routing\Router;
+use Arix\Routing\RouteRegistry;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 

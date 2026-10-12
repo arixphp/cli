@@ -7,7 +7,6 @@ namespace App\Core;
 use RuntimeException;
 use Throwable;
 
-use function count;
 use function in_array;
 use function is_array;
 use function is_resource;
@@ -17,7 +16,7 @@ class Source
 {
     private const array PACKAGES = [
         'symfony/http-foundation' => ['HttpFoundation', 'Symfony\\Component\\HttpFoundation', 'Arix\\HttpFoundation', ''],
-        'nikic/fast-route' => ['Routing', 'FastRoute', 'Arix\\Routing', 'src'],
+        'nikic/fast-route' => ['FastRoute', 'FastRoute', 'Arix\\FastRoute', 'src'],
         'eftec/bladeone' => ['BladeOne', 'eftec\\bladeone', 'Arix\\BladeOne', 'lib'],
     ];
 
@@ -56,9 +55,10 @@ class Source
         $stage = $core.DIRECTORY_SEPARATOR.'.import-'.bin2hex(random_bytes(8));
         $installed = [];
         $backups = [];
+        $completed = false;
 
         try {
-            $this->assertManaged($core);
+            $retired = $this->assertManaged($core);
             mkdir($stage, 0755);
             mkdir($stage.DIRECTORY_SEPARATOR.'previous', 0755);
 
@@ -68,7 +68,9 @@ class Source
             foreach (self::PACKAGES as $package => [$destination, $from, $to, $sourceRoot]) {
                 $root = $vendor.DIRECTORY_SEPARATOR.$package;
                 $source = $sourceRoot === '' ? $root : $root.DIRECTORY_SEPARATOR.$sourceRoot;
-                $this->copy($source, $stage.DIRECTORY_SEPARATOR.$destination, $from, $to);
+                // The standalone core autoloader replaces FastRoute's bootstrap.
+                $excluded = $package === 'nikic/fast-route' ? [$source.DIRECTORY_SEPARATOR.'bootstrap.php'] : [];
+                $this->copy($source, $stage.DIRECTORY_SEPARATOR.$destination, $from, $to, $excluded);
                 $this->copy($root.DIRECTORY_SEPARATOR.'LICENSE', $stage.DIRECTORY_SEPARATOR.$destination.DIRECTORY_SEPARATOR.'LICENSE', null, null);
 
                 $manifest['packages'][$package] = [
@@ -83,6 +85,14 @@ class Source
             ksort($manifest['files']);
 
             $this->write($stage.DIRECTORY_SEPARATOR.'imports.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n");
+
+            foreach ($retired as $name) {
+                if (! $this->move($core.DIRECTORY_SEPARATOR.$name, $stage.DIRECTORY_SEPARATOR.'previous'.DIRECTORY_SEPARATOR.$name)) {
+                    throw new RuntimeException("Cannot back up {$name}");
+                }
+
+                $backups[] = $name;
+            }
 
             foreach ([...$this->destinations(), 'imports.json'] as $name) {
                 if (file_exists($core.DIRECTORY_SEPARATOR.$name)) {
@@ -100,6 +110,8 @@ class Source
                 $installed[] = $name;
             }
 
+            $completed = true;
+
             return $manifest;
         } catch (Throwable $exception) {
             foreach (array_reverse($installed) as $name) {
@@ -116,7 +128,7 @@ class Source
         } finally {
             if (is_dir($stage) && (scandir($stage.DIRECTORY_SEPARATOR.'previous') ?: []) === ['.', '..']) {
                 $this->remove($stage);
-            } elseif (count($installed) === count($this->destinations()) + 1) {
+            } elseif ($completed) {
                 $this->remove($stage);
             }
 
@@ -125,7 +137,8 @@ class Source
         }
     }
 
-    private function assertManaged(string $core): void
+    /** @return list<string> Historical imported directories to retire after validation. */
+    private function assertManaged(string $core): array
     {
         foreach ([...$this->destinations(), 'imports.json'] as $name) {
             $this->assertUnlinkedPath($core.DIRECTORY_SEPARATOR.$name);
@@ -138,7 +151,7 @@ class Source
                 }
             }
 
-            return;
+            return [];
         }
 
         $manifest = json_decode(file_get_contents($core.DIRECTORY_SEPARATOR.'imports.json'), true, flags: JSON_THROW_ON_ERROR);
@@ -149,12 +162,26 @@ class Source
 
         $actual = [];
         $managed = [];
+        $retired = [];
 
         foreach ($manifest['packages'] as $package => $metadata) {
-            if (! isset(self::PACKAGES[$package]) || ! is_array($metadata) || ($metadata['destination'] ?? null) !== self::PACKAGES[$package][0]) {
+            if (! isset(self::PACKAGES[$package]) || ! is_array($metadata)) {
                 throw new RuntimeException('Invalid managed package.');
             }
 
+            $historical = $package === 'nikic/fast-route'
+                && ($metadata['destination'] ?? null) === 'Routing'
+                && ($metadata['namespace'] ?? null) === 'Arix\\Routing';
+
+            if (! $historical && ($metadata['destination'] ?? null) !== self::PACKAGES[$package][0]) {
+                throw new RuntimeException('Invalid managed package.');
+            }
+
+            if ($historical) {
+                $retired[] = 'Routing';
+            }
+
+            $this->assertUnlinkedPath($core.DIRECTORY_SEPARATOR.$metadata['destination']);
             $managed[] = $metadata['destination'];
         }
 
@@ -177,6 +204,8 @@ class Source
         if ($actual !== $manifest['files']) {
             throw new RuntimeException('Imported files have local changes; refusing to overwrite them.');
         }
+
+        return $retired;
     }
 
     private function destinations(): array
@@ -206,13 +235,13 @@ class Source
         } while (true);
     }
 
-    private function copy(string $source, string $destination, null|string $from, null|string $to): void
+    private function copy(string $source, string $destination, null|string $from, null|string $to, array $excluded = []): void
     {
         if (is_link($source)) {
             throw new RuntimeException("Linked package source: {$source}");
         }
 
-        if (basename($source) === 'bladeonecli') {
+        if (basename($source) === 'bladeonecli' || in_array($source, $excluded, true)) {
             return;
         }
 
@@ -222,7 +251,7 @@ class Source
             }
 
             foreach (array_diff(scandir($source), ['.', '..']) as $entry) {
-                $this->copy($source.DIRECTORY_SEPARATOR.$entry, $destination.DIRECTORY_SEPARATOR.$entry, $from, $to);
+                $this->copy($source.DIRECTORY_SEPARATOR.$entry, $destination.DIRECTORY_SEPARATOR.$entry, $from, $to, $excluded);
             }
 
             return;
@@ -239,7 +268,15 @@ class Source
         }
 
         if ($from !== null && str_ends_with($source, '.php')) {
-            $content = str_replace([$from, str_replace('\\', '\\\\', $from)], [$to, str_replace('\\', '\\\\', $to)], $content);
+            $replacements = [$from => $to];
+            $escaped = str_replace('\\', '\\\\', $from);
+
+            if ($escaped !== $from) {
+                $replacements[$escaped] = str_replace('\\', '\\\\', $to);
+            }
+
+            // One pass: FastRoute is also a substring of Arix\FastRoute.
+            $content = strtr($content, $replacements);
         }
 
         $this->write($destination, $content);

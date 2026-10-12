@@ -1,8 +1,8 @@
 <?php
 
-namespace Arix\Routing;
+namespace Arix\FastRoute;
 
-if (!function_exists('Arix\Routing\simpleDispatcher')) {
+if (!function_exists('Arix\FastRoute\simpleDispatcher')) {
     /**
      * @param callable $routeDefinitionCallback
      * @param array $options
@@ -12,10 +12,10 @@ if (!function_exists('Arix\Routing\simpleDispatcher')) {
     function simpleDispatcher(callable $routeDefinitionCallback, array $options = [])
     {
         $options += [
-            'routeParser' => 'Arix\Routing\\RouteParser\\Std',
-            'dataGenerator' => 'Arix\Routing\\DataGenerator\\GroupCountBased',
-            'dispatcher' => 'Arix\Routing\\Dispatcher\\GroupCountBased',
-            'routeCollector' => 'Arix\Routing\\RouteCollector',
+            'routeParser' => 'Arix\FastRoute\\RouteParser\\Std',
+            'dataGenerator' => 'Arix\FastRoute\\DataGenerator\\GroupCountBased',
+            'dispatcher' => 'Arix\FastRoute\\Dispatcher\\GroupCountBased',
+            'routeCollector' => 'Arix\FastRoute\\RouteCollector',
         ];
 
         /** @var RouteCollector $routeCollector */
@@ -36,10 +36,10 @@ if (!function_exists('Arix\Routing\simpleDispatcher')) {
     function cachedDispatcher(callable $routeDefinitionCallback, array $options = [])
     {
         $options += [
-            'routeParser' => 'Arix\Routing\\RouteParser\\Std',
-            'dataGenerator' => 'Arix\Routing\\DataGenerator\\GroupCountBased',
-            'dispatcher' => 'Arix\Routing\\Dispatcher\\GroupCountBased',
-            'routeCollector' => 'Arix\Routing\\RouteCollector',
+            'routeParser' => 'Arix\FastRoute\\RouteParser\\Std',
+            'dataGenerator' => 'Arix\FastRoute\\DataGenerator\\GroupCountBased',
+            'dispatcher' => 'Arix\FastRoute\\Dispatcher\\GroupCountBased',
+            'routeCollector' => 'Arix\FastRoute\\RouteCollector',
             'cacheDisabled' => false,
         ];
 

@@ -1,10 +1,10 @@
 <?php
 
-namespace Arix\Routing\DataGenerator;
+namespace Arix\FastRoute\DataGenerator;
 
-use Arix\Routing\BadRouteException;
-use Arix\Routing\DataGenerator;
-use Arix\Routing\Route;
+use Arix\FastRoute\BadRouteException;
+use Arix\FastRoute\DataGenerator;
+use Arix\FastRoute\Route;
 
 abstract class RegexBasedAbstract implements DataGenerator
 {

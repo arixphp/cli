@@ -1,6 +1,6 @@
 <?php
 
-namespace Arix\Routing;
+namespace Arix\FastRoute;
 
 class RouteCollector
 {

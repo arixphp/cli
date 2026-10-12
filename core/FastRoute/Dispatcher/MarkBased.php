@@ -1,6 +1,6 @@
 <?php
 
-namespace Arix\Routing\Dispatcher;
+namespace Arix\FastRoute\Dispatcher;
 
 class MarkBased extends RegexBasedAbstract
 {

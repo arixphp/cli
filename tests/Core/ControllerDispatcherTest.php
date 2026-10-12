@@ -6,8 +6,8 @@ namespace Tests\Core;
 
 use Arix\Container\Container;
 use Arix\Container\UnknownServiceException;
-use Arix\Http\Routing\ControllerDispatcher;
-use Arix\Http\Routing\RouteDefinition;
+use Arix\Routing\ControllerDispatcher;
+use Arix\Routing\RouteDefinition;
 use Arix\HttpFoundation\Request;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;

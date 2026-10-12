@@ -1,6 +1,6 @@
 <?php
 
-namespace Arix\Routing\DataGenerator;
+namespace Arix\FastRoute\DataGenerator;
 
 class CharCountBased extends RegexBasedAbstract
 {

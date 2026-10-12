@@ -1,6 +1,6 @@
 <?php
 
-namespace Arix\Routing\DataGenerator;
+namespace Arix\FastRoute\DataGenerator;
 
 class GroupPosBased extends RegexBasedAbstract
 {

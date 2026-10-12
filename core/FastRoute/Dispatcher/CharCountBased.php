@@ -1,8 +1,8 @@
 <?php
 
-namespace Arix\Routing\Dispatcher;
+namespace Arix\FastRoute\Dispatcher;
 
-class GroupCountBased extends RegexBasedAbstract
+class CharCountBased extends RegexBasedAbstract
 {
     public function __construct($data)
     {
@@ -12,11 +12,11 @@ class GroupCountBased extends RegexBasedAbstract
     protected function dispatchVariableRoute($routeData, $uri)
     {
         foreach ($routeData as $data) {
-            if (!preg_match($data['regex'], $uri, $matches)) {
+            if (!preg_match($data['regex'], $uri . $data['suffix'], $matches)) {
                 continue;
             }
 
-            list($handler, $varNames) = $data['routeMap'][count($matches)];
+            list($handler, $varNames) = $data['routeMap'][end($matches)];
 
             $vars = [];
             $i = 0;

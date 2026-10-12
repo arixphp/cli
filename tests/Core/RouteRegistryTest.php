@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Core;
 
-use Arix\Http\Routing\RouteRegistry;
-use Arix\Routing\BadRouteException;
+use Arix\FastRoute\BadRouteException;
+use Arix\Routing\RouteRegistry;
 use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;

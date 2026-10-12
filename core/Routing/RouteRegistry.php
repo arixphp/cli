@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Arix\Http\Routing;
+namespace Arix\Routing;
 
 use Arix\Constants\HttpMethod;
-use Arix\Routing\DataGenerator\GroupCountBased;
-use Arix\Routing\Dispatcher;
-use Arix\Routing\Dispatcher\GroupCountBased as CompiledDispatcher;
-use Arix\Routing\RouteCollector;
-use Arix\Routing\RouteParser\Std;
+use Arix\FastRoute\DataGenerator\GroupCountBased;
+use Arix\FastRoute\Dispatcher;
+use Arix\FastRoute\Dispatcher\GroupCountBased as CompiledDispatcher;
+use Arix\FastRoute\RouteCollector;
+use Arix\FastRoute\RouteParser\Std;
 use InvalidArgumentException;
 use LogicException;
 

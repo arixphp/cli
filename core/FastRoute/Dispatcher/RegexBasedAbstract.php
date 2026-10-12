@@ -1,8 +1,8 @@
 <?php
 
-namespace Arix\Routing\Dispatcher;
+namespace Arix\FastRoute\Dispatcher;
 
-use Arix\Routing\Dispatcher;
+use Arix\FastRoute\Dispatcher;
 
 abstract class RegexBasedAbstract implements Dispatcher
 {

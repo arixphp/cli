@@ -34,17 +34,32 @@ class ImportCoreTest extends TestCase
 
         $this->assertFileExists($core.DIRECTORY_SEPARATOR.'HttpFoundation'.DIRECTORY_SEPARATOR.'LICENSE');
         $this->assertDirectoryDoesNotExist($core.DIRECTORY_SEPARATOR.'Dependencies');
-        $this->assertSame(['symfony/http-foundation', 'nikic/fast-route'], array_keys($first['packages']));
-        $this->assertFileExists($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'RouteCollector.php');
-        $this->assertDirectoryDoesNotExist($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'src');
-        $this->assertSame(file_get_contents($vendor.DIRECTORY_SEPARATOR.'nikic'.DIRECTORY_SEPARATOR.'fast-route'.DIRECTORY_SEPARATOR.'LICENSE'), file_get_contents($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'LICENSE'));
-        $this->assertStringNotContainsString('FastRoute', file_get_contents($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'functions.php'));
+        $this->assertSame(['symfony/http-foundation', 'nikic/fast-route', 'eftec/bladeone'], array_keys($first['packages']));
+        $this->assertFileExists($core.DIRECTORY_SEPARATOR.'FastRoute'.DIRECTORY_SEPARATOR.'RouteCollector.php');
+        $this->assertDirectoryDoesNotExist($core.DIRECTORY_SEPARATOR.'FastRoute'.DIRECTORY_SEPARATOR.'src');
+        $this->assertFileDoesNotExist($core.DIRECTORY_SEPARATOR.'FastRoute'.DIRECTORY_SEPARATOR.'bootstrap.php');
+        $this->assertArrayNotHasKey('FastRoute'.DIRECTORY_SEPARATOR.'bootstrap.php', $first['files']);
+        $this->assertFileExists($core.DIRECTORY_SEPARATOR.'BladeOne'.DIRECTORY_SEPARATOR.'BladeOne.php');
+        $this->assertFileDoesNotExist($core.DIRECTORY_SEPARATOR.'BladeOne'.DIRECTORY_SEPARATOR.'bladeonecli');
+        $this->assertDirectoryDoesNotExist($core.DIRECTORY_SEPARATOR.'BladeOne'.DIRECTORY_SEPARATOR.'bladeonecli');
+        $this->assertSame(file_get_contents($vendor.DIRECTORY_SEPARATOR.'nikic'.DIRECTORY_SEPARATOR.'fast-route'.DIRECTORY_SEPARATOR.'LICENSE'), file_get_contents($core.DIRECTORY_SEPARATOR.'FastRoute'.DIRECTORY_SEPARATOR.'LICENSE'));
+        $functions = file_get_contents($core.DIRECTORY_SEPARATOR.'FastRoute'.DIRECTORY_SEPARATOR.'functions.php');
+        $this->assertStringContainsString('namespace Arix\\FastRoute;', $functions);
+        $this->assertStringContainsString('Arix\\FastRoute\\\\Dispatcher\\\\GroupCountBased', $functions);
+        $this->assertStringNotContainsString('namespace FastRoute;', $functions);
         $this->assertSame(file_get_contents($vendor.DIRECTORY_SEPARATOR.'symfony'.DIRECTORY_SEPARATOR.'http-foundation'.DIRECTORY_SEPARATOR.'LICENSE'), file_get_contents($core.DIRECTORY_SEPARATOR.'HttpFoundation'.DIRECTORY_SEPARATOR.'LICENSE'));
 
         $source = file_get_contents($core.DIRECTORY_SEPARATOR.'HttpFoundation'.DIRECTORY_SEPARATOR.'Request.php');
 
         $this->assertStringContainsString('namespace Arix\\HttpFoundation;', $source);
         $this->assertStringNotContainsString('Symfony\\Component\\HttpFoundation', $source);
+
+        $views = file_get_contents($core.DIRECTORY_SEPARATOR.'BladeOne'.DIRECTORY_SEPARATOR.'BladeOne.php');
+
+        $this->assertStringContainsString('namespace Arix\\BladeOne;', $views);
+        $this->assertStringNotContainsString('eftec\\bladeone', $views);
+        $this->assertStringNotContainsString('eftec\\\\bladeone', $views);
+        $this->assertSame(file_get_contents($vendor.DIRECTORY_SEPARATOR.'eftec'.DIRECTORY_SEPARATOR.'bladeone'.DIRECTORY_SEPARATOR.'LICENSE'), file_get_contents($core.DIRECTORY_SEPARATOR.'BladeOne'.DIRECTORY_SEPARATOR.'LICENSE'));
 
         file_put_contents($core.DIRECTORY_SEPARATOR.'Kernel.php', '<?php // application-owned integration');
 
@@ -79,18 +94,23 @@ class ImportCoreTest extends TestCase
         $core = $this->directory.DIRECTORY_SEPARATOR.'core';
         $packages = [
             'symfony/http-foundation' => 'HttpFoundation',
-            'nikic/fast-route' => 'Routing',
+            'nikic/fast-route' => 'FastRoute',
+            'eftec/bladeone' => 'BladeOne',
         ];
         $excluded = ['README.md', 'composer.json', 'NOTICE', '.gitignore', 'LICENSE.txt', 'example.php.txt', 'UPPER.PHP'];
 
         foreach ($packages as $package => $_) {
-            $source = $vendor.DIRECTORY_SEPARATOR.$package.($package === 'nikic/fast-route' ? DIRECTORY_SEPARATOR.'src' : '');
+            $source = $vendor.DIRECTORY_SEPARATOR.$package.($package === 'nikic/fast-route' ? DIRECTORY_SEPARATOR.'src' : ($package === 'eftec/bladeone' ? DIRECTORY_SEPARATOR.'lib' : ''));
             mkdir($source.DIRECTORY_SEPARATOR.'nested', 0755, true);
             file_put_contents($vendor.DIRECTORY_SEPARATOR.$package.DIRECTORY_SEPARATOR.'LICENSE', 'License text');
             file_put_contents($source.DIRECTORY_SEPARATOR.'nested'.DIRECTORY_SEPARATOR.'Example.php', '<?php // source');
 
             if ($package === 'nikic/fast-route') {
                 file_put_contents($vendor.DIRECTORY_SEPARATOR.$package.DIRECTORY_SEPARATOR.'not-in-src.php', '<?php // not source');
+            }
+
+            if ($package === 'eftec/bladeone') {
+                file_put_contents($vendor.DIRECTORY_SEPARATOR.$package.DIRECTORY_SEPARATOR.'lib'.DIRECTORY_SEPARATOR.'bladeonecli', '<?php // cli helper without extension');
             }
 
             foreach ($excluded as $name) {
@@ -113,8 +133,9 @@ class ImportCoreTest extends TestCase
             }
         }
 
-        $this->assertCount(4, $manifest['files']);
-        $this->assertFileDoesNotExist($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'not-in-src.php');
+        $this->assertCount(6, $manifest['files']);
+        $this->assertFileDoesNotExist($core.DIRECTORY_SEPARATOR.'FastRoute'.DIRECTORY_SEPARATOR.'not-in-src.php');
+        $this->assertFileDoesNotExist($core.DIRECTORY_SEPARATOR.'BladeOne'.DIRECTORY_SEPARATOR.'bladeonecli');
         $this->assertSame([], array_values(array_filter(array_keys($manifest['files']), static fn (string $file): bool => str_starts_with($file, 'Dependencies'.DIRECTORY_SEPARATOR))));
         $this->assertDirectoryDoesNotExist($core.DIRECTORY_SEPARATOR.'Dependencies');
     }
@@ -170,8 +191,8 @@ class ImportCoreTest extends TestCase
         $manifest = ['format' => 1, 'packages' => ['symfony/http-foundation' => ['destination' => 'HttpFoundation']], 'files' => ['HttpFoundation'.DIRECTORY_SEPARATOR.'LICENSE' => hash('sha256', 'old license')]];
         file_put_contents($core.DIRECTORY_SEPARATOR.'imports.json', json_encode($manifest));
         $vendor = dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'vendor';
-        mkdir($core.DIRECTORY_SEPARATOR.'Routing');
-        file_put_contents($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'keep.txt', 'keep');
+        mkdir($core.DIRECTORY_SEPARATOR.'FastRoute');
+        file_put_contents($core.DIRECTORY_SEPARATOR.'FastRoute'.DIRECTORY_SEPARATOR.'keep.txt', 'keep');
 
         $error = null;
 
@@ -182,18 +203,18 @@ class ImportCoreTest extends TestCase
         }
 
         $this->assertInstanceOf(RuntimeException::class, $error);
-        $this->assertSame('keep', file_get_contents($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'keep.txt'));
+        $this->assertSame('keep', file_get_contents($core.DIRECTORY_SEPARATOR.'FastRoute'.DIRECTORY_SEPARATOR.'keep.txt'));
 
-        $this->remove($core.DIRECTORY_SEPARATOR.'Routing');
+        $this->remove($core.DIRECTORY_SEPARATOR.'FastRoute');
         $updated = new Source()->import($vendor, $core);
         $this->assertArrayHasKey('nikic/fast-route', $updated['packages']);
-        file_put_contents($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'Dispatcher.php', 'local edits');
+        file_put_contents($core.DIRECTORY_SEPARATOR.'FastRoute'.DIRECTORY_SEPARATOR.'Dispatcher.php', 'local edits');
         $this->expectException(RuntimeException::class);
 
         try {
             new Source()->import($vendor, $core);
         } finally {
-            $this->assertSame('local edits', file_get_contents($core.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'Dispatcher.php'));
+            $this->assertSame('local edits', file_get_contents($core.DIRECTORY_SEPARATOR.'FastRoute'.DIRECTORY_SEPARATOR.'Dispatcher.php'));
         }
     }
 
@@ -208,7 +229,7 @@ class ImportCoreTest extends TestCase
         {
             protected function move(string $from, string $to): bool
             {
-                if (basename($to) === 'Routing' && str_starts_with(basename(dirname($from)), '.import-')) {
+                if (basename($to) === 'FastRoute' && str_starts_with(basename(dirname($from)), '.import-')) {
                     return false;
                 }
 
@@ -225,7 +246,7 @@ class ImportCoreTest extends TestCase
         }
 
         $this->assertInstanceOf(RuntimeException::class, $error);
-        $this->assertSame('Cannot install Routing', $error->getMessage());
+        $this->assertSame('Cannot install FastRoute', $error->getMessage());
         $this->assertSame($first, json_decode(file_get_contents($core.DIRECTORY_SEPARATOR.'imports.json'), true));
 
         foreach ($first['files'] as $name => $hash) {
@@ -256,7 +277,7 @@ class ImportCoreTest extends TestCase
 
         $this->assertInstanceOf(RuntimeException::class, $error);
         $this->assertFileDoesNotExist($core.DIRECTORY_SEPARATOR.'imports.json');
-        $this->assertDirectoryDoesNotExist($core.DIRECTORY_SEPARATOR.'Routing');
+        $this->assertDirectoryDoesNotExist($core.DIRECTORY_SEPARATOR.'FastRoute');
     }
 
     #[Test]
@@ -265,9 +286,10 @@ class ImportCoreTest extends TestCase
         $core = $this->directory.DIRECTORY_SEPARATOR.'core';
         $vendor = dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'vendor';
         $manifest = new Source()->import($vendor, $core);
-        unset($manifest['packages']['nikic/fast-route']);
+        unset($manifest['packages']['nikic/fast-route'], $manifest['packages']['eftec/bladeone']);
         $manifest['files'] = array_filter($manifest['files'], static fn (string $name): bool => str_starts_with($name, 'HttpFoundation'.DIRECTORY_SEPARATOR), ARRAY_FILTER_USE_KEY);
-        $this->remove($core.DIRECTORY_SEPARATOR.'Routing');
+        $this->remove($core.DIRECTORY_SEPARATOR.'FastRoute');
+        $this->remove($core.DIRECTORY_SEPARATOR.'BladeOne');
         file_put_contents($core.DIRECTORY_SEPARATOR.'imports.json', json_encode($manifest));
         $before = file_get_contents($core.DIRECTORY_SEPARATOR.'HttpFoundation'.DIRECTORY_SEPARATOR.'Request.php');
         $updated = new Source()->import($vendor, $core);
@@ -285,10 +307,13 @@ class ImportCoreTest extends TestCase
         $vendor = $this->directory.DIRECTORY_SEPARATOR.'vendor';
         mkdir($vendor.DIRECTORY_SEPARATOR.'symfony'.DIRECTORY_SEPARATOR.'http-foundation', 0755, true);
         mkdir($vendor.DIRECTORY_SEPARATOR.'nikic'.DIRECTORY_SEPARATOR.'fast-route'.DIRECTORY_SEPARATOR.'src', 0755, true);
+        mkdir($vendor.DIRECTORY_SEPARATOR.'eftec'.DIRECTORY_SEPARATOR.'bladeone'.DIRECTORY_SEPARATOR.'lib', 0755, true);
         file_put_contents($vendor.DIRECTORY_SEPARATOR.'autoload.php', '<?php require '.var_export($root.DIRECTORY_SEPARATOR.'vendor'.DIRECTORY_SEPARATOR.'autoload.php', true).';');
         file_put_contents($vendor.DIRECTORY_SEPARATOR.'symfony'.DIRECTORY_SEPARATOR.'http-foundation'.DIRECTORY_SEPARATOR.'LICENSE', 'license');
         file_put_contents($vendor.DIRECTORY_SEPARATOR.'nikic'.DIRECTORY_SEPARATOR.'fast-route'.DIRECTORY_SEPARATOR.'LICENSE', 'license');
+        file_put_contents($vendor.DIRECTORY_SEPARATOR.'eftec'.DIRECTORY_SEPARATOR.'bladeone'.DIRECTORY_SEPARATOR.'LICENSE', 'license');
         file_put_contents($vendor.DIRECTORY_SEPARATOR.'nikic'.DIRECTORY_SEPARATOR.'fast-route'.DIRECTORY_SEPARATOR.'src'.DIRECTORY_SEPARATOR.'Example.php', '<?php namespace FastRoute;');
+        file_put_contents($vendor.DIRECTORY_SEPARATOR.'eftec'.DIRECTORY_SEPARATOR.'bladeone'.DIRECTORY_SEPARATOR.'lib'.DIRECTORY_SEPARATOR.'Example.php', '<?php namespace eftec\\bladeone;');
         $source = $this->directory.DIRECTORY_SEPARATOR.'source';
         copy($root.DIRECTORY_SEPARATOR.'source', $source);
 
@@ -299,8 +324,9 @@ class ImportCoreTest extends TestCase
             fclose($pipes[1]);
             fclose($pipes[2]);
             $this->assertSame(0, proc_close($process), $errors);
-            $this->assertStringContainsString('Imported 2 packages', $output);
-            $this->assertFileExists($this->directory.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'Routing'.DIRECTORY_SEPARATOR.'Example.php');
+            $this->assertStringContainsString('Imported 3 packages', $output);
+            $this->assertFileExists($this->directory.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'FastRoute'.DIRECTORY_SEPARATOR.'Example.php');
+            $this->assertFileExists($this->directory.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'BladeOne'.DIRECTORY_SEPARATOR.'Example.php');
             $this->assertFileExists($this->directory.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'HttpFoundation'.DIRECTORY_SEPARATOR.'LICENSE');
         }
     }

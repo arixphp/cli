@@ -7,7 +7,7 @@ namespace Tests\Core;
 use Arix\Container\Container;
 use Arix\Container\ContainerContext;
 use Arix\Facades\Route;
-use Arix\Http\Routing\RouteRegistry;
+use Arix\Routing\RouteRegistry;
 use LogicException;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;

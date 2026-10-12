@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arix\Http\Routing;
+namespace Arix\Routing;
 
 use Arix\Constants\HttpStatusCode;
 use Arix\Container\Container;

@@ -7,8 +7,8 @@ namespace Tests\Core;
 use Arix\Container\Container;
 use Arix\Facades\Route;
 use Arix\Http\Kernel;
-use Arix\Http\Routing\RouteRegistry;
-use Arix\Http\Routing\RoutingHandler;
+use Arix\Routing\RouteRegistry;
+use Arix\Routing\RoutingHandler;
 use Arix\HttpFoundation\Request;
 use PHPUnit\Framework\Attributes\Test;
 use stdClass;
@@ -108,8 +108,8 @@ class RoutingHandlerTest extends RoutingTestCase
         $autoload = dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'autoload.php';
         $program = 'require '.var_export($autoload, true).'; $class = '.var_export($class, true).'; $directory = '.var_export($this->directory, true).'; '.<<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
-            $kernel = new Arix\Http\Kernel(new Arix\Http\Routing\RoutingHandler($directory), configure: function ($container) use ($class) {
-                $container->instance(Arix\Http\Routing\RouteRegistry::class, new Arix\Http\Routing\RouteRegistry);
+            $kernel = new Arix\Http\Kernel(new Arix\Routing\RoutingHandler($directory), configure: function ($container) use ($class) {
+                $container->instance(Arix\Routing\RouteRegistry::class, new Arix\Routing\RouteRegistry);
                 $container->bind($class, static fn () => new $class);
                 Arix\Facades\Route::get('/articles/{id:\d+}', [$class, 'show']);
             });
