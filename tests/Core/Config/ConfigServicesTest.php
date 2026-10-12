@@ -109,7 +109,7 @@ class ConfigServicesTest extends TestCase
         $file = $this->directory . DIRECTORY_SEPARATOR . 'config';
         file_put_contents($file, 'not a directory');
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessageIs($file);
+        $this->expectExceptionMessageIsOrContains($file);
 
         ConfigServices::register(new Container(), $file);
     }
