@@ -55,7 +55,8 @@ class HttpExceptionTest extends TestCase
         $exception = new HttpException(HttpStatusCode::SERVICE_UNAVAILABLE, 'Unavailable.', ['Retry-After' => '60']);
         $response = new ErrorResponder()->respond($exception);
         $this->assertSame(503, $response->getStatusCode());
-        $this->assertSame('Unavailable.', $response->getContent());
+        $this->assertSame('text/html; charset=UTF-8', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString('<pre>Unavailable.</pre>', $response->getContent());
         $this->assertSame('60', $response->headers->get('Retry-After'));
     }
 }

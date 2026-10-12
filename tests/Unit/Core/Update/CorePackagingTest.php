@@ -19,7 +19,11 @@ class CorePackagingTest extends TestCase
         $project = dirname(__DIR__, 4);
 
         try {
-            $source = $fixture->core('source', ['Http/Kernel.php' => "<?php\n// Keep this comment and whitespace.\n\n"]);
+            $source = $fixture->core('source', [
+                'Http/Kernel.php' => "<?php\n// Keep this comment and whitespace.\n\n",
+                '.htaccess' => "Require all denied\r\n",
+                'stubs/error.html' => "<!doctype html>\r\n<!-- Keep whitespace. -->\n<pre>{{message}}</pre>\n",
+            ]);
             $fixture->write('release/resources/.placeholder', '');
             CoreDistribution::build($source, $fixture->path('release/resources/core.bundle'));
 
@@ -33,7 +37,11 @@ declare(strict_types=1);
 require __DIR__.'/app/CoreFiles.php';
 require __DIR__.'/app/CoreDistribution.php';
 $distribution = App\Core\Update\CoreDistribution::bundled(__DIR__);
-echo $distribution->contents('Http/Kernel.php');
+echo json_encode([
+    $distribution->contents('Http/Kernel.php'),
+    $distribution->contents('.htaccess'),
+    $distribution->contents('stubs/error.html'),
+], JSON_THROW_ON_ERROR);
 PHP);
             $configuration = json_decode(file_get_contents($project . DIRECTORY_SEPARATOR . 'box.json'), true, flags: JSON_THROW_ON_ERROR);
             $configuration['main'] = 'main.php';
@@ -52,7 +60,11 @@ PHP);
             $runtime = new Process([PHP_BINARY, $fixture->path('release/release.phar')], $fixture->root);
             $runtime->run();
             $this->assertSame(0, $runtime->getExitCode(), $runtime->getErrorOutput());
-            $this->assertSame("<?php\n// Keep this comment and whitespace.\n\n", $runtime->getOutput());
+            $this->assertSame([
+                "<?php\n// Keep this comment and whitespace.\n\n",
+                "Require all denied\r\n",
+                "<!doctype html>\r\n<!-- Keep whitespace. -->\n<pre>{{message}}</pre>\n",
+            ], json_decode($runtime->getOutput(), true, flags: JSON_THROW_ON_ERROR));
         } finally {
             $fixture->cleanup();
         }

@@ -20,7 +20,7 @@ class CoreUpdateCommandTest extends TestCase
     {
         parent::setUp();
         $this->fixture = new CoreUpdateFixture();
-        $this->application = $this->fixture->installed();
+        $this->application = $this->fixture->installed(includeResources: false);
         CoreDistribution::build($this->fixture->core('source', ['New.php' => '<?php // new']), $this->fixture->path('core.bundle'));
         $this->app->instance(CoreDistribution::class, CoreDistribution::load($this->fixture->path('core.bundle')));
     }
@@ -36,10 +36,14 @@ class CoreUpdateCommandTest extends TestCase
     {
         $this->artisan('core:update', ['--path' => $this->application, '--dry-run' => true])
             ->expectsOutputToContain('New.php')
+            ->expectsOutputToContain('.htaccess')
+            ->expectsOutputToContain('stubs/error.html')
             ->expectsOutputToContain('Dry run')
             ->assertExitCode(0);
 
         $this->assertFileDoesNotExist($this->fixture->path('application/core/New.php'));
+        $this->assertFileDoesNotExist($this->fixture->path('application/core/.htaccess'));
+        $this->assertFileDoesNotExist($this->fixture->path('application/core/stubs/error.html'));
         $this->assertFileDoesNotExist($this->fixture->path('application/.core-update.lock'));
         $this->assertSame([], glob($this->fixture->path('application/.core-stage-*')));
     }
@@ -52,6 +56,8 @@ class CoreUpdateCommandTest extends TestCase
             ->assertExitCode(0);
 
         $this->assertSame('<?php // new', file_get_contents($this->fixture->path('application/core/New.php')));
+        $this->assertSame("Require all denied\n", file_get_contents($this->fixture->path('application/core/.htaccess')));
+        $this->assertFileExists($this->fixture->path('application/core/stubs/error.html'));
         $this->assertSame($this->app->make(CoreDistribution::class)->manifest['id'], new CoreInspector()->installedManifest($this->fixture->path('application/core'))['id']);
     }
 

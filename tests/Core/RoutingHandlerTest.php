@@ -7,9 +7,10 @@ namespace Tests\Core;
 use Arix\Container\Container;
 use Arix\Facades\Route;
 use Arix\Http\Kernel;
+use Arix\HttpFoundation\Request;
 use Arix\Routing\RouteRegistry;
 use Arix\Routing\RoutingHandler;
-use Arix\HttpFoundation\Request;
+use Arix\Views\ViewServices;
 use PHPUnit\Framework\Attributes\Test;
 use stdClass;
 
@@ -20,8 +21,8 @@ class RoutingHandlerTest extends RoutingTestCase
     {
         $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("id"), 201, ["X-Route" => "yes"]); }');
         $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class): void {
-            $container->instance(RouteRegistry::class, new RouteRegistry);
-            $container->bind($class, static fn (): object => new $class);
+            $container->instance(RouteRegistry::class, new RouteRegistry());
+            $container->bind($class, static fn (): object => new $class());
             Route::get('/articles/{id:\d+}', [$class, 'show']);
             Route::query('/articles/{id:\d+}', [$class, 'show']);
         });
@@ -46,8 +47,8 @@ class RoutingHandlerTest extends RoutingTestCase
     {
         $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("slug")); }');
         $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class): void {
-            $container->instance(RouteRegistry::class, new RouteRegistry);
-            $container->bind($class, static fn (): object => new $class);
+            $container->instance(RouteRegistry::class, new RouteRegistry());
+            $container->bind($class, static fn (): object => new $class());
             Route::get('/articles/{slug}', [$class, 'show']);
         }, basePath: '/site');
         $this->assertSame('café', $kernel->handle(Request::create('/site/articles/caf%C3%A9'))->getContent());
@@ -66,9 +67,9 @@ class RoutingHandlerTest extends RoutingTestCase
         $controllers = [];
         $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class, &$scopes, &$controllers): void {
             $scopes[] = $container;
-            $container->instance(RouteRegistry::class, new RouteRegistry);
+            $container->instance(RouteRegistry::class, new RouteRegistry());
             $container->bind($class, static function () use ($class, &$controllers): object {
-                $controller = new $class;
+                $controller = new $class();
                 $controllers[] = $controller;
 
                 return $controller;
@@ -92,21 +93,22 @@ class RoutingHandlerTest extends RoutingTestCase
     {
         $class = $this->controller('public function show(): Response { return new Response; }');
         $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class): void {
-            $container->instance(RouteRegistry::class, new RouteRegistry);
-            $container->bind($class, static fn (): stdClass => new stdClass);
+            $container->instance(RouteRegistry::class, new RouteRegistry());
+            $container->bind($class, static fn (): stdClass => new stdClass());
             Route::get('/', [$class, 'show']);
         }, logger: static function (): void {});
         $response = $kernel->handle(Request::create('/'));
         $this->assertSame(500, $response->getStatusCode());
-        $this->assertSame('Internal server error.', $response->getContent());
+        $this->assertSame('text/html; charset=UTF-8', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString('<pre>Internal server error.</pre>', $response->getContent());
     }
 
     #[Test]
     public function it_runs_the_kernel_router_and_controller_without_composer(): void
     {
         $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("id")); }');
-        $autoload = dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'autoload.php';
-        $program = 'require '.var_export($autoload, true).'; $class = '.var_export($class, true).'; $directory = '.var_export($this->directory, true).'; '.<<<'PHP'
+        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $program = 'require ' . var_export($autoload, true) . '; $class = ' . var_export($class, true) . '; $directory = ' . var_export($this->directory, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
             $kernel = new Arix\Http\Kernel(new Arix\Routing\RoutingHandler($directory), configure: function ($container) use ($class) {
                 $container->instance(Arix\Routing\RouteRegistry::class, new Arix\Routing\RouteRegistry);
@@ -128,20 +130,20 @@ class RoutingHandlerTest extends RoutingTestCase
     #[Test]
     public function it_renders_views_through_the_kernel_and_suppresses_head_bodies(): void
     {
-        mkdir($this->directory.DIRECTORY_SEPARATOR.'views', 0755, true);
-        mkdir($this->directory.DIRECTORY_SEPARATOR.'lang', 0755, true);
-        mkdir($this->directory.DIRECTORY_SEPARATOR.'cache', 0755, true);
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR.'page.arix.php', '<h1>{{ $title }}</h1>');
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'views', 0755, true);
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'lang', 0755, true);
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'cache', 0755, true);
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'page.arix.php', '<h1>{{ $title }}</h1>');
         $root = $this->directory;
         $class = $this->controller('public function show(): \\Arix\\Views\\Contracts\\View { return new \\Arix\\Views\\View("page", ["title" => "Hi"]); }');
         $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class, $root): void {
-            $container->instance(RouteRegistry::class, new RouteRegistry);
-            $container->bind($class, static fn (): object => new $class);
-            \Arix\Views\ViewServices::register($container, $root, $container->get(Request::class), [
+            $container->instance(RouteRegistry::class, new RouteRegistry());
+            $container->bind($class, static fn (): object => new $class());
+            ViewServices::register($container, $root, $container->get(Request::class), [
                 'app' => ['name' => 'Site', 'base_path' => '', 'locales' => ['en'], 'default_locale' => 'en'],
-                'cache' => ['path' => $root.DIRECTORY_SEPARATOR.'cache', 'version' => '1'],
-                'views' => $root.DIRECTORY_SEPARATOR.'views',
-                'lang' => $root.DIRECTORY_SEPARATOR.'lang',
+                'cache' => ['path' => $root . DIRECTORY_SEPARATOR . 'cache', 'version' => '1'],
+                'views' => $root . DIRECTORY_SEPARATOR . 'views',
+                'lang' => $root . DIRECTORY_SEPARATOR . 'lang',
             ]);
             Route::get('/page', [$class, 'show']);
         });

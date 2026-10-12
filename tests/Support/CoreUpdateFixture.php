@@ -38,7 +38,7 @@ class CoreUpdateFixture
     }
 
     /** @param array<string, string> $files */
-    public function core(string $relative, array $files = []): string
+    public function core(string $relative, array $files = [], bool $includeResources = true): string
     {
         $files = array_replace([
             'autoload.php' => "<?php\ndeclare(strict_types=1);\n",
@@ -46,6 +46,13 @@ class CoreUpdateFixture
             'Http/Kernel.php' => "<?php\ndeclare(strict_types=1);\n// kernel\n",
             'imports.json' => '{"format":1,"packages":[],"files":[]}',
         ], $files);
+
+        if ($includeResources) {
+            $files = array_replace([
+                '.htaccess' => "Require all denied\n",
+                'stubs/error.html' => '<html lang="{{locale}}"><title>{{status}} — {{name}}</title><pre>{{message}}</pre></html>',
+            ], $files);
+        }
 
         foreach ($files as $name => $contents) {
             $this->write("{$relative}/{$name}", $contents);
@@ -64,13 +71,14 @@ class CoreUpdateFixture
     }
 
     /** @param array<string, string> $files */
-    public function installed(string $relative = 'application', array $files = []): string
+    public function installed(string $relative = 'application', array $files = [], bool $includeResources = true): string
     {
         $application = $this->application($relative);
-        $core = $this->core("{$relative}/core", $files);
+        $core = $this->core("{$relative}/core", $files, $includeResources);
         $hashes = [];
+        $resources = $includeResources ? ['.htaccess', 'stubs/error.html'] : [];
 
-        foreach (['autoload.php', 'functions.php', 'Http/Kernel.php', 'imports.json', ...array_keys($files)] as $name) {
+        foreach (['autoload.php', 'functions.php', 'Http/Kernel.php', 'imports.json', ...$resources, ...array_keys($files)] as $name) {
             $hashes[$name] = hash_file('sha256', $core . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $name));
         }
 

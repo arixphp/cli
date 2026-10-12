@@ -6,6 +6,7 @@ namespace Tests\Unit\Core\Update;
 
 use App\Core\Update\CoreDistribution;
 use App\Core\Update\CorePackager;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -23,6 +24,67 @@ class CorePackagerTest extends TestCase
     protected function tearDown(): void
     {
         $this->fixture->cleanup();
+    }
+
+    #[Test]
+    public function it_packages_exact_runtime_resource_bytes(): void
+    {
+        $source = $this->fixture->core('source');
+        $this->fixture->write('source/.htaccess', "Require all denied\n");
+        $this->fixture->write('source/stubs/error.html', '<html>error</html>');
+        $distribution = new CorePackager($source, $this->fixture->path('core.bundle'))->build();
+
+        $this->assertSame("Require all denied\n", $distribution->contents('.htaccess'));
+        $this->assertSame('<html>error</html>', $distribution->contents('stubs/error.html'));
+        $this->assertSame(hash('sha256', "Require all denied\n"), $distribution->manifest['files']['.htaccess']);
+        $this->assertSame(hash('sha256', '<html>error</html>'), $distribution->manifest['files']['stubs/error.html']);
+    }
+
+    #[Test]
+    #[DataProvider('runtimeResources')]
+    public function it_rejects_release_sources_missing_required_resources(string $missing): void
+    {
+        $source = $this->fixture->core('source');
+        $this->fixture->write('source/.htaccess', 'deny');
+        $this->fixture->write('source/stubs/error.html', 'error');
+        unlink($this->fixture->path("source/{$missing}"));
+        $bundle = $this->fixture->path('resources/core.bundle');
+
+        try {
+            new CorePackager($source, $bundle)->build();
+            $this->fail('Incomplete release source accepted.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString($missing, $exception->getMessage());
+        }
+
+        $this->assertDirectoryDoesNotExist($this->fixture->path('resources'));
+    }
+
+    public static function runtimeResources(): array
+    {
+
+        return [['.htaccess'], ['stubs/error.html']];
+    }
+
+    #[Test]
+    #[DataProvider('runtimeResources')]
+    public function it_checks_required_resources_without_rewriting_the_bundle(string $missing): void
+    {
+        $source = $this->fixture->core('source');
+        $bundle = $this->fixture->path('core.bundle');
+        $packager = new CorePackager($source, $bundle);
+        $packager->build();
+        $bytes = file_get_contents($bundle);
+        unlink($this->fixture->path("source/{$missing}"));
+
+        try {
+            $packager->check();
+            $this->fail('Incomplete release source accepted.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString($missing, $exception->getMessage());
+        }
+
+        $this->assertSame($bytes, file_get_contents($bundle));
     }
 
     #[Test]

@@ -7,6 +7,7 @@ namespace Tests\Unit\Core\Update;
 use App\Core\Update\CoreDistribution;
 use App\Core\Update\CoreInspector;
 use App\Core\Update\CoreUpdater;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -25,7 +26,7 @@ class CoreUpdaterTest extends TestCase
     protected function setUp(): void
     {
         $this->fixture = new CoreUpdateFixture();
-        $this->application = $this->fixture->installed(files: ['Old.php' => '<?php // old']);
+        $this->application = $this->fixture->installed(files: ['Old.php' => '<?php // old'], includeResources: false);
         $source = $this->fixture->core('source', ['New.php' => '<?php // new', 'Http/Kernel.php' => '<?php // updated']);
         CoreDistribution::build($source, $this->fixture->path('core.bundle'));
         $this->distribution = CoreDistribution::load($this->fixture->path('core.bundle'));
@@ -35,6 +36,90 @@ class CoreUpdaterTest extends TestCase
     protected function tearDown(): void
     {
         $this->fixture->cleanup();
+    }
+
+    #[Test]
+    public function it_updates_a_previous_core_with_runtime_resources(): void
+    {
+        $this->fixture->write('application/assets/site.css', 'application css');
+        $preview = new CoreInspector()->inspect($this->application, $this->distribution);
+        $this->assertSame(['.htaccess', 'New.php', 'stubs/error.html'], $preview['added']);
+        $this->assertFileDoesNotExist($this->fixture->path('application/core/.htaccess'));
+        $backup = new CoreUpdater()->update($this->application, $this->distribution, $this->previousId);
+
+        $this->assertNotNull($backup);
+        $this->assertSame($this->previousId, new CoreInspector()->installedManifest($backup)['id']);
+        $this->assertFileDoesNotExist($backup . DIRECTORY_SEPARATOR . '.htaccess');
+        $this->assertSame("Require all denied\n", file_get_contents($this->fixture->path('application/core/.htaccess')));
+        $this->assertSame('<html lang="{{locale}}"><title>{{status}} — {{name}}</title><pre>{{message}}</pre></html>', file_get_contents($this->fixture->path('application/core/stubs/error.html')));
+        $this->assertSame($this->distribution->manifest['id'], new CoreInspector()->installedManifest($this->fixture->path('application/core'))['id']);
+        $this->assertSame('<?php // application entry point', file_get_contents($this->fixture->path('application/index.php')));
+        $this->assertSame('<?php // application bootstrap', file_get_contents($this->fixture->path('application/app/bootstrap.php')));
+        $this->assertSame('application css', file_get_contents($this->fixture->path('application/assets/site.css')));
+        $this->assertSame(0644, fileperms($this->fixture->path('application/core/.htaccess')) & 0777);
+        $this->assertSame(0644, fileperms($this->fixture->path('application/core/stubs/error.html')) & 0777);
+    }
+
+    #[Test]
+    #[DataProvider('resourceChanges')]
+    public function it_detects_modified_or_missing_runtime_resources(string $resource, bool $missing): void
+    {
+        new CoreUpdater()->update($this->application, $this->distribution, $this->previousId);
+        $path = $this->fixture->path("application/core/{$resource}");
+
+        if ($missing) {
+            unlink($path);
+        } else {
+            file_put_contents($path, 'local edit');
+        }
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains('local changes');
+        new CoreUpdater()->update($this->application, $this->distribution, $this->distribution->manifest['id']);
+    }
+
+    public static function resourceChanges(): array
+    {
+
+        return [['.htaccess', false], ['.htaccess', true], ['stubs/error.html', false], ['stubs/error.html', true]];
+    }
+
+    #[Test]
+    public function it_preserves_the_previous_core_when_resource_staging_fails(): void
+    {
+        $updater = new class() extends CoreUpdater
+        {
+            protected function writeFile(string $path, string $contents): void
+            {
+                if (basename($path) === '.htaccess') {
+                    throw new RuntimeException('Simulated resource copy failure.');
+                }
+
+                parent::writeFile($path, $contents);
+            }
+        };
+
+        $this->assertRestoredAfterFailure($updater, 'resource copy failure');
+        $this->assertFileDoesNotExist($this->fixture->path('application/core/.htaccess'));
+    }
+
+    #[Test]
+    public function it_restores_the_previous_core_when_installed_resource_verification_fails(): void
+    {
+        $updater = new class() extends CoreUpdater
+        {
+            protected function move(string $from, string $to): void
+            {
+                parent::move($from, $to);
+
+                if (str_contains(basename($from), '.core-stage-') && basename($to) === 'core') {
+                    file_put_contents($to . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR . 'error.html', 'corrupted resource');
+                }
+            }
+        };
+
+        $this->assertRestoredAfterFailure($updater, 'local changes');
+        $this->assertFileDoesNotExist($this->fixture->path('application/core/stubs/error.html'));
     }
 
     #[Test]

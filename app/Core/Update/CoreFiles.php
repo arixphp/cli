@@ -35,7 +35,7 @@ class CoreFiles
 
     public static function assertRelative(string $path): void
     {
-        if (! preg_match('/^[A-Za-z0-9_][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$/D', $path)) {
+        if ($path !== '.htaccess' && ! preg_match('/^[A-Za-z0-9_][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$/D', $path)) {
             throw new RuntimeException("Unsafe manifest path: {$path}");
         }
     }
@@ -93,6 +93,10 @@ class CoreFiles
 
             $seen[$folded] = true;
 
+            if (($relative === '.htaccess' || $relative === 'stubs/error.html') && ! $entry->isFile()) {
+                throw new RuntimeException("Unsupported runtime resource: {$relative}");
+            }
+
             if ($entry->isDir()) {
                 $directories[] = $relative;
 
@@ -103,7 +107,8 @@ class CoreFiles
                 throw new RuntimeException("Unsupported core file: {$relative}");
             }
 
-            if ($source && ! str_ends_with($relative, '.php') && $entry->getFilename() !== 'LICENSE' && $relative !== 'imports.json') {
+            if ($source && ! str_ends_with($relative, '.php') && $entry->getFilename() !== 'LICENSE'
+                && $relative !== 'imports.json' && $relative !== '.htaccess' && $relative !== 'stubs/error.html') {
                 throw new RuntimeException("Unsupported distribution file: {$relative}");
             }
 

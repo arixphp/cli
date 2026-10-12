@@ -72,6 +72,7 @@ class KernelTest extends TestCase
         $response = $kernel->handle(Request::create('/'));
         $this->assertSame(405, $response->getStatusCode());
         $this->assertSame('GET, HEAD', $response->headers->get('Allow'));
+        $this->assertSame('text/html; charset=UTF-8', $response->headers->get('Content-Type'));
         $this->assertTrue($response->headers->hasCacheControlDirective('no-store'));
     }
 
@@ -86,7 +87,9 @@ class KernelTest extends TestCase
         });
         $response = $kernel->handle(Request::create('/'));
         $this->assertSame(500, $response->getStatusCode());
-        $this->assertSame('Internal server error.', $response->getContent());
+        $this->assertSame('text/html; charset=UTF-8', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString('<pre>Internal server error.</pre>', $response->getContent());
+        $this->assertStringNotContainsString('secret-password', $response->getContent());
         $this->assertStringContainsString('secret-password', $logs[0]);
         $this->assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
         $this->expectException(LogicException::class);
@@ -204,7 +207,13 @@ class KernelTest extends TestCase
                 });
             $response = $kernel->handle(Request::create('/', $method));
             $this->assertSame(500, $response->getStatusCode());
-            $this->assertSame($body, $response->getContent());
+            $this->assertSame('text/html; charset=UTF-8', $response->headers->get('Content-Type'));
+
+            if ($method === 'HEAD') {
+                $this->assertSame('', $response->getContent());
+            } else {
+                $this->assertStringContainsString($body, $response->getContent());
+            }
             $this->assertTrue($response->headers->hasCacheControlDirective('no-store'));
             $this->assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
             $this->assertStringContainsString('application failed', file_get_contents($log));
@@ -216,7 +225,7 @@ class KernelTest extends TestCase
 
     public static function errorMethods(): array
     {
-        return [['GET', 'Internal server error.'], ['HEAD', '']];
+        return [['GET', '<pre>Internal server error.</pre>'], ['HEAD', '']];
     }
 
     #[Test]
@@ -227,7 +236,8 @@ class KernelTest extends TestCase
         $request = new Request(server: ['REQUEST_URI' => '/', 'REQUEST_METHOD' => []], content: '');
         $response = $kernel->handle($request);
         $this->assertSame(500, $response->getStatusCode());
-        $this->assertSame('Internal server error.', $response->getContent());
+        $this->assertSame('text/html; charset=UTF-8', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString('<pre>Internal server error.</pre>', $response->getContent());
         $this->assertTrue($response->headers->hasCacheControlDirective('no-store'));
         $this->assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
         $this->expectException(LogicException::class);

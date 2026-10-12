@@ -20,6 +20,7 @@ class ErrorResponder
     public function respond(Throwable $exception): Response
     {
         $headers = [];
+        $diagnostics = false;
 
         if ($exception instanceof HttpException) {
             $status = $exception->status;
@@ -30,6 +31,7 @@ class ErrorResponder
             $message = 'Bad request.';
         } else {
             $status = HttpStatusCode::INTERNAL_SERVER_ERROR;
+            $diagnostics = $this->debug;
             $message = $this->debug ? (string) $exception : 'Internal server error.';
             $log = "Arix: {$exception}";
 
@@ -48,8 +50,9 @@ class ErrorResponder
             }
         }
 
-        $response = new Response($message, $status->value, $headers);
-        $response->headers->set('Content-Type', 'text/plain; charset=UTF-8');
+        $html = $diagnostics ? null : new ErrorPageRenderer()->render($status->value, $message);
+        $response = new Response($html ?? $message, $status->value, $headers);
+        $response->headers->set('Content-Type', $html === null ? 'text/plain; charset=UTF-8' : 'text/html; charset=UTF-8');
         $response->headers->set('Cache-Control', 'no-store');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
 

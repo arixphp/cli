@@ -22,6 +22,7 @@ class CorePackager
         CoreFiles::assertUnlinked($this->bundle);
 
         $hashes = CoreFiles::inventory($this->source, true);
+        $this->assertRuntimeResources($hashes);
         $imports = CoreDistribution::decode(CoreFiles::read(CoreFiles::local($this->source, 'imports.json')));
 
         $this->validateImports($imports, $hashes);
@@ -61,8 +62,10 @@ class CorePackager
     {
         $this->assertDevelopmentSource();
         $distribution = CoreDistribution::load($this->bundle);
+        $hashes = CoreFiles::inventory($this->source, true);
+        $this->assertRuntimeResources($hashes);
 
-        if (CoreFiles::inventory($this->source, true) !== $distribution->manifest['files']) {
+        if ($hashes !== $distribution->manifest['files']) {
             throw new RuntimeException('Core bundle is stale; run php arix core:package before updating.');
         }
 
@@ -73,6 +76,15 @@ class CorePackager
     {
         if (str_starts_with($this->source, 'phar://') || str_starts_with($this->bundle, 'phar://')) {
             throw new RuntimeException('Core packaging requires the development source tree; compiled CLIs use their embedded bundle.');
+        }
+    }
+
+    private function assertRuntimeResources(array $hashes): void
+    {
+        foreach (['.htaccess', 'stubs/error.html'] as $resource) {
+            if (! isset($hashes[$resource])) {
+                throw new RuntimeException("Incomplete core release source: {$resource}");
+            }
         }
     }
 

@@ -25,6 +25,20 @@ class CoreDistributionTest extends TestCase
     }
 
     #[Test]
+    public function it_accepts_previous_installed_manifests_without_new_resources(): void
+    {
+        $files = [
+            'Http/Kernel.php' => hash('sha256', 'kernel'),
+            'autoload.php' => hash('sha256', 'autoload'),
+            'functions.php' => hash('sha256', 'functions'),
+            'imports.json' => hash('sha256', 'imports'),
+        ];
+        $manifest = CoreDistribution::manifest($files);
+
+        $this->assertSame($files, CoreDistribution::validateManifest($manifest)['files']);
+    }
+
+    #[Test]
     public function it_packages_exact_bytes_and_excludes_development_artifacts(): void
     {
         $source = $this->fixture->core('source');
@@ -36,7 +50,7 @@ class CoreDistributionTest extends TestCase
         CoreDistribution::build($source, $bundle);
         $distribution = CoreDistribution::load($bundle);
 
-        $this->assertSame(['Http/Kernel.php', 'autoload.php', 'functions.php', 'imports.json'], array_keys($distribution->manifest['files']));
+        $this->assertSame(['.htaccess', 'Http/Kernel.php', 'autoload.php', 'functions.php', 'imports.json', 'stubs/error.html'], array_keys($distribution->manifest['files']));
         $this->assertSame("<?php\ndeclare(strict_types=1);\n// kernel\n", $distribution->contents('Http/Kernel.php'));
         $this->assertSame(hash('sha256', $distribution->contents('Http/Kernel.php')), $distribution->manifest['files']['Http/Kernel.php']);
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $distribution->manifest['id']);

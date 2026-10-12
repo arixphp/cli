@@ -25,14 +25,14 @@ class HttpRuntimeTest extends TestCase
 
         try {
             $_SERVER = ['REQUEST_METHOD' => 'QUERY', 'REQUEST_URI' => '/hook'];
-            $handler = new class implements RequestHandler
+            $handler = new class() implements RequestHandler
             {
                 public function handle(Request $request, Container $container): Response
                 {
-                    return new Response($request->getMethod().':'.$request->attributes->get('_arix_path'));
+                    return new Response($request->getMethod() . ':' . $request->attributes->get('_arix_path'));
                 }
             };
-            $response = (new HttpRuntime)->handle(static fn (): Kernel => new Kernel($handler), $sapi);
+            $response = (new HttpRuntime())->handle(static fn (): Kernel => new Kernel($handler), $sapi);
             $this->assertSame(200, $response->getStatusCode());
             $this->assertSame('QUERY:/hook', $response->getContent());
         } finally {
@@ -50,7 +50,7 @@ class HttpRuntimeTest extends TestCase
     public function it_unsupported_runtime_rejects_before_bootstrap(string $sapi): void
     {
         $called = false;
-        $response = (new HttpRuntime)->handle(static function () use (&$called): void {
+        $response = (new HttpRuntime())->handle(static function () use (&$called): void {
             $called = true;
         }, $sapi);
         $this->assertSame(503, $response->getStatusCode());
@@ -73,7 +73,9 @@ class HttpRuntimeTest extends TestCase
             throw new RuntimeException('bootstrap secret');
         }, 'fpm-fcgi');
         $this->assertSame(500, $response->getStatusCode());
-        $this->assertSame('Internal server error.', $response->getContent());
+        $this->assertSame('text/html; charset=UTF-8', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString('<pre>Internal server error.</pre>', $response->getContent());
+        $this->assertStringNotContainsString('bootstrap secret', $response->getContent());
         $this->assertStringContainsString('bootstrap secret', $logs[0]);
     }
 
@@ -96,8 +98,8 @@ class HttpRuntimeTest extends TestCase
     #[Test]
     public function it_cli_run_writes_only_stderr_and_does_not_execute_bootstrap(): void
     {
-        $autoload = dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'autoload.php';
-        $program = 'require '.var_export($autoload, true).'; exit((new Arix\\Runtime\\HttpRuntime)->run(static function () { echo "BOOTSTRAP"; }));';
+        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $program = 'require ' . var_export($autoload, true) . '; exit((new Arix\\Runtime\\HttpRuntime)->run(static function () { echo "BOOTSTRAP"; }));';
         $process = proc_open([PHP_BINARY, '-r', $program], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         $stdout = stream_get_contents($pipes[1]);
         $stderr = stream_get_contents($pipes[2]);
@@ -125,7 +127,13 @@ class HttpRuntimeTest extends TestCase
                 throw new RuntimeException('bootstrap failed');
             }, 'fpm-fcgi');
             $this->assertSame(500, $response->getStatusCode());
-            $this->assertSame($body, $response->getContent());
+            $this->assertSame('text/html; charset=UTF-8', $response->headers->get('Content-Type'));
+
+            if ($method === 'HEAD') {
+                $this->assertSame('', $response->getContent());
+            } else {
+                $this->assertStringContainsString($body, $response->getContent());
+            }
             $this->assertTrue($response->headers->hasCacheControlDirective('no-store'));
             $this->assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
             $this->assertStringContainsString('bootstrap failed', file_get_contents($log));
@@ -138,6 +146,6 @@ class HttpRuntimeTest extends TestCase
 
     public static function errorMethods(): array
     {
-        return [['GET', 'Internal server error.'], ['HEAD', '']];
+        return [['GET', '<pre>Internal server error.</pre>'], ['HEAD', '']];
     }
 }
