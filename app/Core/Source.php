@@ -18,6 +18,7 @@ class Source
     private const array PACKAGES = [
         'symfony/http-foundation' => ['HttpFoundation', 'Symfony\\Component\\HttpFoundation', 'Arix\\HttpFoundation', ''],
         'nikic/fast-route' => ['Routing', 'FastRoute', 'Arix\\Routing', 'src'],
+        'eftec/bladeone' => ['BladeOne', 'eftec\\bladeone', 'Arix\\BladeOne', 'lib'],
     ];
 
     public function import(string $vendor, string $core): array
@@ -209,6 +210,10 @@ class Source
     {
         if (is_link($source)) {
             throw new RuntimeException("Linked package source: {$source}");
+        }
+
+        if (basename($source) === 'bladeonecli') {
+            return;
         }
 
         if (is_dir($source)) {

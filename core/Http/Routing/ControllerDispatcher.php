@@ -7,6 +7,8 @@ namespace Arix\Http\Routing;
 use Arix\Container\Container;
 use Arix\HttpFoundation\Request;
 use Arix\HttpFoundation\Response;
+use Arix\Views\TemplateEngine;
+use Arix\Views\Contracts\View as ViewContract;
 use ReflectionClass;
 use ReflectionNamedType;
 use ReflectionUnionType;
@@ -67,8 +69,8 @@ class ControllerDispatcher
         $types = $return instanceof ReflectionUnionType ? $return->getTypes() : [$return];
 
         foreach ($types as $type) {
-            if (! $type instanceof ReflectionNamedType || $type->allowsNull() || ! is_a($type->getName(), Response::class, true)) {
-                throw new RuntimeException('Controller action must declare a Response-compatible return type.');
+            if (! $type instanceof ReflectionNamedType || $type->allowsNull() || (! is_a($type->getName(), Response::class, true) && ! is_a($type->getName(), ViewContract::class, true))) {
+                throw new RuntimeException('Controller action must declare a Response or View return type.');
             }
         }
 
@@ -78,7 +80,23 @@ class ControllerDispatcher
             throw new RuntimeException('Controller binding returned an incompatible instance.');
         }
 
-        return $controller->{$route->action}(...($parameters === [] ? [] : [$request]));
+        $result = $controller->{$route->action}(...($parameters === [] ? [] : [$request]));
+
+        if ($result instanceof Response) {
+            return $result;
+        }
+
+        if (! $result instanceof ViewContract) {
+            throw new RuntimeException('Controller action must return a Response or View.');
+        }
+
+        $engine = $container->get(TemplateEngine::class);
+
+        if (! $engine instanceof TemplateEngine) {
+            throw new RuntimeException('TemplateEngine binding returned an incompatible instance.');
+        }
+
+        return new Response($engine->render($result->name(), $result->data()), 200, ['Content-Type' => 'text/html; charset=UTF-8']);
     }
 
     private function controllerFile(string $class): string

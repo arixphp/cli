@@ -11,9 +11,19 @@
             "version": "1.3.1",
             "destination": "Routing",
             "namespace": "Arix\\Routing"
+        },
+        "eftec/bladeone": {
+            "version": "5.0",
+            "destination": "BladeOne",
+            "namespace": "Arix\\BladeOne"
         }
     },
     "files": {
+        "BladeOne/BladeOne.php": "4a558e29c88930239f96a22027de04360112f9329dd1aa7e6382fcfbea336be9",
+        "BladeOne/BladeOneCache.php": "3292868238c1af1ab59856097672af5ffaec412501344d6944c419ad722468cc",
+        "BladeOne/BladeOneCacheRedis.php": "1b27912eecddb97042b05f9d2192c3e578f3a68069982c080f446dddfe72ada7",
+        "BladeOne/BladeOneCustom.php": "f030d8859178a04909bc79b61e66943b613b8b2642489a950154e5a9b206062d",
+        "BladeOne/LICENSE": "717b3effa39b4f8a73093fa222108d7e2bf9206c71262d4ba108aad55e754e22",
         "HttpFoundation/AcceptHeader.php": "6547e8103cb778456666cc9f468ed1c6c2508b7c38e4acfba6557745fd01437b",
         "HttpFoundation/AcceptHeaderItem.php": "49cdd11642fff95d003e4e66e243b028a856c40ebc6ac20027c74d21b318eec8",
         "HttpFoundation/BinaryFileResponse.php": "f22895936bd6af5f12a2c1ff9ff6e95f9663980e6f8bc47ed06400594974adfe",

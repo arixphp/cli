@@ -124,4 +124,31 @@ class RoutingHandlerTest extends RoutingTestCase
         $this->assertSame(0, proc_close($process), $errors);
         $this->assertSame('200:42', $output);
     }
+
+    #[Test]
+    public function it_renders_views_through_the_kernel_and_suppresses_head_bodies(): void
+    {
+        mkdir($this->directory.DIRECTORY_SEPARATOR.'views', 0755, true);
+        mkdir($this->directory.DIRECTORY_SEPARATOR.'lang', 0755, true);
+        mkdir($this->directory.DIRECTORY_SEPARATOR.'cache', 0755, true);
+        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'views'.DIRECTORY_SEPARATOR.'page.arix.php', '<h1>{{ $title }}</h1>');
+        $root = $this->directory;
+        $class = $this->controller('public function show(): \\Arix\\Views\\Contracts\\View { return new \\Arix\\Views\\View("page", ["title" => "Hi"]); }');
+        $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class, $root): void {
+            $container->instance(RouteRegistry::class, new RouteRegistry);
+            $container->bind($class, static fn (): object => new $class);
+            \Arix\Views\ViewServices::register($container, $root, $container->get(Request::class), [
+                'app' => ['name' => 'Site', 'base_path' => '', 'locales' => ['en'], 'default_locale' => 'en'],
+                'cache' => ['path' => $root.DIRECTORY_SEPARATOR.'cache', 'version' => '1'],
+                'views' => $root.DIRECTORY_SEPARATOR.'views',
+                'lang' => $root.DIRECTORY_SEPARATOR.'lang',
+            ]);
+            Route::get('/page', [$class, 'show']);
+        });
+        $response = $kernel->handle(Request::create('/page'));
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('<h1>Hi</h1>', $response->getContent());
+        $this->assertSame('text/html; charset=UTF-8', $response->headers->get('Content-Type'));
+        $this->assertSame('', $kernel->handle(Request::create('/page', 'HEAD'))->getContent());
+    }
 }

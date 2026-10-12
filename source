@@ -17,7 +17,7 @@ if (PHP_VERSION_ID < 80401) {
 $arguments = array_slice($argv, 1);
 
 if ($arguments === ['--help']) {
-    fwrite(STDOUT, "Usage: ./source [--package=http-foundation|--package=routing]\nImports the complete HttpFoundation and FastRoute bundle from vendor into core.\nPackage options are compatibility aliases for the full bundle, not selective imports.\n");
+    fwrite(STDOUT, "Usage: ./source [--package=http-foundation|--package=routing]\nImports the complete HttpFoundation, FastRoute and BladeOne bundle from vendor into core.\nPackage options are compatibility aliases for the full bundle, not selective imports.\n");
 
     exit(0);
 }
