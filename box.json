@@ -7,7 +7,10 @@
         "vendor"
     ],
     "files": [
-        "composer.json"
+        "composer.json",
+        "resources/core.bundle",
+        "resources/js/arix.js",
+        "resources/js/manifest.json"
     ],
     "exclude-composer-files": false,
     "compression": "GZ",
