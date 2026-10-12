@@ -9,8 +9,8 @@ use Arix\Container\Container;
 use Arix\Container\ContainerContext;
 use Arix\HttpFoundation\Request;
 use Arix\Localization\Translator;
+use Arix\Routing\UrlGenerator;
 use Arix\Views\TemplateEngine;
-use Arix\Views\UrlGenerator;
 use Arix\Views\ViewServices;
 use InvalidArgumentException;
 use LogicException;
@@ -96,7 +96,7 @@ class ViewHelpersTest extends TestCase
 
         $this->assertSame('/site/about', $urls->to('/about'));
         $this->assertSame('/site/about', $urls->current());
-        $this->assertSame('/about', $urls->current_path());
+        $this->assertSame('/about', $urls->currentPath());
         $this->assertSame('/site/styles/app.css', $urls->asset('styles/app.css'));
     }
 
@@ -217,7 +217,7 @@ class ViewHelpersTest extends TestCase
                 if (! $view instanceof Arix\Views\Contracts\View) { exit(3); }
                 if (trans('missing.key') !== 'missing.key') { exit(4); }
                 if (config('app.missing', 'dflt') !== 'dflt') { exit(5); }
-                if (! (url() instanceof Arix\Views\UrlGenerator)) { exit(6); }
+                if (! (url() instanceof Arix\Routing\UrlGenerator)) { exit(6); }
                 $engine = $container->get(Arix\Views\TemplateEngine::class);
                 return $engine->render($view->name(), $view->data());
             });

@@ -35,9 +35,9 @@ if (! function_exists('trans')) {
 }
 
 if (! function_exists('url')) {
-    function url(null|string $path = null): Arix\Views\UrlGenerator|string
+    function url(null|string $path = null): Arix\Routing\UrlGenerator|string
     {
-        $generator = Arix\Container\ContainerContext::current()->get(Arix\Views\UrlGenerator::class);
+        $generator = Arix\Container\ContainerContext::current()->get(Arix\Routing\UrlGenerator::class);
 
         return $path === null ? $generator : $generator->to($path);
     }
@@ -53,7 +53,7 @@ if (! function_exists('config')) {
 if (! function_exists('asset')) {
     function asset(string $path): string
     {
-        return Arix\Container\ContainerContext::current()->get(Arix\Views\UrlGenerator::class)->asset($path);
+        return Arix\Container\ContainerContext::current()->get(Arix\Routing\UrlGenerator::class)->asset($path);
     }
 }
 

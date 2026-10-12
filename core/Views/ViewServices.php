@@ -8,6 +8,7 @@ use Arix\Config\Repository;
 use Arix\Container\Container;
 use Arix\HttpFoundation\Request;
 use Arix\Localization\Translator;
+use Arix\Routing\UrlGenerator;
 use Arix\Support\Path;
 use InvalidArgumentException;
 

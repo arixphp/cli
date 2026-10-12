@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arix\Views;
+namespace Arix\Routing;
 
 use Arix\Constants\HttpStatusCode;
 use Arix\Http\HttpException;
@@ -34,14 +34,14 @@ class UrlGenerator
         return rtrim($this->basePath, '/').'/'.$this->suffix($path);
     }
 
-    public function current_path(): string
+    public function currentPath(): string
     {
         return '/'.$this->suffix($this->currentPath);
     }
 
     public function current(): string
     {
-        return $this->to($this->current_path());
+        return $this->to($this->currentPath());
     }
 
     public function asset(string $path): string
