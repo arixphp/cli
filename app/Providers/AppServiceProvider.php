@@ -1,7 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Providers;
 
+use App\Core\Update\CoreDistribution;
+use App\Core\Update\CorePackager;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +16,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        $this->app['events']->listen(CommandStarting::class, function (CommandStarting $event): void {
+            if ($event->command !== 'app:build' || $event->input->hasParameterOption(['--help', '-h', '--version', '-V'], true)) {
+
+                return;
+            }
+
+            $distribution = $this->app->make(CorePackager::class)->build();
+            $event->output->writeln("Core bundle prepared: {$distribution->manifest['id']}");
+        });
     }
 
     /**
@@ -19,6 +32,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(CoreDistribution::class, fn (): CoreDistribution => CoreDistribution::bundled($this->app->basePath()));
+        $this->app->bind(CorePackager::class, fn (): CorePackager => new CorePackager(
+            $this->app->basePath('core'),
+            $this->app->basePath('resources' . DIRECTORY_SEPARATOR . 'core.bundle'),
+        ));
     }
 }
