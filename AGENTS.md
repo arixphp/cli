@@ -24,7 +24,7 @@ unless the user explicitly requests a cross-project change.
 
 ## Project layout
 
-- `application` is the Laravel Zero entry point.
+- `arix` is the Laravel Zero entry point.
 - `app/` contains development-tool commands, providers, and the source importer.
 - `app/Core/Source.php` owns the supported upstream import process.
 - `source` is the executable interface for regenerating managed core sources.
@@ -33,7 +33,12 @@ unless the user explicitly requests a cross-project change.
   Pest.
 - `tests/Feature/` and `tests/Unit/` cover the Laravel Zero application.
 - `docs/` documents current architecture and historical implementation work.
-- `vendor/` is development-only and must never be mixed with `../arix/`.
+- `vendor/` supplies CLI dependencies, including Pest as a runtime dependency;
+  it must never be copied into `../arix/` or standalone core.
+- `app/Testing/` launches isolated application tests; `resources/testing/`
+  contains the standalone worker and Pest adapter. Production uses a PHPacker
+  executable with embedded PHP and an intermediate PHAR. Packaged workers extract
+  dependencies to a private disposable directory and clean it on shutdown.
 - `box.json` configures the compiled CLI build.
 
 The primary architecture references are `docs/core-kernel.md`,
@@ -109,7 +114,9 @@ Run every command from the `cli/` directory.
 - Inspect importer options: `./source --help`
 - Rebuild the optimized development autoloader after class or namespace moves:
   `composer dump-autoload --no-scripts`
-- Run the development CLI: `php application` or `./application`
+- Run the development CLI: `php arix` or `./arix`
+- Application tests: `php arix tests --path=../arix` from this directory, or
+  installed `arix tests` from the application's root.
 
 There are no project Composer scripts, PHPStan or Psalm configuration, GitHub
 Actions, or repository CI to assume. Do not invoke tools merely because they
@@ -122,6 +129,16 @@ in scope and validate the working tree first.
 
 ## Testing
 
+- Application tests live in the target application's `tests/` and use Pest
+  syntax only. Read its `phpunit.xml` via PHPUnit and bootstrap
+  `tests/autoload.php`; never fall back to CLI tests or bootstrap Laravel Zero
+  in the worker. Preserve local `App\\`, `Arix\\`, `Tests\\`, and Arix helpers.
+- Pest is a production CLI dependency, not a deployed core dependency. Verify
+  source, intermediate PHAR, and native executable modes; do not patch vendor code.
+  Set `ARIX_TEST_EXECUTABLE` to run native integration tests without PHP in PATH.
+  Micro-SAPI workers re-execute `micro_get_self_filename()` directly, not a system
+  PHP command. Keep PHPacker in separate release tooling while its dependency
+  constraints conflict with this project's Symfony requirements.
 - Tests for `core/` belong under `tests/Core/` and use PHPUnit classes and
   assertions, not Pest closure syntax.
 - PHPUnit test methods begin with `it_` and use the `#[Test]` attribute.
