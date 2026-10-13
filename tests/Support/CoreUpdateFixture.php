@@ -63,7 +63,7 @@ class CoreUpdateFixture
 
     public function application(string $relative = 'application'): string
     {
-        $this->write("{$relative}/.arix.json", '{"format":1,"core_contract":"standalone-http-v1"}');
+        $this->write("{$relative}/.arix.json", '{"format":1,"core_contract":"arix-core-v1"}');
         $this->write("{$relative}/index.php", '<?php // application entry point');
         $this->write("{$relative}/app/bootstrap.php", '<?php // application bootstrap');
 
@@ -85,7 +85,7 @@ class CoreUpdateFixture
         ksort($hashes);
         $manifest = [
             'format' => 1,
-            'contract' => 'standalone-http-v1',
+            'contract' => 'arix-core-v1',
             'php' => '>=8.4.1',
             'extensions' => ['mbstring'],
             'files' => $hashes,

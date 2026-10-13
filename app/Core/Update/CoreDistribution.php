@@ -97,7 +97,7 @@ class CoreDistribution
     /** @return array<string, mixed> */
     public static function validateManifest(array $manifest): array
     {
-        if (($manifest['format'] ?? null) !== 1 || ($manifest['contract'] ?? null) !== 'standalone-http-v1'
+        if (($manifest['format'] ?? null) !== 1 || ($manifest['contract'] ?? null) !== 'arix-core-v1'
             || ($manifest['php'] ?? null) !== '>=8.4.1' || ($manifest['extensions'] ?? null) !== ['mbstring']
             || ! is_array($manifest['files'] ?? null) || ! is_string($manifest['id'] ?? null)) {
             throw new RuntimeException('Unsupported core distribution manifest.');
@@ -160,7 +160,7 @@ class CoreDistribution
     public static function manifest(array $files): array
     {
         ksort($files);
-        $manifest = ['format' => 1, 'contract' => 'standalone-http-v1', 'php' => '>=8.4.1', 'extensions' => ['mbstring'], 'files' => $files];
+        $manifest = ['format' => 1, 'contract' => 'arix-core-v1', 'php' => '>=8.4.1', 'extensions' => ['mbstring'], 'files' => $files];
         $manifest['id'] = hash('sha256', json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
 
         return $manifest;

@@ -38,7 +38,7 @@ class ApplicationTarget
 
         $contract = CoreDistribution::decode(CoreFiles::read($metadata));
 
-        if (($contract['format'] ?? null) !== 1 || ($contract['core_contract'] ?? null) !== 'standalone-http-v1') {
+        if (($contract['format'] ?? null) !== 1 || ($contract['core_contract'] ?? null) !== 'arix-core-v1') {
             throw new RuntimeException('Unsupported application compatibility contract; migrate the application first.');
         }
 

@@ -145,4 +145,15 @@ class CoreInspectorTest extends TestCase
         $this->expectExceptionMessageIsOrContains('local changes');
         new CoreInspector()->inspect($application, CoreDistribution::load($this->fixture->path('core.bundle')));
     }
+
+    #[Test]
+    public function it_rejects_application_metadata_declaring_a_retired_core_contract(): void
+    {
+        $application = $this->fixture->installed();
+        $this->fixture->write('application/.arix.json', '{"format":1,"core_contract":"standalone-http-v1"}');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains('compatibility');
+        ApplicationTarget::resolve($application, $this->fixture->root);
+    }
 }

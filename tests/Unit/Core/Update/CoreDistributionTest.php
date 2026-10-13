@@ -179,4 +179,19 @@ class CoreDistributionTest extends TestCase
         $this->expectExceptionMessageIsOrContains('Imported');
         CoreDistribution::build($source, $this->fixture->path('core.bundle'));
     }
+
+    #[Test]
+    public function it_declares_the_arix_core_contract_identifier(): void
+    {
+        $files = [
+            'Http/Kernel.php' => hash('sha256', 'kernel'),
+            'autoload.php' => hash('sha256', 'autoload'),
+            'functions.php' => hash('sha256', 'functions'),
+            'imports.json' => hash('sha256', 'imports'),
+        ];
+        $manifest = CoreDistribution::manifest($files);
+
+        $this->assertSame('arix-core-v1', $manifest['contract']);
+        $this->assertSame($manifest, CoreDistribution::validateManifest($manifest));
+    }
 }
