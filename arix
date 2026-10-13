@@ -1,6 +1,13 @@
 #!/usr/bin/env php
 <?php
 
+declare(strict_types=1);
+
+if (($_SERVER['argv'][1] ?? null) === '--arix-tests-worker') {
+    require __DIR__ . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Testing' . DIRECTORY_SEPARATOR . 'worker.php';
+    exit($status);
+}
+
 define('LARAVEL_START', microtime(true));
 
 /*
