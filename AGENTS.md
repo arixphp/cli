@@ -35,8 +35,8 @@ unless the user explicitly requests a cross-project change.
 - `docs/` documents current architecture and historical implementation work.
 - `vendor/` supplies CLI dependencies, including Pest as a runtime dependency;
   it must never be copied into `../arix/` or standalone core.
-- `app/Testing/` launches isolated application tests; `resources/testing/`
-  contains the standalone worker and Pest adapter. Production uses a PHPacker
+- `app/Testing/` launches isolated application tests, including the standalone
+  worker entry and Pest adapter. Production uses a PHPacker
   executable with embedded PHP and an intermediate PHAR. Packaged workers extract
   dependencies to a private disposable directory and clean it on shutdown.
 - `box.json` configures the compiled CLI build.
