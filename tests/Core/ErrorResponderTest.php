@@ -83,8 +83,54 @@ class ErrorResponderTest extends TestCase
     }
 
     #[Test]
+    #[DataProvider('rendererFailures')]
+    public function it_discards_incidental_output_from_custom_renderers(bool $fails): void
+    {
+        $level = ob_get_level();
+        $output = '';
+        ob_start(static function (string $buffer) use (&$output): string {
+            $output .= $buffer;
+
+            return '';
+        });
+
+        try {
+            $response = new ErrorResponder()->respond(new HttpException(HttpStatusCode::NOT_FOUND, 'Missing.'), static function () use ($fails): string {
+                echo 'renderer secret';
+                ob_flush();
+
+                if ($fails) {
+                    throw new RuntimeException('render failed');
+                }
+
+                return '<main>Custom 404</main>';
+            });
+            ob_end_clean();
+        } finally {
+            while (ob_get_level() > $level) {
+                ob_end_clean();
+            }
+        }
+
+        $this->assertSame('', $output);
+        $this->assertSame(404, $response->getStatusCode());
+
+        if ($fails) {
+            $this->assertStringContainsString('<pre>Missing.</pre>', $response->getContent());
+        } else {
+            $this->assertSame('<main>Custom 404</main>', $response->getContent());
+        }
+    }
+
+    public static function rendererFailures(): array
+    {
+
+        return [[false], [true]];
+    }
+
+    #[Test]
     #[DataProvider('standaloneResources')]
-    public function it_handles_errors_without_composer_or_application_services(string $resource): void
+    public function it_handles_errors_without_composer_or_application_services(string $resource, bool $viewFails = false): void
     {
         $fixture = new CoreUpdateFixture();
         $source = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core';
@@ -104,7 +150,8 @@ class ErrorResponderTest extends TestCase
 
             $program = <<<'PHP'
 require $argv[1];
-$response = (new Arix\Http\ErrorResponder(logger: static function (): void {}))->respond(new RuntimeException('standalone secret'));
+$renderView = $argv[2] === 'fail' ? static function (int $status, string $message): string { throw new RuntimeException('template secret'); } : null;
+$response = (new Arix\Http\ErrorResponder(logger: static function (): void {}))->respond(new RuntimeException('standalone secret'), $renderView);
 echo json_encode([
     'composer' => class_exists('Composer\Autoload\ClassLoader', false),
     'status' => $response->getStatusCode(),
@@ -114,7 +161,7 @@ echo json_encode([
     'nosniff' => $response->headers->get('X-Content-Type-Options'),
 ], JSON_THROW_ON_ERROR);
 PHP;
-            $process = new Process([PHP_BINARY, '-d', 'display_errors=stderr', '-r', $program, $fixture->path('core/autoload.php')], $fixture->root, ['XDEBUG_MODE' => 'off']);
+            $process = new Process([PHP_BINARY, '-d', 'display_errors=stderr', '-r', $program, $fixture->path('core/autoload.php'), $viewFails ? 'fail' : 'none'], $fixture->root, ['XDEBUG_MODE' => 'off']);
             $process->run();
 
             $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -125,6 +172,7 @@ PHP;
             $this->assertTrue($result['no_store']);
             $this->assertSame('nosniff', $result['nosniff']);
             $this->assertStringNotContainsString('standalone secret', $result['body']);
+            $this->assertStringNotContainsString('template secret', $result['body']);
 
             if ($resource === 'valid') {
                 $this->assertSame('text/html; charset=UTF-8', $result['type']);
@@ -141,6 +189,6 @@ PHP;
     public static function standaloneResources(): array
     {
 
-        return [['valid'], ['missing'], ['empty'], ['malformed']];
+        return [['valid'], ['missing'], ['empty'], ['malformed'], ['valid', true], ['missing', true], ['empty', true], ['malformed', true]];
     }
 }
