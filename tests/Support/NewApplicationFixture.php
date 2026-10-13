@@ -1,0 +1,85 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Support;
+
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use ZipArchive;
+
+class NewApplicationFixture
+{
+    public readonly string $root;
+
+    public function __construct()
+    {
+        $this->root = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-new-test-' . bin2hex(random_bytes(8));
+        mkdir($this->root, 0700);
+    }
+
+    public function path(string $relative): string
+    {
+
+        return $this->root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative);
+    }
+
+    public function write(string $relative, string $contents): string
+    {
+        $path = $this->path($relative);
+
+        if (! is_dir(dirname($path))) {
+            mkdir(dirname($path), 0700, true);
+        }
+
+        file_put_contents($path, $contents);
+
+        return $path;
+    }
+
+    public function cleanup(): void
+    {
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->root, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+
+        foreach ($iterator as $file) {
+            if ($file->isDir() && ! $file->isLink()) {
+                rmdir($file->getPathname());
+            } else {
+                unlink($file->getPathname());
+            }
+        }
+
+        rmdir($this->root);
+    }
+
+    /** @param array<string, string>|null $entries */
+    public function archive(array|null $entries = null, string $name = 'fixture.zip'): string
+    {
+        $zip = new ZipArchive();
+        $path = $this->path($name);
+        $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+
+        foreach ($entries ?? self::skeleton() as $entry => $contents) {
+            $zip->addFromString($entry, $contents);
+        }
+
+        $zip->close();
+
+        return $path;
+    }
+
+    /** @return array<string, string> */
+    public static function skeleton(): array
+    {
+
+        return [
+            'app-sha/.arix.json' => '{"format":1,"core_contract":"arix-core-v1"}',
+            'app-sha/.htaccess' => 'RewriteEngine On',
+            'app-sha/.gitignore' => '/storage/cache',
+            'app-sha/index.php' => '<?php throw new RuntimeException("Do not execute downloaded PHP");',
+            'app-sha/core/autoload.php' => '<?php // downloaded core',
+            'app-sha/app/routes.php' => '<?php // routes',
+        ];
+    }
+}

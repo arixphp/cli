@@ -7,6 +7,10 @@ namespace App\Providers;
 use App\Core\Update\CoreDistribution;
 use App\Core\Update\CorePackager;
 use App\Css\Update\CssDistribution;
+use App\Installation\CurlTransport;
+use App\Installation\GitHubSkeleton;
+use App\Installation\HttpTransport;
+use App\Installation\SkeletonSource;
 use App\Js\Update\JsDistribution;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Support\ServiceProvider;
@@ -41,5 +45,7 @@ class AppServiceProvider extends ServiceProvider
             $this->app->basePath('core'),
             $this->app->basePath('resources' . DIRECTORY_SEPARATOR . 'core.bundle'),
         ));
+        $this->app->bind(HttpTransport::class, CurlTransport::class);
+        $this->app->bind(SkeletonSource::class, GitHubSkeleton::class);
     }
 }
