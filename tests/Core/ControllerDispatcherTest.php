@@ -98,7 +98,7 @@ class ControllerDispatcherTest extends RoutingTestCase
     {
         $class = $this->controller('public function __construct() { throw new \\LogicException("constructed"); } public function show(): Response { return new Response; }');
         $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('constructed');
+        $this->expectExceptionMessageIsOrContains('constructed');
         new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container);
     }
 

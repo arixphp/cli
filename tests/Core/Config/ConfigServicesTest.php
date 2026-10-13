@@ -86,7 +86,7 @@ class ConfigServicesTest extends TestCase
         $file = $this->directory . DIRECTORY_SEPARATOR . $name;
         file_put_contents($file, $code);
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage($file);
+        $this->expectExceptionMessageIsOrContains($file);
 
         ConfigServices::register(new Container(), $this->directory);
     }

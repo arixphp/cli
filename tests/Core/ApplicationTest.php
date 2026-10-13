@@ -100,7 +100,7 @@ class ApplicationTest extends TestCase
         $this->routes('/', $class);
         file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'services.php', "<?php\ndeclare(strict_types=1);\nreturn [];\n");
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('registration closure');
+        $this->expectExceptionMessageIsOrContains('registration closure');
         Application::create($this->root);
     }
 
@@ -113,7 +113,7 @@ class ApplicationTest extends TestCase
         file_put_contents($target, "<?php\ndeclare(strict_types=1);\nreturn static function (\\Arix\\Container\\Container \$container): void {};\n");
         symlink($target, $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'services.php');
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('linked');
+        $this->expectExceptionMessageIsOrContains('linked');
         Application::create($this->root);
     }
 
