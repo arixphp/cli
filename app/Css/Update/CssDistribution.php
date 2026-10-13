@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace App\Css\Update;
 
 use App\Core\Update\CoreFiles;
+use App\Frontend\ReleaseManifest;
 use JsonException;
 use RuntimeException;
 
-use function in_array;
 use function is_array;
-use function is_string;
 
 class CssDistribution
 {
@@ -46,6 +45,12 @@ class CssDistribution
 
         if ($version === null) {
             throw new RuntimeException('The canonical styles are not a recorded release.');
+        }
+
+        foreach ($contents as $file => $body) {
+            if (preg_match_all('/Arix CSS version:\s*([0-9]+\.[0-9]+\.[0-9]+)/', $body, $matches) !== 1 || $matches[1][0] !== $version) {
+                throw new RuntimeException("CSS version header does not match release: {$file}");
+            }
         }
 
         return new self($version, $hashes, $releases, $contents);
@@ -101,35 +106,8 @@ class CssDistribution
     /** @return array<string, array<string, string>> */
     public static function validateManifest(array $manifest): array
     {
-        if (($manifest['format'] ?? null) !== 1 || ! is_array($manifest['releases'] ?? null) || ($manifest['releases'] ?? []) === []) {
-            throw new RuntimeException('Unsupported styles distribution manifest.');
-        }
 
-        $releases = [];
-
-        foreach ($manifest['releases'] as $version => $files) {
-            if (! is_string($version) || $version === '' || ! is_array($files)) {
-                throw new RuntimeException('Invalid manifest release.');
-            }
-
-            $recorded = [];
-
-            foreach ($files as $file => $hash) {
-                if (! in_array($file, self::FILES, true) || ! is_string($hash) || preg_match('/^[a-f0-9]{64}$/D', $hash) !== 1) {
-                    throw new RuntimeException('Invalid manifest release file or hash.');
-                }
-
-                $recorded[$file] = $hash;
-            }
-
-            if (array_diff(self::FILES, array_keys($recorded)) !== []) {
-                throw new RuntimeException("Incomplete manifest release: {$version}");
-            }
-
-            $releases[$version] = $recorded;
-        }
-
-        return $releases;
+        return ReleaseManifest::validate($manifest, self::FILES);
     }
 
     /** @return array<string, mixed> */

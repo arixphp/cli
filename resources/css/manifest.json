@@ -6,6 +6,12 @@
             "components.css": "62abc9d22cd093f129db443c35b7e8438660601ad3901c3339b3aaec772c3488",
             "tokens.css": "e24dfd99fd22eb865f4925b701d4aba759e6a5169f938edf6941c144b1e55112",
             "utilities.css": "ec35a2092997b45ce1992f456870a12fa0f49af3772ff9a78d5272b727258de0"
+        },
+        "1.1.0": {
+            "base.css": "acc9c366497d61eba5bed58904369f9f1ce38859e9556aa73d418c7b67858f7f",
+            "components.css": "2eb4c3a9860a61f7a15dc46b4aaf4355a0ec5583b00e60c5caee4b1ad5bc3d25",
+            "tokens.css": "9cdb62aa9dc093c235c016b3ff203d155b3cf50fdc7b5d1e7cfe7577c61a64e5",
+            "utilities.css": "4cdbe2ab37310fc23b5d31b69aa04c9687e29b619840204c06bcd38180553f9a"
         }
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Js\Update;
 
 use App\Core\Update\CoreFiles;
+use App\Frontend\ReleaseManifest;
 use JsonException;
 use RuntimeException;
 
@@ -76,12 +77,15 @@ class JsDistribution
 
         $releases = [];
 
-        foreach ($manifest['releases'] as $version => $hash) {
-            if (! is_string($version) || $version === '' || ! is_string($hash) || preg_match('/^[a-f0-9]{64}$/D', $hash) !== 1) {
-                throw new RuntimeException('Invalid manifest release or hash.');
+        // Normalize legacy single-file inventories before shared validation.
+        foreach ($manifest['releases'] as $version => $inventory) {
+            if (is_string($inventory)) {
+                $manifest['releases'][$version] = ['arix.js' => $inventory];
             }
+        }
 
-            $releases[$version] = $hash;
+        foreach (ReleaseManifest::validate($manifest, ['arix.js']) as $version => $inventory) {
+            $releases[$version] = $inventory['arix.js'];
         }
 
         return $releases;
