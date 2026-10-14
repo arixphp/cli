@@ -122,6 +122,11 @@ class TemplateEngineTest extends TestCase
     public function it_fails_closed_on_unwritable_cache_without_partial_output(): void
     {
         chmod($this->cache, 0555);
+
+        if (is_writable($this->cache)) {
+            $this->markTestSkipped('This filesystem/user does not enforce POSIX write permissions.');
+        }
+
         $engine = new TemplateEngine($this->views, $this->cache);
         $level = ob_get_level();
         ob_start();

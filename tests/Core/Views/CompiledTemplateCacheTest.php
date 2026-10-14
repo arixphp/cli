@@ -85,6 +85,11 @@ class CompiledTemplateCacheTest extends TestCase
 
         chmod($this->directory, 0555);
 
+        if (is_writable($this->directory)) {
+            $this->assertSame(2, $rejected);
+            $this->markTestSkipped('Linked and missing directories were checked; this filesystem/user does not enforce POSIX write permissions.');
+        }
+
         try {
             (new CompiledTemplateCache($this->directory, '1'))->remember('source', 'code', static fn (): string => 'x');
         } catch (RuntimeException) {

@@ -1,0 +1,27 @@
+{
+    "repository": "phpacker/php-bin",
+    "commit": "0c75828a74a42068581520a10694ce9a425465e3",
+    "php": "8.4",
+    "targets": {
+        "linux-x64": {
+            "path": "linux/x64",
+            "sha256": "385a2b45daefe7b93fbdab5d55ded83fab91d1ba301817df2365d29be5efec08"
+        },
+        "linux-arm": {
+            "path": "linux/arm64",
+            "sha256": "d8f2716381869607c8dd69e9fd52dd7edfb6c486217403f18285da11826199d4"
+        },
+        "mac-x64": {
+            "path": "mac/x64",
+            "sha256": "2a8bceed2056ffdb7c44f95ebda25b97f443998fc7a6b8a8e003676675c01110"
+        },
+        "mac-arm": {
+            "path": "mac/arm64",
+            "sha256": "efc494a9e0420c23d7b94547e3b393a65d6412c39d86be2fdf92fdcb97e09668"
+        },
+        "windows-x64": {
+            "path": "win/x64",
+            "sha256": "469bcbe3d767e303ecad347c174382f662d8711adde7ddf0490d192c73813089"
+        }
+    }
+}

@@ -85,7 +85,9 @@ class InstallationTargetTest extends TestCase
     #[Test]
     public function it_rejects_broken_destination_links(): void
     {
+        $this->fixture->write('absent', 'temporary link target');
         symlink($this->fixture->path('absent'), $this->fixture->path('app'));
+        unlink($this->fixture->path('absent'));
         $this->expectException(InvalidArgumentException::class);
         InstallationTarget::resolve('app', '.', $this->fixture->root);
     }

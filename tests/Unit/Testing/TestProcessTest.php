@@ -15,6 +15,10 @@ class TestProcessTest extends TestCase
     #[Test]
     public function it_reexecutes_a_self_contained_binary_without_a_php_command(): void
     {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $this->markTestSkipped('This shell fixture requires POSIX; release integration tests exercise the Windows executable directly.');
+        }
+
         $fixture = new ApplicationTestingFixture();
 
         try {
