@@ -1,31 +1,28 @@
-<p align="center">
-    <img title="Laravel Zero" height="100" src="https://raw.githubusercontent.com/laravel-zero/docs/master/images/logo/laravel-zero-readme.png" alt="Laravel Zero Logo" />
-</p>
+# Arix CLI
 
-<p align="center">
-  <a href="https://github.com/laravel-zero/framework/actions"><img src="https://github.com/laravel-zero/laravel-zero/actions/workflows/tests.yml/badge.svg" alt="Build Status" /></a>
-  <a href="https://packagist.org/packages/laravel-zero/framework"><img src="https://img.shields.io/packagist/dt/laravel-zero/framework.svg" alt="Total Downloads" /></a>
-  <a href="https://packagist.org/packages/laravel-zero/framework"><img src="https://img.shields.io/packagist/v/laravel-zero/framework.svg?label=stable" alt="Latest Stable Version" /></a>
-  <a href="https://packagist.org/packages/laravel-zero/framework"><img src="https://img.shields.io/packagist/l/laravel-zero/framework.svg" alt="License" /></a>
-  <a href="https://youtube.com/@nunomaduro?sub_confirmation=1"><img alt="YouTube Channel Subscribers" src="https://img.shields.io/youtube/channel/subscribers/UCO_hYZF2gb_CyG5sA7ArlGg?style=flat&label=youtube&color=brightgreen"></a>
-</p>
+Development and distribution tooling for ArixPHP.
 
-Laravel Zero was created by [Nuno Maduro](https://github.com/nunomaduro) and [Owen Voke](https://github.com/owenvoke), and is a micro-framework that provides an elegant starting point for your console application. It is an **unofficial** and customized version of Laravel, optimized for building command-line applications.
+The CLI creates, maintains, and verifies Arix applications. It runs
+application tests in isolated workers (`arix tests`), imports the approved
+upstream packages into the standalone framework core (`./source`), and builds
+the distributable executable (intermediate PHAR plus a PHPacker native binary
+with PHP embedded).
 
-- Built on top of the [Laravel](https://laravel.com) components.
-- Optional installation of Laravel [Eloquent](https://laravel-zero.com/docs/database/), Laravel [Logging](https://laravel-zero.com/docs/logging/) and many others.
-- Supports interactive [menus](https://laravel-zero.com/docs/build-interactive-menus/) and [desktop notifications](https://laravel-zero.com/docs/send-desktop-notifications/) on Linux, Windows & MacOS.
-- Ships with a [Scheduler](https://laravel-zero.com/docs/task-scheduling/) and  a [Standalone Compiler](https://laravel-zero.com/docs/distribute-as-a-single-executable-binary/).
-- Integration with [Collision](https://github.com/nunomaduro/collision) - Beautiful error reporting
-- Follow the creator Nuno Maduro:
-    - YouTube: **[youtube.com/@nunomaduro](https://www.youtube.com/@nunomaduro)** — Videos every weekday
-    - Twitch: **[twitch.tv/enunomaduro](https://www.twitch.tv/enunomaduro)** — Streams (almost) every weekday
-    - Twitter / X: **[x.com/enunomaduro](https://x.com/enunomaduro)**
-    - LinkedIn: **[linkedin.com/in/nunomaduro](https://www.linkedin.com/in/nunomaduro)**
-    - Instagram: **[instagram.com/enunomaduro](https://www.instagram.com/enunomaduro)**
-    - Tiktok: **[tiktok.com/@enunomaduro](https://www.tiktok.com/@enunomaduro)**
+Laravel Zero and Composer are development infrastructure for this tool only.
+They are never part of a deployed Arix application. The deployed core in
+`core/` (`Arix\`) runs on traditional PHP hosting without Composer, Node, or
+frontend build steps, and requires PHP 8.4.1+ with `ext-mbstring`.
 
-------
+The deployable application skeleton ([arixphp/app](https://github.com/arixphp/app))
+and this CLI evolve together, but they are
+separate repositories with separate verification. Do not copy `cli/core/` into
+an application's `core/` manually; a future `update` command will own that
+migration once its integration is implemented and verified.
+
+## Learning Arix
+
+The official documentation is available at
+[arix.omarbarbosa.com](https://arix.omarbarbosa.com).
 
 ## Documentation
 
@@ -55,7 +52,7 @@ The command validates the application and starts a fresh PHP worker, streams
 Pest output, and preserves its exit status. Relative `--path` values resolve from
 the invocation directory. Empty suites and invalid configurations fail. The
 worker uses the application's own core, class loading and global helpers, not
-Laravel Zero's bootstrap. XML and tests are trusted local executable code.
+the CLI development bootstrap. XML and tests are trusted local executable code.
 
 Source execution uses the CLI's dependencies directly. Production distribution
 uses a PHPacker self-contained executable with PHP embedded; the PHAR is an
@@ -69,9 +66,10 @@ needed. Forced process termination may leave a directory for the host to clean.
 
 ### Building and verifying the executable
 
-Laravel Zero produces the intermediate PHAR and PHPacker embeds it in a native
-binary. Keep PHPacker in a separate release-tool installation: its current
-Symfony requirements differ from this CLI's runtime dependencies.
+The CLI produces the intermediate PHAR through Laravel Zero's build command,
+and PHPacker embeds it in a native binary. Keep PHPacker in a separate
+release-tool installation: its current Symfony requirements differ from this
+CLI's runtime dependencies.
 
 ```sh
 # Build in a disposable release copy with production dependencies installed:
@@ -91,7 +89,8 @@ Builds download the embedded PHP runtime; test execution does not. Verify the
 embedded PHP extensions on every target platform, including mbstring and
 Pest/PHPUnit's required XML extensions. Native integration tests are skipped
 unless `ARIX_TEST_EXECUTABLE` is set. See
-[Laravel Zero's binary distribution guide](https://laravel-zero.com/docs/distribute-as-a-single-executable-binary).
+[Laravel Zero's binary distribution guide](https://laravel-zero.com/docs/distribute-as-a-single-executable-binary)
+for the underlying build command.
 
 CLI installations require the PHP version and extensions declared in
 `composer.json` and the locked dependencies; the standalone application core
@@ -190,14 +189,37 @@ does not trigger another workflow listening to `release: published`, so all
 required verification is inside this workflow. Validate the first full release
 in a separate test repository before enabling production distribution.
 
-For full documentation, visit [laravel-zero.com](https://laravel-zero.com/).
+## Security Vulnerabilities
 
-## Support the development
-**Do you like this project? Support it by donating**
+If you discover a security vulnerability within the Arix CLI, please send an e-mail to Omar Barbosa via [contacto@omarbarbosa.com](mailto:contacto@omarbarbosa.com). All security vulnerabilities will be promptly addressed.
 
-- PayPal: [Donate](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=66BYDWAT92N6L)
-- Patreon: [Donate](https://www.patreon.com/nunomaduro)
+## Credits
+
+The Arix CLI is built and maintained by Omar Barbosa as part of ArixPHP.
+
+This tool stands on the work of the Laravel ecosystem and the upstream packages
+imported into the standalone core:
+
+- [Laravel](https://laravel.com) — underlying components used through the CLI
+  development runtime.
+- [Laravel Zero](https://laravel-zero.com), created by
+  [Nuno Maduro](https://github.com/nunomaduro) and
+  [Owen Voke](https://github.com/owenvoke) — micro-framework used only as
+  development infrastructure for the CLI commands and the intermediate PHAR
+  build. It is not the product this repository distributes.
+- [symfony/http-foundation](https://github.com/symfony/http-foundation) —
+  imported into `core/HttpFoundation/` as `Arix\HttpFoundation`.
+- [nikic/fast-route](https://github.com/nikic/FastRoute) — imported into
+  `core/FastRoute/` as `Arix\FastRoute`.
+- [eftec/bladeone](https://github.com/EFTEC/BladeOne) — imported into
+  `core/BladeOne/` as `Arix\BladeOne`.
+
+Imported sources are namespace-relocated, managed copies; each managed
+directory keeps its upstream `LICENSE` file. Do not hand-edit them; regenerate
+them through `./source`. Test and packaging tooling includes
+[Pest](https://pestphp.com), [Box](https://github.com/box-project/box), and
+[PHPacker](https://github.com/phpacker/phpacker).
 
 ## License
 
-Laravel Zero is an open-source software licensed under the MIT license.
+The Arix CLI is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
