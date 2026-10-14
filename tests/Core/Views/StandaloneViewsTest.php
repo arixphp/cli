@@ -13,8 +13,8 @@ class StandaloneViewsTest extends TestCase
     public function it_resolves_relocated_views_and_integration_without_composer(): void
     {
         $root = dirname(__DIR__, 3);
-        $autoload = $root.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'autoload.php';
-        $program = 'require '.var_export($autoload, true).'; '.<<<'PHP'
+        $autoload = $root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $program = 'require ' . var_export($autoload, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
             $files = [];
             foreach (['Arix\Views\Contracts\View', 'Arix\Views\View', 'Arix\Views\ViewFactory', 'Arix\BladeOne\BladeOne', 'Arix\Views\TemplateEngine'] as $class) {
@@ -32,10 +32,10 @@ class StandaloneViewsTest extends TestCase
         fclose($pipes[2]);
         $this->assertSame(0, proc_close($process), $errors);
         $files = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
-        $this->assertSame($root.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'Views'.DIRECTORY_SEPARATOR.'Contracts'.DIRECTORY_SEPARATOR.'View.php', $files['Arix\Views\Contracts\View']);
-        $this->assertSame($root.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'Views'.DIRECTORY_SEPARATOR.'View.php', $files['Arix\Views\View']);
-        $this->assertSame($root.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'Views'.DIRECTORY_SEPARATOR.'ViewFactory.php', $files['Arix\Views\ViewFactory']);
-        $this->assertSame($root.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'BladeOne'.DIRECTORY_SEPARATOR.'BladeOne.php', $files['Arix\BladeOne\BladeOne']);
-        $this->assertSame($root.DIRECTORY_SEPARATOR.'core'.DIRECTORY_SEPARATOR.'Views'.DIRECTORY_SEPARATOR.'TemplateEngine.php', $files['Arix\Views\TemplateEngine']);
+        $this->assertSame($root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Views' . DIRECTORY_SEPARATOR . 'Contracts' . DIRECTORY_SEPARATOR . 'View.php', $files['Arix\Views\Contracts\View']);
+        $this->assertSame($root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Views' . DIRECTORY_SEPARATOR . 'View.php', $files['Arix\Views\View']);
+        $this->assertSame($root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Views' . DIRECTORY_SEPARATOR . 'ViewFactory.php', $files['Arix\Views\ViewFactory']);
+        $this->assertSame($root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'BladeOne' . DIRECTORY_SEPARATOR . 'BladeOne.php', $files['Arix\BladeOne\BladeOne']);
+        $this->assertSame($root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Views' . DIRECTORY_SEPARATOR . 'TemplateEngine.php', $files['Arix\Views\TemplateEngine']);
     }
 }

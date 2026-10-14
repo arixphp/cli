@@ -17,10 +17,10 @@ class TemplateResolverTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->directory = realpath(sys_get_temp_dir()).DIRECTORY_SEPARATOR.'arix-views-'.bin2hex(random_bytes(8));
-        mkdir($this->directory.DIRECTORY_SEPARATOR.'layouts', 0755, true);
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'layouts'.DIRECTORY_SEPARATOR.'main.arix.php', 'layout');
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'plain.php', 'plain');
+        $this->directory = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-views-' . bin2hex(random_bytes(8));
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'layouts', 0755, true);
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'layouts' . DIRECTORY_SEPARATOR . 'main.arix.php', 'layout');
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'plain.php', 'plain');
     }
 
     protected function tearDown(): void
@@ -34,8 +34,8 @@ class TemplateResolverTest extends TestCase
     {
         $resolver = new TemplateResolver($this->directory);
 
-        $this->assertSame($this->directory.DIRECTORY_SEPARATOR.'layouts'.DIRECTORY_SEPARATOR.'main.arix.php', $resolver->resolve('layouts.main'));
-        $this->assertSame($this->directory.DIRECTORY_SEPARATOR.'plain.php', $resolver->resolve('plain'));
+        $this->assertSame($this->directory . DIRECTORY_SEPARATOR . 'layouts' . DIRECTORY_SEPARATOR . 'main.arix.php', $resolver->resolve('layouts.main'));
+        $this->assertSame($this->directory . DIRECTORY_SEPARATOR . 'plain.php', $resolver->resolve('plain'));
     }
 
     #[Test]
@@ -73,8 +73,8 @@ class TemplateResolverTest extends TestCase
     #[Test]
     public function it_rejects_conflicting_templates(): void
     {
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'dupe.arix.php', 'a');
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'dupe.php', 'b');
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'dupe.arix.php', 'a');
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'dupe.php', 'b');
 
         $this->expectException(RuntimeException::class);
         (new TemplateResolver($this->directory))->resolve('dupe');
@@ -83,9 +83,9 @@ class TemplateResolverTest extends TestCase
     #[Test]
     public function it_rejects_symlinks_case_mismatches_and_escapes(): void
     {
-        $outside = $this->directory.DIRECTORY_SEPARATOR.'outside.php';
+        $outside = $this->directory . DIRECTORY_SEPARATOR . 'outside.php';
         file_put_contents($outside, 'outside');
-        symlink($outside, $this->directory.DIRECTORY_SEPARATOR.'linked.arix.php');
+        symlink($outside, $this->directory . DIRECTORY_SEPARATOR . 'linked.arix.php');
 
         $resolver = new TemplateResolver($this->directory);
 
@@ -95,7 +95,7 @@ class TemplateResolverTest extends TestCase
         } catch (RuntimeException) {
         }
 
-        file_put_contents($this->directory.DIRECTORY_SEPARATOR.'Cased.arix.php', 'cased');
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'Cased.arix.php', 'cased');
 
         try {
             $resolver->resolve('cased');
@@ -103,14 +103,14 @@ class TemplateResolverTest extends TestCase
         } catch (RuntimeException) {
         }
 
-        $this->assertSame($this->directory.DIRECTORY_SEPARATOR.'Cased.arix.php', $resolver->resolve('Cased'));
+        $this->assertSame($this->directory . DIRECTORY_SEPARATOR . 'Cased.arix.php', $resolver->resolve('Cased'));
     }
 
     private function remove(string $path): void
     {
         if (is_dir($path) && ! is_link($path)) {
             foreach (array_diff(scandir($path), ['.', '..']) as $entry) {
-                $this->remove($path.DIRECTORY_SEPARATOR.$entry);
+                $this->remove($path . DIRECTORY_SEPARATOR . $entry);
             }
 
             rmdir($path);

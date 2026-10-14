@@ -17,7 +17,7 @@ class ViewFactoryTest extends TestCase
     #[Test]
     public function it_creates_named_views_with_data(): void
     {
-        $view = (new ViewFactory)->make('layouts.main', ['title' => 'Hello']);
+        $view = (new ViewFactory())->make('layouts.main', ['title' => 'Hello']);
 
         $this->assertInstanceOf(ViewContract::class, $view);
         $this->assertInstanceOf(View::class, $view);
@@ -30,7 +30,7 @@ class ViewFactoryTest extends TestCase
     public function it_rejects_invalid_view_names(string $name): void
     {
         $this->expectException(InvalidArgumentException::class);
-        (new ViewFactory)->make($name);
+        (new ViewFactory())->make($name);
     }
 
     public static function invalidNames(): array
@@ -48,7 +48,7 @@ class ViewFactoryTest extends TestCase
     public function it_rejects_reserved_template_data(array $data): void
     {
         $this->expectException(InvalidArgumentException::class);
-        (new ViewFactory)->make('index', $data);
+        (new ViewFactory())->make('index', $data);
     }
 
     public static function invalidData(): array

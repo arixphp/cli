@@ -1,4 +1,7 @@
-<?php /** @noinspection ReturnTypeCanBeDeclaredInspection */
+<?php
+
+declare(strict_types=1);
+/** @noinspection ReturnTypeCanBeDeclaredInspection */
 /** @noinspection PhpMissingReturnTypeInspection */
 /** @noinspection UnknownInspectionInspection */
 
@@ -17,16 +20,16 @@ trait BladeOneCustom
 {
     private array $customItem = []; // indicates the type of the current tag. such as select/selectgroup/etc.
 
-    //<editor-fold desc="compile function">
+    // <editor-fold desc="compile function">
     /**
      * Usage @panel('title',true,true).....@endpanel()
      *
-     * @param $expression
      * @return string
      */
     protected function compilePanel($expression)
     {
         $this->customItem[] = 'Panel';
+
         return $this->phpTag . "echo \$this->panel$expression; ?>";
     }
 
@@ -36,12 +39,13 @@ trait BladeOneCustom
         if ($r === null) {
             $this->showError('@endpanel', 'Missing @compilepanel or so many @compilepanel', true);
         }
+
         return ' </div></section><!-- end panel -->'; // we don't need to create a function for this.
     }
 
-    //</editor-fold>
+    // </editor-fold>
 
-    //<editor-fold desc="used function">
+    // <editor-fold desc="used function">
     protected function panel($title = '', $toggle = true, $dismiss = true)
     {
         return "<section class='panel'>
@@ -55,5 +59,5 @@ trait BladeOneCustom
                 </header>
                 <div class='panel-body'>";
     }
-    //</editor-fold>
+    // </editor-fold>
 }

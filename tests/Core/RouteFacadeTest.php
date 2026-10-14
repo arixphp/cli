@@ -18,8 +18,8 @@ class RouteFacadeTest extends TestCase
     public function it_registers_only_in_the_active_container(): void
     {
         foreach (['/one', '/two'] as $path) {
-            $container = new Container;
-            $registry = new RouteRegistry;
+            $container = new Container();
+            $registry = new RouteRegistry();
             $container->instance(RouteRegistry::class, $registry);
             ContainerContext::run($container, static function () use ($path): void {
                 Route::get($path, ['App\\Controllers\\UnloadedController', 'show']);

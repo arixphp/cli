@@ -18,7 +18,7 @@ class RouteRegistryTest extends TestCase
     #[Test]
     public function it_registers_dynamic_routes_without_loading_controllers(): void
     {
-        $registry = new RouteRegistry;
+        $registry = new RouteRegistry();
         $route = $registry->get('/archive[/{year:\d+}]', ['App\\Controllers\\UnloadedController', 'show']);
         $dispatcher = $registry->dispatcher();
         $this->assertSame([1, $route, ['year' => '2026']], $dispatcher->dispatch('GET', '/archive/2026'));
@@ -62,7 +62,7 @@ class RouteRegistryTest extends TestCase
     public function it_preserves_constraint_regex_syntax_instead_of_treating_it_as_uri_metadata(): void
     {
         foreach ([['/items/{id:(?:foo|bar)}', '/items/foo', 'foo'], ['/items/{id:ab?}', '/items/a', 'a'], ['/items/{id:[a-z#]+}', '/items/a#b', 'a#b']] as [$pattern, $path, $value]) {
-            $registry = new RouteRegistry;
+            $registry = new RouteRegistry();
             $registry->get($pattern, ['App\\Controllers\\UnloadedController', 'show']);
             $this->assertSame(['id' => $value], $registry->dispatcher()->dispatch('GET', $path)[2]);
         }
@@ -72,7 +72,7 @@ class RouteRegistryTest extends TestCase
     #[DataProvider('conflictingPatterns')]
     public function it_rejects_duplicate_and_invalid_fastroute_patterns(string $pattern): void
     {
-        $registry = new RouteRegistry;
+        $registry = new RouteRegistry();
         $registry->get('/same', ['App\\Controllers\\UnloadedController', 'show']);
         $this->expectException(BadRouteException::class);
         $registry->get($pattern, ['App\\Controllers\\UnloadedController', 'show']);
@@ -86,7 +86,7 @@ class RouteRegistryTest extends TestCase
     #[Test]
     public function it_rejects_conflicts_without_corrupting_previous_registration(): void
     {
-        $registry = new RouteRegistry;
+        $registry = new RouteRegistry();
         $first = $registry->get('/{id}', ['App\\Controllers\\UnloadedController', 'show']);
         $failed = false;
 
