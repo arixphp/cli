@@ -54,6 +54,16 @@ class TemplateEngineTest extends TestCase
     }
 
     #[Test]
+    public function it_handles_missing_numeric_directive_arguments_under_strict_types(): void
+    {
+        $this->assertNull(BladeAdapter::get([0 => '@endsection', 1 => 'endsection', 2 => ''], 3));
+        $this->assertSame('fallback', BladeAdapter::get([], 3, static fn (): string => 'fallback'));
+        $this->assertSame('(\'content\')', BladeAdapter::get([3 => '(\'content\')'], 3));
+        $this->assertSame('nested', BladeAdapter::get(['section' => ['name' => 'nested']], 'section.name'));
+        $this->assertSame(['value'], BladeAdapter::get(['value'], null));
+    }
+
+    #[Test]
     public function it_renders_layouts_sections_and_escapes(): void
     {
         $html = (new TemplateEngine($this->views, $this->cache))->render('page', ['title' => '<Hi>', 'raw' => '<b>raw</b>']);

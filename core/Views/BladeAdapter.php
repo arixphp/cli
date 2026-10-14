@@ -11,6 +11,7 @@ use RuntimeException;
 use function count;
 use function in_array;
 use function is_array;
+use function is_int;
 use function is_string;
 
 class BladeAdapter extends BladeOne
@@ -32,6 +33,15 @@ class BladeAdapter extends BladeOne
     public function setNativeRunner(Closure $runner): void
     {
         $this->nativeRunner = $runner;
+    }
+
+    public static function get($array, $key, $default = null): mixed
+    {
+        if (is_int($key)) {
+            $key = (string) $key;
+        }
+
+        return parent::get($array, $key, $default);
     }
 
     public function run(null|string $view = null, array $variables = [], array $seed = []): string
