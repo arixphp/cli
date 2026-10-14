@@ -26,6 +26,81 @@ The official documentation is available at
 
 ## Documentation
 
+### Installing the distributed CLI
+
+#### With a package manager (recommended)
+
+```sh
+# macOS or Linux:
+brew install arixphp/tap/arix
+
+# Windows:
+winget install ArixPHP.CLI
+```
+
+Both installers follow each release automatically: the release workflow opens
+a formula PR in [arixphp/homebrew-tap](https://github.com/arixphp/homebrew-tap)
+and submits the Windows manifest to winget. No system PHP installation is
+required in any case: the binary embeds its own PHP runtime.
+
+#### Direct download
+
+Download the archive for your platform from the
+[releases page](https://github.com/arixphp/cli/releases), along with
+`SHA256SUMS`. Tags carry no `v` prefix, so version `1.2.3` ships as:
+
+| Platform | Archive |
+|---|---|
+| Linux x64 | `arix-1.2.3-linux-x64.tar.gz` |
+| Linux ARM64 | `arix-1.2.3-linux-arm64.tar.gz` |
+| macOS x64 (Intel) | `arix-1.2.3-macos-x64.tar.gz` |
+| macOS ARM64 (Apple Silicon) | `arix-1.2.3-macos-arm64.tar.gz` |
+| Windows x64 | `arix-1.2.3-windows-x64.zip` (contains `arix.exe`) |
+
+Verify the checksum before extracting:
+
+```sh
+grep "<platform>" SHA256SUMS | sha256sum -c -
+```
+
+The platform subsections below cover direct downloads; prefer the package
+manager above when available.
+
+No system PHP installation is required: the binary embeds its own PHP
+runtime.
+
+#### macOS and Linux (direct download)
+
+```sh
+tar -xzf arix-1.2.3-macos-arm64.tar.gz
+sudo install -m 755 arix /usr/local/bin/arix
+hash -r
+arix --version
+```
+
+Without administrator rights, place `arix` in `~/.local/bin` (or any
+directory) and add that directory to `PATH` instead of using
+`/usr/local/bin`.
+
+Releases are not signed or notarized. If macOS refuses to open the binary,
+allow it once with right-click → Open, or remove the quarantine attribute:
+
+```sh
+xattr -d com.apple.quarantine /usr/local/bin/arix
+```
+
+#### Windows (direct download)
+
+1. Extract `arix-1.2.3-windows-x64.zip`.
+2. Move `arix.exe` to a permanent folder, for example
+   `%LocalAppData%\Programs\Arix`.
+3. Add that folder to your user `PATH` under System Properties →
+   Environment Variables.
+4. Open a new terminal and run `arix --version`.
+
+Releases are not signed, so Windows SmartScreen may warn on first run; use
+More info → Run anyway after verifying the checksum.
+
 ### Testing Arix applications
 
 Pest is included as a runtime dependency of the Arix CLI. The target application
@@ -167,6 +242,17 @@ has not moved and that the release is still a draft, and only then publishes.
 Tags with SemVer prerelease identifiers, such as `1.2.3-rc.1`, publish as
 prereleases without changing the latest stable release. PHARs remain internal
 workflow artifacts. Releases are not signed or notarized by this workflow.
+
+After publication, two distribution jobs run: `tap` regenerates
+`Formula/arix.rb` from the verified archives and opens a PR in
+`arixphp/homebrew-tap` (it never pushes to the tap directly), and `winget`
+submits the Windows manifest with a pinned `wingetcreate` build whose checksum
+is verified before use. Both jobs require their secrets (`HOMEBREW_TAP_TOKEN`,
+a PAT with `contents:write` on the tap repository, and `WINGET_TOKEN`); without
+them a job fails fast with a clear message and the published release is
+unaffected. Create the `arixphp/homebrew-tap` repository and submit the first
+winget package manually before relying on automation: `wingetcreate update`
+only handles packages that already exist.
 
 If any check, build or asset operation fails, the draft remains unpublished.
 Re-run the workflow, or choose **Actions → Release → Run workflow** from `main`
