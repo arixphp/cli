@@ -51,6 +51,9 @@ jobs:
       - name: Verify PHP requirements
         run: composer check-platform-reqs
 
+      - name: Prepare standalone core bundle
+        run: php arix core:package
+
       - name: Run full suite
         run: php vendor/bin/pest
 
