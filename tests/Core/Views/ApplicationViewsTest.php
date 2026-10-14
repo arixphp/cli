@@ -16,7 +16,9 @@ class ApplicationViewsTest extends TestCase
         parent::setUp();
         $this->directory = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-appviews-' . bin2hex(random_bytes(8));
         mkdir($this->directory, 0755, true);
-        $reference = dirname(__DIR__, 4) . DIRECTORY_SEPARATOR . 'arix' . DIRECTORY_SEPARATOR . 'app';
+        $reference = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'Fixtures' . DIRECTORY_SEPARATOR . 'ApplicationViews';
+        $this->assertDirectoryExists($reference . DIRECTORY_SEPARATOR . 'views');
+        $this->assertDirectoryExists($reference . DIRECTORY_SEPARATOR . 'lang');
         $this->copy($reference . DIRECTORY_SEPARATOR . 'views', $this->directory . DIRECTORY_SEPARATOR . 'views');
         $this->copy($reference . DIRECTORY_SEPARATOR . 'lang', $this->directory . DIRECTORY_SEPARATOR . 'lang');
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'cache', 0755, true);
