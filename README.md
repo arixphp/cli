@@ -107,6 +107,17 @@ Pint separately, and Actionlint for workflow validation. Dependencies come from
 Actionlint checks as required checks in the rulesets for both branches after their
 first run. Repository settings are not changed by the workflows.
 
+The core packaging fixture is compiled with Box in a Linux job and shared with
+all three test runners. Each runner executes the same PHAR and verifies that
+compaction preserves the exact core bytes without a source tree or Composer.
+Box 4.7.0 cannot clean up its working directory on Windows, so Windows tests
+consume the Linux-built artifact instead of compiling it or skipping validation.
+For local testing, export it on Linux/macOS with
+`ARIX_EXPORT_CORE_PHAR=/absolute/path/core-packaging.phar ./vendor/bin/pest tests/Unit/Core/Update/CorePackagingTest.php`,
+then set `ARIX_TEST_CORE_PHAR` to that file's absolute path on the consuming host.
+Missing or invalid artifacts fail the test. Unix runs without that variable
+continue to build the fixture locally.
+
 The `Release` workflow starts when a SemVer tag such as `v1.2.3` is pushed. The
 tagged commit must belong to the history of `main`. Merge the workflow files and
 their release helpers into `main` before creating the first release tag.

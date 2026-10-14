@@ -13,8 +13,38 @@ permissions:
   contents: read
 
 jobs:
+  core-packaging:
+    name: Box PHAR (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, dom, xml, xmlwriter, xmlreader, simplexml, fileinfo, iconv, curl, zip, phar
+          ini-values: phar.readonly=0
+          coverage: none
+          tools: composer:v2
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Build and verify compacted core fixture
+        env:
+          ARIX_EXPORT_CORE_PHAR: ${{ runner.temp }}/core-packaging.phar
+        run: php vendor/bin/pest tests/Unit/Core/Update/CorePackagingTest.php
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: core-packaging-phar
+          path: ${{ runner.temp }}/core-packaging.phar
+          if-no-files-found: error
+          retention-days: 1
+
   tests:
     name: Pest (${{ matrix.os }})
+    needs: core-packaging
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -54,7 +84,14 @@ jobs:
       - name: Prepare standalone core bundle
         run: php arix core:package
 
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: core-packaging-phar
+          path: ${{ runner.temp }}/core-packaging
+
       - name: Run full suite
+        env:
+          ARIX_TEST_CORE_PHAR: ${{ runner.temp }}/core-packaging/core-packaging.phar
         run: php vendor/bin/pest
 
   style:
