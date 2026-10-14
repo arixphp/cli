@@ -1,11 +1,9 @@
 <?php
 
-declare(strict_types=1);
 
 namespace Arix\BladeOne;
 
 use Redis;
-
 use function class_exists;
 use function file_put_contents;
 use function filemtime;
@@ -20,10 +18,8 @@ use function time;
  * Extends the tags of the class BladeOne.  Its optional
  * It adds the next tags to the template
  * <code>
- *
  * @ cache([cacheid],[duration=86400]).  The id is optional. The duration of the cache is in seconds
  * // content here
- *
  * @ endcache()
  * </code>
  * It also adds a new function (optional) to the business or logic layer
@@ -33,10 +29,9 @@ use function time;
  * }
  * </code>
  *
+ * @package  BladeOneCacheRedis
  * @version  0.1 2017-12-15 NOT YET IMPLEMENTED, ITS A WIP!!!!!!!!
- *
  * @link     https://github.com/EFTEC/BladeOne
- *
  * @author   Jorge Patricio Castro Castillo <jcastro arroba eftec dot cl>
  */
 const CACHEREDIS_SCOPEURL = 1;
@@ -44,31 +39,20 @@ const CACHEREDIS_SCOPEURL = 1;
 trait BladeOneCacheRedis
 {
     protected $curCacheId = 0;
-
-    protected $curCacheDuration = '';
-
+    protected $curCacheDuration = "";
     protected $curCachePosition = 0;
-
     protected $cacheRunning = false;
-
-    /** @var Redis */
+    /** @var \Redis $redis */
     protected $redis;
-
     protected $redisIP = '127.0.0.1';
-
     protected $redisPort = 6379;
-
     protected $redisTimeOut = 2.5;
-
     protected $redisConnected = false;
-
     protected $redisNamespace = 'bladeonecache:';
-
     protected $redisBase = 0;
-
     private $cacheExpired = []; // avoids to compare the file different times.
 
-    // <editor-fold desc="compile">
+    //<editor-fold desc="compile">
     public function compileCache($expression)
     {
         // get id of template
@@ -85,14 +69,14 @@ trait BladeOneCacheRedis
     {
         return $this->phpTag . "} // if cacheRunning\necho \$this->cacheEnd{$expression}; ?>";
     }
-    // </editor-fold>
+    //</editor-fold>
 
     public function connect($redisIP = null, $redisPort = null, $redisTimeOut = null)
     {
         if ($this->redisConnected) {
             return true;
         }
-        if (! class_exists('Redis')) {
+        if (!class_exists('Redis')) {
             return false; // it requires redis.
         }
         if ($redisIP !== null) {
@@ -110,10 +94,10 @@ trait BladeOneCacheRedis
     /**
      * Returns true if the cache expired (or doesn't exist), otherwise false.
      *
-     * @param  string  $templateName  name of the template to use (such hello for template hello.blade.php)
-     * @param  string  $id  (id of cache, optional, if not id then it adds automatically a number)
-     * @param  int  $scope  scope of the cache.
-     * @param  int  $cacheDuration  (duration of the cache in seconds)
+     * @param string $templateName  name of the template to use (such hello for template hello.blade.php)
+     * @param string $id            (id of cache, optional, if not id then it adds automatically a number)
+     * @param int    $scope         scope of the cache.
+     * @param int    $cacheDuration (duration of the cache in seconds)
      * @return bool (return if the cache expired)
      */
     public function cacheExpired($templateName, $id, $scope, $cacheDuration)
@@ -130,22 +114,19 @@ trait BladeOneCacheRedis
         if ($date) {
             if ($date + $cacheDuration < time()) {
                 $this->cacheExpired[$compiledFile] = true;
-
                 return true; // time-out.
             }
         } else {
             $this->cacheExpired[$compiledFile] = true;
-
             return true; // no file
         }
         $this->cacheExpired[$compiledFile] = false;
-
         return false; // cache active.
     }
 
-    public function cacheStart($id = '', $cacheDuration = 86400)
+    public function cacheStart($id = "", $cacheDuration = 86400)
     {
-        $this->curCacheId = ($id == '') ? ($this->curCacheId + 1) : $id;
+        $this->curCacheId = ($id == "") ? ($this->curCacheId + 1) : $id;
         $this->curCacheDuration = $cacheDuration;
         $this->curCachePosition = strlen(ob_get_contents());
         $compiledFile = $this->getCompiledFile() . '_cache' . $this->curCacheId;
@@ -161,7 +142,7 @@ trait BladeOneCacheRedis
 
     public function cacheEnd()
     {
-        if (! $this->cacheRunning) {
+        if (!$this->cacheRunning) {
             $txt = substr(ob_get_contents(), $this->curCachePosition);
             $compiledFile = $this->getCompiledFile() . '_cache' . $this->curCacheId;
             file_put_contents($compiledFile, $txt);
