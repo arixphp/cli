@@ -166,6 +166,8 @@ jobs:
       - name: Verify PHAR checksum
         shell: bash
         run: |
+          # $sum belongs to PHP, not Bash; keep the PHP expression literal.
+          # shellcheck disable=SC2016
           php -r '$sum = explode(" ", file_get_contents("builds/arix.phar.sha256"))[0]; if (!hash_equals($sum, hash_file("sha256", "builds/arix.phar"))) { exit(1); }'
       - name: Build with pinned PHP runtime
         id: build
