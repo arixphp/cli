@@ -2,11 +2,11 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: ['[0-9]*', 'v[0-9]*']
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing SemVer tag on main (for example v1.2.3)
+        description: Existing SemVer tag on main (for example 1.2.3)
         required: true
         type: string
 

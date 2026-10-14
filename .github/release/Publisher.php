@@ -65,7 +65,7 @@ class Publisher
             }
         }
 
-        $arguments = ['gh', 'release', 'create', $tag, '--repo', $this->repository, '--verify-tag', '--draft', '--title', $tag, '--generate-notes'];
+        $arguments = ['gh', 'release', 'create', $tag, '--repo', $this->repository, '--verify-tag', '--draft', '--title', Release::title($tag), '--generate-notes'];
 
         if (Release::prerelease($tag)) {
             $arguments[] = '--prerelease';

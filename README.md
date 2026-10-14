@@ -117,14 +117,16 @@ then set `ARIX_TEST_CORE_PHAR` to that file's absolute path on the consuming hos
 Missing or invalid artifacts fail the test. Unix runs without that variable
 continue to build the fixture locally.
 
-The `Release` workflow starts when a SemVer tag such as `v1.2.3` is pushed. The
+The `Release` workflow starts when a SemVer tag such as `1.2.3` is pushed. The
 tagged commit must belong to the history of `main`. Merge the workflow files and
-their release helpers into `main` before creating the first release tag.
+their release helpers into `main` before creating the first release tag. Tags
+carry no `v` prefix; the GitHub release title uses the `v`-prefixed version
+(for example tag `1.2.3`, title `v1.2.3`).
 
 ```sh
 # Run from this CLI repository, after verification and with a clean release commit:
-git tag v1.2.3
-git push origin v1.2.3
+git tag 1.2.3
+git push origin 1.2.3
 ```
 
 The workflow creates or recovers a **draft release**, verifies the exact tagged
@@ -162,7 +164,7 @@ tests when there is no executable; a release may not.
 After every target passes, the workflow uploads the five archives and
 `SHA256SUMS`, downloads them again to verify their content, checks that the tag
 has not moved and that the release is still a draft, and only then publishes.
-Tags with SemVer prerelease identifiers, such as `v1.2.3-rc.1`, publish as
+Tags with SemVer prerelease identifiers, such as `1.2.3-rc.1`, publish as
 prereleases without changing the latest stable release. PHARs remain internal
 workflow artifacts. Releases are not signed or notarized by this workflow.
 

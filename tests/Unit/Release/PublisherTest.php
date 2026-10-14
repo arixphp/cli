@@ -30,17 +30,17 @@ class PublisherTest extends TestCase
 
         if ($command[0] === 'git') {
 
-            return "{$this->sha}\trefs/tags/v1.2.3\n";
+            return "{$this->sha}\trefs/tags/1.2.3\n";
         }
 
         if ($command[1] === 'api') {
 
-            return '[[{"tag_name":"v1.2.3","draft":true}]]';
+            return '[[{"tag_name":"1.2.3","draft":true}]]';
         }
 
         if ($command[2] === 'view') {
 
-            return '{"tagName":"v1.2.3","isDraft":true}';
+            return '{"tagName":"1.2.3","isDraft":true}';
         }
 
         return '';
@@ -50,7 +50,7 @@ class PublisherTest extends TestCase
     public function it_reuses_existing_drafts_without_overwriting_notes(): void
     {
         $publisher = new Publisher('owner/repo', $this->runner(...));
-        $publisher->draft('v1.2.3', $this->sha);
+        $publisher->draft('1.2.3', $this->sha);
         $writes = array_filter($this->commands, static fn (array $command): bool => ($command[2] ?? '') === 'create' || ($command[2] ?? '') === 'edit');
         $this->assertSame([], $writes);
     }
@@ -69,7 +69,7 @@ class PublisherTest extends TestCase
         $this->expectException(RuntimeException::class);
 
         try {
-            $publisher->draft('v1.2.3', $this->sha);
+            $publisher->draft('1.2.3', $this->sha);
         } finally {
             $this->assertCount(1, $this->commands);
         }
@@ -81,7 +81,7 @@ class PublisherTest extends TestCase
         $publisher = new Publisher('owner/repo', function (array $command): string {
             if (($command[2] ?? '') === 'view') {
 
-                return '{"tagName":"v1.2.3","isDraft":false}';
+                return '{"tagName":"1.2.3","isDraft":false}';
             }
 
             return $this->runner($command);
@@ -89,7 +89,7 @@ class PublisherTest extends TestCase
         $this->expectException(RuntimeException::class);
 
         try {
-            $publisher->draft('v1.2.3', $this->sha);
+            $publisher->draft('1.2.3', $this->sha);
         } finally {
             $this->assertSame([], array_filter($this->commands, static fn (array $command): bool => ($command[2] ?? '') === 'upload'));
         }
@@ -100,7 +100,7 @@ class PublisherTest extends TestCase
     {
         $publisher = new Publisher('owner/repo', $this->runner(...));
         $this->expectException(RuntimeException::class);
-        $publisher->draft('v1.2.3', str_repeat('a', 40));
+        $publisher->draft('1.2.3', str_repeat('a', 40));
     }
 
     #[Test]
@@ -111,7 +111,7 @@ class PublisherTest extends TestCase
 
             if ($command[0] === 'git') {
 
-                return str_repeat('a', 40) . "\trefs/tags/v1.2.3-rc.1\n{$this->sha}\trefs/tags/v1.2.3-rc.1^{}\n";
+                return str_repeat('a', 40) . "\trefs/tags/1.2.3-rc.1\n{$this->sha}\trefs/tags/1.2.3-rc.1^{}\n";
             }
 
             if ($command[1] === 'api') {
@@ -121,14 +121,14 @@ class PublisherTest extends TestCase
 
             if ($command[2] === 'view') {
 
-                return '{"tagName":"v1.2.3-rc.1","isDraft":true}';
+                return '{"tagName":"1.2.3-rc.1","isDraft":true}';
             }
 
             return '';
         });
-        $publisher->draft('v1.2.3-rc.1', $this->sha);
+        $publisher->draft('1.2.3-rc.1', $this->sha);
         $create = $this->commands[2];
-        $this->assertSame(['gh', 'release', 'create', 'v1.2.3-rc.1', '--repo', 'owner/repo', '--verify-tag', '--draft', '--title', 'v1.2.3-rc.1', '--generate-notes', '--prerelease'], $create);
+        $this->assertSame(['gh', 'release', 'create', '1.2.3-rc.1', '--repo', 'owner/repo', '--verify-tag', '--draft', '--title', 'v1.2.3-rc.1', '--generate-notes', '--prerelease'], $create);
     }
 
     #[Test]
@@ -142,7 +142,7 @@ class PublisherTest extends TestCase
             $this->expectException(RuntimeException::class);
 
             try {
-                $publisher->publish('v1.2.3', $this->sha, $fixture->path('dist'));
+                $publisher->publish('1.2.3', $this->sha, $fixture->path('dist'));
             } finally {
                 $this->assertSame([], $this->commands);
             }
@@ -171,7 +171,7 @@ class PublisherTest extends TestCase
             $this->expectException(RuntimeException::class);
 
             try {
-                $publisher->publish('v1.2.3', $this->sha, $fixture->path('dist'));
+                $publisher->publish('1.2.3', $this->sha, $fixture->path('dist'));
             } finally {
                 $this->assertSame([], array_filter($this->commands, static fn (array $command): bool => ($command[2] ?? '') === 'edit'));
             }
@@ -202,7 +202,7 @@ class PublisherTest extends TestCase
 
                 if (($command[2] ?? '') === 'view' && ++$views === 2) {
 
-                    return '{"tagName":"v1.2.3","isDraft":false}';
+                    return '{"tagName":"1.2.3","isDraft":false}';
                 }
 
                 return $this->runner($command);
@@ -210,7 +210,7 @@ class PublisherTest extends TestCase
             $this->expectException(RuntimeException::class);
 
             try {
-                $publisher->publish('v1.2.3', $this->sha, $fixture->path('dist'));
+                $publisher->publish('1.2.3', $this->sha, $fixture->path('dist'));
             } finally {
                 $this->assertSame([], array_filter($this->commands, static fn (array $command): bool => ($command[2] ?? '') === 'edit'));
             }
@@ -240,9 +240,9 @@ class PublisherTest extends TestCase
 
                 return $this->runner($command);
             });
-            $publisher->publish('v1.2.3', $this->sha, $fixture->path('dist'));
+            $publisher->publish('1.2.3', $this->sha, $fixture->path('dist'));
             $last = $this->commands[array_key_last($this->commands)];
-            $this->assertSame(['gh', 'release', 'edit', 'v1.2.3', '--repo', 'owner/repo', '--draft=false', '--prerelease=false', '--latest'], $last);
+            $this->assertSame(['gh', 'release', 'edit', '1.2.3', '--repo', 'owner/repo', '--draft=false', '--prerelease=false', '--latest'], $last);
             $this->assertSame([], array_filter($this->commands, static fn (array $command): bool => ($command[2] ?? '') === 'delete' || ($command[2] ?? '') === 'delete-asset'));
         } finally {
             $fixture->cleanup();
@@ -275,7 +275,7 @@ class PublisherTest extends TestCase
             $this->expectException(RuntimeException::class);
 
             try {
-                $publisher->publish('v1.2.3', $this->sha, $fixture->path('dist'));
+                $publisher->publish('1.2.3', $this->sha, $fixture->path('dist'));
             } finally {
                 $this->assertSame([], array_filter($this->commands, static fn (array $command): bool => ($command[2] ?? '') === 'edit'));
             }

@@ -23,12 +23,16 @@ class ReleaseTest extends TestCase
     #[Test]
     public function it_validates_versions_before_using_them_as_paths_or_arguments(): void
     {
+        $this->assertSame('1.2.3', Release::version('1.2.3'));
+        $this->assertSame('0.1.0', Release::version('0.1.0'));
+        $this->assertSame('1.2.3-rc.1+build.2', Release::version('1.2.3-rc.1+build.2'));
         $this->assertSame('1.2.3', Release::version('v1.2.3'));
-        $this->assertSame('1.2.3-rc.1+build.2', Release::version('v1.2.3-rc.1+build.2'));
-        $this->assertTrue(Release::prerelease('v1.2.3-rc.1'));
-        $this->assertFalse(Release::prerelease('v1.2.3+build.2'));
+        $this->assertSame('v1.2.3', Release::title('1.2.3'));
+        $this->assertSame('v1.2.3', Release::title('v1.2.3'));
+        $this->assertTrue(Release::prerelease('1.2.3-rc.1'));
+        $this->assertFalse(Release::prerelease('1.2.3+build.2'));
 
-        foreach (['1.2.3', 'v01.2.3', 'v1.2', 'v1.2.3-01', 'v1.2.3/evil', "v1.2.3\n", '--help'] as $tag) {
+        foreach (['v01.2.3', '01.2.3', '1.2', '1.2.3-01', '1.2.3/evil', "1.2.3\n", 'v', '', '--help'] as $tag) {
             try {
                 Release::version($tag);
                 $this->fail("Accepted invalid tag {$tag}");
@@ -46,7 +50,7 @@ class ReleaseTest extends TestCase
         try {
             $fixture->write('dist/arix-1.2.3-linux-x64.tar.gz', 'linux');
             $this->expectException(RuntimeException::class);
-            Release::checksums('v1.2.3', $fixture->path('dist'));
+            Release::checksums('1.2.3', $fixture->path('dist'));
         } finally {
             $this->assertFileDoesNotExist($fixture->path('dist/SHA256SUMS'));
             $fixture->cleanup();
@@ -64,14 +68,14 @@ class ReleaseTest extends TestCase
                 $fixture->write("download/arix-1.2.3-{$target}", 'abc');
             }
 
-            Release::checksums('v1.2.3', $fixture->path('dist'));
+            Release::checksums('1.2.3', $fixture->path('dist'));
             $sums = file_get_contents($fixture->path('dist/SHA256SUMS'));
             $this->assertStringContainsString('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  arix-1.2.3-linux-x64.tar.gz', $sums);
             $fixture->write('download/SHA256SUMS', $sums);
-            Release::verify('v1.2.3', $fixture->path('dist'), $fixture->path('download'));
+            Release::verify('1.2.3', $fixture->path('dist'), $fixture->path('download'));
             $fixture->write('download/arix-1.2.3-windows-x64.zip', 'corrupt');
             $this->expectException(RuntimeException::class);
-            Release::verify('v1.2.3', $fixture->path('dist'), $fixture->path('download'));
+            Release::verify('1.2.3', $fixture->path('dist'), $fixture->path('download'));
         } finally {
             $fixture->cleanup();
         }
@@ -89,7 +93,7 @@ class ReleaseTest extends TestCase
 
             $fixture->write('dist/arix-1.2.3-linux-x64.tar.gz', '');
             $this->expectException(RuntimeException::class);
-            Release::checksums('v1.2.3', $fixture->path('dist'));
+            Release::checksums('1.2.3', $fixture->path('dist'));
         } finally {
             $fixture->cleanup();
         }
@@ -109,7 +113,7 @@ class ReleaseTest extends TestCase
             }
 
             $this->expectException(RuntimeException::class);
-            Release::checksums('v1.2.3', $fixture->path('dist'));
+            Release::checksums('1.2.3', $fixture->path('dist'));
         } finally {
             $fixture->cleanup();
         }

@@ -17,13 +17,18 @@ class Release
     {
         $number = '(?:0|[1-9][0-9]*)';
         $identifier = '(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)';
-        $pattern = "~\\Av{$number}\\.{$number}\\.{$number}(?:-{$identifier}(?:\\.{$identifier})*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?\\z~";
+        $pattern = "~\\Av?{$number}\\.{$number}\\.{$number}(?:-{$identifier}(?:\\.{$identifier})*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?\\z~";
 
         if (preg_match($pattern, $tag) !== 1) {
-            throw new RuntimeException('Expected a SemVer tag such as v1.2.3 or v1.2.3-rc.1.');
+            throw new RuntimeException('Expected a SemVer tag such as 1.2.3 or 1.2.3-rc.1.');
         }
 
-        return substr($tag, 1);
+        return str_starts_with($tag, 'v') ? substr($tag, 1) : $tag;
+    }
+
+    public static function title(string $tag): string
+    {
+        return 'v' . self::version($tag);
     }
 
     public static function prerelease(string $tag): bool
@@ -35,7 +40,7 @@ class Release
 
     public static function reportedVersion(string $output, string $expected): void
     {
-        self::version("v{$expected}");
+        self::version($expected);
 
         if (preg_match('/\A[^\r\n]+ ([^\s]+)\z/', trim($output), $matches) !== 1 || $matches[1] !== $expected) {
             throw new RuntimeException('Packaged CLI version does not match the release tag.');
