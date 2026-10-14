@@ -173,7 +173,8 @@ class ImportCoreTest extends TestCase
     public function it_source_binary_help_uses_current_name_and_invalid_options_fail(): void
     {
         foreach ([['--help', 0, 'Usage: ./source'], ['--package=unknown', 1, 'Unsupported source option']] as [$argument, $status, $message]) {
-            $process = proc_open([dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'source', $argument], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $this->directory);
+            $process = proc_open([PHP_BINARY, dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'source', $argument], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $this->directory);
+            $this->assertIsResource($process);
             $output = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
             fclose($pipes[1]);
             fclose($pipes[2]);

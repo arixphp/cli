@@ -42,7 +42,10 @@ test('private physical runtime', function () {
     $file = (new ReflectionClass(Pest\TestSuite::class))->getFileName();
     expect(str_starts_with($file, 'phar://'))->toBeFalse();
     $root = dirname($file, 5);
-    expect(fileperms($root) & 0777)->toBe(0700);
+    expect(is_dir($root))->toBeTrue();
+    if (PHP_OS_FAMILY !== 'Windows') {
+        expect(fileperms($root) & 0777)->toBe(0700);
+    }
     file_put_contents(getcwd() . '/runtime-path.txt', $root);
     register_shutdown_function(function () use ($root) {
         $value = require $root . '/vendor/shutdown-marker.php';

@@ -88,7 +88,11 @@ class JsUpdaterTest extends TestCase
         $this->assertSame($this->fixture->framework('1.0.0'), file_get_contents($backup . DIRECTORY_SEPARATOR . 'arix.js'));
         $this->assertSame($this->distribution->contents(), file_get_contents($this->fixture->path('application/scripts/arix.js')));
         $this->assertSame('// application entry', file_get_contents($this->fixture->path('application/scripts/app.js')));
-        $this->assertSame(0644, fileperms($this->fixture->path('application/scripts/arix.js')) & 0777);
+
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->assertSame(0644, fileperms($this->fixture->path('application/scripts/arix.js')) & 0777);
+        }
+
         $this->assertFileDoesNotExist($this->fixture->path('application/.js-update.lock'));
     }
 

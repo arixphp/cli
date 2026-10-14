@@ -47,7 +47,10 @@ class ApplicationInstallerTest extends TestCase
         $this->assertDirectoryDoesNotExist($this->fixture->path('my-app/vendor'));
         $this->assertDirectoryDoesNotExist($this->fixture->path('my-app/.git'));
         $this->assertSame([], glob($this->fixture->path('.arix-new-*')));
-        $this->assertSame(0755, fileperms($target->path) & 0777);
+
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->assertSame(0755, fileperms($target->path) & 0777);
+        }
     }
 
     #[Test]
