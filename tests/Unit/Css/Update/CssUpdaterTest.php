@@ -96,7 +96,10 @@ class CssUpdaterTest extends TestCase
         foreach (CssDistribution::FILES as $file) {
             $this->assertSame($this->installedBodies[$file], file_get_contents($backup . DIRECTORY_SEPARATOR . $file));
             $this->assertSame($this->distribution->contents($file), file_get_contents($this->fixture->path("application/styles/{$file}")));
-            $this->assertSame(0644, fileperms($this->fixture->path("application/styles/{$file}")) & 0777);
+
+            if (PHP_OS_FAMILY !== 'Windows') {
+                $this->assertSame(0644, fileperms($this->fixture->path("application/styles/{$file}")) & 0777);
+            }
         }
 
         $this->assertSame('/* application entry */', file_get_contents($this->fixture->path('application/styles/app.css')));

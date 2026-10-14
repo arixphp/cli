@@ -52,7 +52,7 @@ test('local ownership', function () {
     expect(class_exists(Arix\Application::class))->toBeFalse();
     expect(class_exists(Tests\TestCase::class))->toBeFalse();
     expect(function_exists('something'))->toBeFalse();
-    expect((new ReflectionClass(Arix\ApplicationMarker::class))->getFileName())->toBe(getcwd() . '/core/autoload.php');
+    expect((new ReflectionClass(Arix\ApplicationMarker::class))->getFileName())->toBe(realpath(getcwd() . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php'));
     expect(view())->toBe('application-view');
     expect(trans())->toBe('application-trans');
     expect(config())->toBe('application-config');

@@ -57,7 +57,10 @@ class ApplicationPublisherTest extends TestCase
             $this->assertStringContainsString('publish', $exception->getMessage());
             $this->assertSame(['.', '..'], scandir($target->path));
             $this->assertSame($target->identity['ino'], lstat($target->path)['ino']);
-            $this->assertSame(0700, fileperms($target->path) & 0777);
+
+            if (PHP_OS_FAMILY !== 'Windows') {
+                $this->assertSame(0700, fileperms($target->path) & 0777);
+            }
         }
     }
 

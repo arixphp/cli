@@ -19,28 +19,28 @@ class NativeTemplateTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $root = realpath(sys_get_temp_dir()).DIRECTORY_SEPARATOR.'arix-native-'.bin2hex(random_bytes(8));
-        $this->views = $root.DIRECTORY_SEPARATOR.'views';
-        $this->cache = $root.DIRECTORY_SEPARATOR.'cache';
-        mkdir($this->views.DIRECTORY_SEPARATOR.'native', 0755, true);
+        $root = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-native-' . bin2hex(random_bytes(8));
+        $this->views = $root . DIRECTORY_SEPARATOR . 'views';
+        $this->cache = $root . DIRECTORY_SEPARATOR . 'cache';
+        mkdir($this->views . DIRECTORY_SEPARATOR . 'native', 0755, true);
         mkdir($this->cache, 0755, true);
 
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'hello.php', '<p>Hello <?= $this->escape($name) ?></p>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'layout.php', '<html><?= $this->yieldSection(\'content\', \'Default\') ?></html>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'page.php', '<?php $this->extend(\'native.layout\'); $this->startSection(\'content\'); ?><h1><?= $this->escape($title) ?></h1><?php $this->endSection(); ?>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'fileinfo.php', '<?= __FILE__ ?>|<?= basename(__DIR__) ?>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'card.php', '<article><h2><?= $this->escape($heading) ?></h2><div><?= $slot ?></div></article>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'withcomponent.php', '<?php $this->startComponent(\'native.card\', [\'heading\' => $title]); ?><p>body</p><?= $this->endComponent() ?>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'toblade.php', '<?php $this->extend(\'blayout\'); $this->startSection(\'content\'); ?>native-body<?php $this->endSection(); ?>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'cyclea.php', '<?php $this->extend(\'native.cycleb\'); ?>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'cycleb.php', '<?php $this->extend(\'native.cyclea\'); ?>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'unclosed.php', '<?php $this->startSection(\'content\'); ?>oops');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'twice.php', '<?php $this->extend(\'native.layout\'); $this->extend(\'native.layout\'); ?>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'bpart.arix.php', '<b>{{ $v }}</b>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'withblade.php', '<?= $this->partial(\'bpart\', [\'v\' => $v]) ?>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'blayout.arix.php', '<html>@yield(\'content\')</html>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'bwithnative.arix.php', '@include(\'native.hello\', [\'name\' => $who])');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'bextendsnative.arix.php', '@extends(\'native.layout\') @section(\'content\')blade-body @endsection');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'hello.php', '<p>Hello <?= $this->escape($name) ?></p>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'layout.php', '<html><?= $this->yieldSection(\'content\', \'Default\') ?></html>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'page.php', '<?php $this->extend(\'native.layout\'); $this->startSection(\'content\'); ?><h1><?= $this->escape($title) ?></h1><?php $this->endSection(); ?>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'fileinfo.php', '<?= __FILE__ ?>|<?= basename(__DIR__) ?>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'card.php', '<article><h2><?= $this->escape($heading) ?></h2><div><?= $slot ?></div></article>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'withcomponent.php', '<?php $this->startComponent(\'native.card\', [\'heading\' => $title]); ?><p>body</p><?= $this->endComponent() ?>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'toblade.php', '<?php $this->extend(\'blayout\'); $this->startSection(\'content\'); ?>native-body<?php $this->endSection(); ?>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'cyclea.php', '<?php $this->extend(\'native.cycleb\'); ?>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'cycleb.php', '<?php $this->extend(\'native.cyclea\'); ?>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'unclosed.php', '<?php $this->startSection(\'content\'); ?>oops');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'twice.php', '<?php $this->extend(\'native.layout\'); $this->extend(\'native.layout\'); ?>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'bpart.arix.php', '<b>{{ $v }}</b>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'withblade.php', '<?= $this->partial(\'bpart\', [\'v\' => $v]) ?>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'blayout.arix.php', '<html>@yield(\'content\')</html>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'bwithnative.arix.php', '@include(\'native.hello\', [\'name\' => $who])');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'bextendsnative.arix.php', '@extends(\'native.layout\') @section(\'content\')blade-body @endsection');
     }
 
     protected function tearDown(): void
@@ -55,7 +55,7 @@ class NativeTemplateTest extends TestCase
         $engine = new TemplateEngine($this->views, $this->cache);
 
         $this->assertSame('<p>Hello Ada</p>', $engine->render('native.hello', ['name' => 'Ada']));
-        $expected = $this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'fileinfo.php'.'|native';
+        $expected = $this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'fileinfo.php' . '|native';
 
         $this->assertSame($expected, $engine->render('native.fileinfo'));
     }
@@ -101,7 +101,7 @@ class NativeTemplateTest extends TestCase
     #[Test]
     public function it_rejects_reserved_data_in_native_partials(): void
     {
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native'.DIRECTORY_SEPARATOR.'badpartial.php', '<?= $this->partial(\'native.hello\', [\'this\' => 1]) ?>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'badpartial.php', '<?= $this->partial(\'native.hello\', [\'this\' => 1]) ?>');
 
         $this->expectException(InvalidArgumentException::class);
         (new TemplateEngine($this->views, $this->cache))->render('native.badpartial', ['name' => 'Ada']);
@@ -111,7 +111,7 @@ class NativeTemplateTest extends TestCase
     {
         if (is_dir($path) && ! is_link($path)) {
             foreach (array_diff(scandir($path), ['.', '..']) as $entry) {
-                $this->remove($path.DIRECTORY_SEPARATOR.$entry);
+                $this->remove($path . DIRECTORY_SEPARATOR . $entry);
             }
 
             rmdir($path);

@@ -22,28 +22,28 @@ class TemplateEngineTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $root = realpath(sys_get_temp_dir()).DIRECTORY_SEPARATOR.'arix-engine-'.bin2hex(random_bytes(8));
-        $this->views = $root.DIRECTORY_SEPARATOR.'views';
-        $this->cache = $root.DIRECTORY_SEPARATOR.'cache';
-        mkdir($this->views.DIRECTORY_SEPARATOR.'layouts', 0755, true);
-        mkdir($this->views.DIRECTORY_SEPARATOR.'partials', 0755, true);
-        mkdir($this->views.DIRECTORY_SEPARATOR.'components', 0755, true);
+        $root = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-engine-' . bin2hex(random_bytes(8));
+        $this->views = $root . DIRECTORY_SEPARATOR . 'views';
+        $this->cache = $root . DIRECTORY_SEPARATOR . 'cache';
+        mkdir($this->views . DIRECTORY_SEPARATOR . 'layouts', 0755, true);
+        mkdir($this->views . DIRECTORY_SEPARATOR . 'partials', 0755, true);
+        mkdir($this->views . DIRECTORY_SEPARATOR . 'components', 0755, true);
         mkdir($this->cache, 0755, true);
 
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'layouts'.DIRECTORY_SEPARATOR.'main.arix.php', "<html>@yield('content')</html>");
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'page.arix.php', "@extends('layouts.main')\n@section('content')<h1>{{ \$title }}</h1>{!! \$raw !!}@endsection");
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'partials'.DIRECTORY_SEPARATOR.'greet.arix.php', '<p>Hello {{ $name }}!</p>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'withinclude.arix.php', "@include('partials.greet', ['name' => \$who])");
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'components'.DIRECTORY_SEPARATOR.'card.arix.php', '<article><h2>{{ $heading }}</h2><div>{!! $slot !!}</div></article>');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'withcomponent.arix.php', "@component('components.card', ['heading' => \$title])<p>body</p>@endcomponent");
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'cond.arix.php', "@if(\$show)yes @else no @endif @foreach(\$items as \$item){{\$item}}; @endforeach");
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'json.arix.php', '@json($value)');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'inlinesection.arix.php', '@section(\'t\', $v) @yield(\'t\')');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'yielddefault.arix.php', '@yield(\'missing\', \'<b>D</b>\')');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'cyclea.arix.php', "@include('cycleb')");
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'cycleb.arix.php', "@include('cyclea')");
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'boom.arix.php', 'before <?php throw new RuntimeException(\'boom\'); ?> after');
-        file_put_contents($this->views.DIRECTORY_SEPARATOR.'native.php', '<p>native</p>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'layouts' . DIRECTORY_SEPARATOR . 'main.arix.php', "<html>@yield('content')</html>");
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'page.arix.php', "@extends('layouts.main')\n@section('content')<h1>{{ \$title }}</h1>{!! \$raw !!}@endsection");
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'partials' . DIRECTORY_SEPARATOR . 'greet.arix.php', '<p>Hello {{ $name }}!</p>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'withinclude.arix.php', "@include('partials.greet', ['name' => \$who])");
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'card.arix.php', '<article><h2>{{ $heading }}</h2><div>{!! $slot !!}</div></article>');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'withcomponent.arix.php', "@component('components.card', ['heading' => \$title])<p>body</p>@endcomponent");
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'cond.arix.php', '@if($show)yes @else no @endif @foreach($items as $item){{$item}}; @endforeach');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'json.arix.php', '@json($value)');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'inlinesection.arix.php', '@section(\'t\', $v) @yield(\'t\')');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'yielddefault.arix.php', '@yield(\'missing\', \'<b>D</b>\')');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'cyclea.arix.php', "@include('cycleb')");
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'cycleb.arix.php', "@include('cyclea')");
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'boom.arix.php', 'before <?php throw new RuntimeException(\'boom\'); ?> after');
+        file_put_contents($this->views . DIRECTORY_SEPARATOR . 'native.php', '<p>native</p>');
     }
 
     protected function tearDown(): void
@@ -51,6 +51,16 @@ class TemplateEngineTest extends TestCase
         chmod($this->cache, 0755);
         $this->remove(dirname($this->views));
         parent::tearDown();
+    }
+
+    #[Test]
+    public function it_handles_missing_numeric_directive_arguments_under_strict_types(): void
+    {
+        $this->assertNull(BladeAdapter::get([0 => '@endsection', 1 => 'endsection', 2 => ''], 3));
+        $this->assertSame('fallback', BladeAdapter::get([], 3, static fn (): string => 'fallback'));
+        $this->assertSame('(\'content\')', BladeAdapter::get([3 => '(\'content\')'], 3));
+        $this->assertSame('nested', BladeAdapter::get(['section' => ['name' => 'nested']], 'section.name'));
+        $this->assertSame(['value'], BladeAdapter::get(['value'], null));
     }
 
     #[Test]
@@ -83,16 +93,16 @@ class TemplateEngineTest extends TestCase
         $mtimes = [];
 
         foreach (array_diff(scandir($this->cache), ['.', '..']) as $file) {
-            $mtimes[$file] = filemtime($this->cache.DIRECTORY_SEPARATOR.$file);
+            $mtimes[$file] = filemtime($this->cache . DIRECTORY_SEPARATOR . $file);
         }
 
         $this->assertSame($first, $engine->render('page', ['title' => 'T', 'raw' => 'R']));
 
         foreach ($mtimes as $file => $mtime) {
-            $this->assertSame($mtime, filemtime($this->cache.DIRECTORY_SEPARATOR.$file));
+            $this->assertSame($mtime, filemtime($this->cache . DIRECTORY_SEPARATOR . $file));
         }
 
-        $source = $this->views.DIRECTORY_SEPARATOR.'partials'.DIRECTORY_SEPARATOR.'greet.arix.php';
+        $source = $this->views . DIRECTORY_SEPARATOR . 'partials' . DIRECTORY_SEPARATOR . 'greet.arix.php';
         $mtime = filemtime($source);
         file_put_contents($source, '<p>Hi {{ $name }}!</p>');
         touch($source, $mtime);
@@ -122,6 +132,11 @@ class TemplateEngineTest extends TestCase
     public function it_fails_closed_on_unwritable_cache_without_partial_output(): void
     {
         chmod($this->cache, 0555);
+
+        if (is_writable($this->cache)) {
+            $this->markTestSkipped('This filesystem/user does not enforce POSIX write permissions.');
+        }
+
         $engine = new TemplateEngine($this->views, $this->cache);
         $level = ob_get_level();
         ob_start();
@@ -172,7 +187,7 @@ class TemplateEngineTest extends TestCase
     {
         if (is_dir($path) && ! is_link($path)) {
             foreach (array_diff(scandir($path), ['.', '..']) as $entry) {
-                $this->remove($path.DIRECTORY_SEPARATOR.$entry);
+                $this->remove($path . DIRECTORY_SEPARATOR . $entry);
             }
 
             rmdir($path);

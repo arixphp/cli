@@ -56,8 +56,10 @@ class CoreUpdaterTest extends TestCase
         $this->assertSame('<?php // application entry point', file_get_contents($this->fixture->path('application/index.php')));
         $this->assertSame('<?php // application bootstrap', file_get_contents($this->fixture->path('application/app/bootstrap.php')));
         $this->assertSame('application css', file_get_contents($this->fixture->path('application/assets/site.css')));
-        $this->assertSame(0644, fileperms($this->fixture->path('application/core/.htaccess')) & 0777);
-        $this->assertSame(0644, fileperms($this->fixture->path('application/core/stubs/error.html')) & 0777);
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->assertSame(0644, fileperms($this->fixture->path('application/core/.htaccess')) & 0777);
+            $this->assertSame(0644, fileperms($this->fixture->path('application/core/stubs/error.html')) & 0777);
+        }
     }
 
     #[Test]
@@ -136,7 +138,9 @@ class CoreUpdaterTest extends TestCase
         $this->assertSame('<?php // application entry point', file_get_contents($this->fixture->path('application/index.php')));
         $this->assertSame('application css', file_get_contents($this->fixture->path('application/assets/site.css')));
         $this->assertFileDoesNotExist($this->fixture->path('application/.core-update.json'));
-        $this->assertSame(0644, fileperms($this->fixture->path('application/core/New.php')) & 0777);
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->assertSame(0644, fileperms($this->fixture->path('application/core/New.php')) & 0777);
+        }
     }
 
     #[Test]

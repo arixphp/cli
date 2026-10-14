@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 
 class ApplicationTestingFixture
@@ -68,16 +67,6 @@ XML);
 
     public function cleanup(): void
     {
-        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->root, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
-
-        foreach ($iterator as $file) {
-            if ($file->isDir() && ! $file->isLink()) {
-                rmdir($file->getPathname());
-            } else {
-                unlink($file->getPathname());
-            }
-        }
-
-        rmdir($this->root);
+        (new Filesystem())->remove($this->root);
     }
 }

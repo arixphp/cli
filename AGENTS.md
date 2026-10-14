@@ -40,6 +40,11 @@ unless the user explicitly requests a cross-project change.
   executable with embedded PHP and an intermediate PHAR. Packaged workers extract
   dependencies to a private disposable directory and clean it on shutdown.
 - `box.json` configures the compiled CLI build.
+- `.github/workflows/ci.yml` verifies pushes and PRs for `main` and `develop`.
+  `verify.yml` shares Pest, Pint and Actionlint jobs with `release.yml`.
+- `.github/release/` contains development-only release guards, packaging helpers
+  and the pinned embedded-runtime manifest. `.github/phpacker/` is a separate
+  locked tooling installation; never mix its autoloader with the CLI's.
 
 The primary architecture references are `docs/core-kernel.md`,
 `docs/routing.md`, and `docs/views.md`. Plans and ledgers under
@@ -118,9 +123,20 @@ Run every command from the `cli/` directory.
 - Application tests: `php arix tests --path=../arix` from this directory, or
   installed `arix tests` from the application's root.
 
-There are no project Composer scripts, PHPStan or Psalm configuration, GitHub
-Actions, or repository CI to assume. Do not invoke tools merely because they
-appear transitively in `composer.lock` or `vendor/`.
+There are no project Composer scripts or PHPStan/Psalm configurations. GitHub
+Actions run the full suite on Linux, macOS and Windows, Pint, and pinned
+Actionlint. Do not invoke other tools merely because they appear transitively
+in `composer.lock` or `vendor/`.
+
+Release tags trigger a draft-first build of Linux x64/ARM64, macOS x64/ARM64 and
+Windows x64 executables. Every target must pass native integration tests before
+the draft can be published. Release helpers reject moved tags, releases observed
+as published, missing assets and mismatched checksums. Do not manually publish or
+edit a draft while its workflow is running; enable release immutability for
+server-side protection against concurrent asset changes after publication.
+See `README.md` for recovery,
+runner requirements and tooling refresh. Do not push tags, change repository
+rulesets or publish releases without explicit authorization.
 
 Do not run `composer install` or `composer update` unless the task requires a
 dependency operation. Do not run `./source` casually: it rewrites managed source

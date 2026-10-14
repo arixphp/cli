@@ -16,7 +16,7 @@ class CompiledTemplateCacheTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->directory = realpath(sys_get_temp_dir()).DIRECTORY_SEPARATOR.'arix-cache-'.bin2hex(random_bytes(8));
+        $this->directory = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-cache-' . bin2hex(random_bytes(8));
         mkdir($this->directory, 0755, true);
     }
 
@@ -38,8 +38,8 @@ class CompiledTemplateCacheTest extends TestCase
             return '<?php // compiled';
         };
 
-        $first = $cache->remember($this->directory.DIRECTORY_SEPARATOR.'page.arix.php', 'source-a', $compile);
-        $second = $cache->remember($this->directory.DIRECTORY_SEPARATOR.'page.arix.php', 'source-a', $compile);
+        $first = $cache->remember($this->directory . DIRECTORY_SEPARATOR . 'page.arix.php', 'source-a', $compile);
+        $second = $cache->remember($this->directory . DIRECTORY_SEPARATOR . 'page.arix.php', 'source-a', $compile);
 
         $this->assertSame($first, $second);
         $this->assertSame(1, $calls);
@@ -53,10 +53,10 @@ class CompiledTemplateCacheTest extends TestCase
         $cache = new CompiledTemplateCache($this->directory, '1');
         $compile = static fn (): string => '<?php // compiled';
 
-        $original = $cache->remember($this->directory.DIRECTORY_SEPARATOR.'a.arix.php', 'same', $compile);
-        $changed = $cache->remember($this->directory.DIRECTORY_SEPARATOR.'a.arix.php', 'different', $compile);
-        $otherSource = $cache->remember($this->directory.DIRECTORY_SEPARATOR.'b.arix.php', 'same', $compile);
-        $otherVersion = (new CompiledTemplateCache($this->directory, '2'))->remember($this->directory.DIRECTORY_SEPARATOR.'a.arix.php', 'same', $compile);
+        $original = $cache->remember($this->directory . DIRECTORY_SEPARATOR . 'a.arix.php', 'same', $compile);
+        $changed = $cache->remember($this->directory . DIRECTORY_SEPARATOR . 'a.arix.php', 'different', $compile);
+        $otherSource = $cache->remember($this->directory . DIRECTORY_SEPARATOR . 'b.arix.php', 'same', $compile);
+        $otherVersion = (new CompiledTemplateCache($this->directory, '2'))->remember($this->directory . DIRECTORY_SEPARATOR . 'a.arix.php', 'same', $compile);
 
         $this->assertNotSame($original, $changed);
         $this->assertNotSame($original, $otherSource);
@@ -66,24 +66,29 @@ class CompiledTemplateCacheTest extends TestCase
     #[Test]
     public function it_rejects_linked_missing_and_unwritable_directories(): void
     {
-        $target = $this->directory.DIRECTORY_SEPARATOR.'target';
+        $target = $this->directory . DIRECTORY_SEPARATOR . 'target';
         mkdir($target);
-        symlink($target, $this->directory.DIRECTORY_SEPARATOR.'linked');
+        symlink($target, $this->directory . DIRECTORY_SEPARATOR . 'linked');
         $rejected = 0;
 
         try {
-            new CompiledTemplateCache($this->directory.DIRECTORY_SEPARATOR.'linked', '1');
+            new CompiledTemplateCache($this->directory . DIRECTORY_SEPARATOR . 'linked', '1');
         } catch (RuntimeException) {
             $rejected++;
         }
 
         try {
-            new CompiledTemplateCache($this->directory.DIRECTORY_SEPARATOR.'missing', '1');
+            new CompiledTemplateCache($this->directory . DIRECTORY_SEPARATOR . 'missing', '1');
         } catch (RuntimeException) {
             $rejected++;
         }
 
         chmod($this->directory, 0555);
+
+        if (is_writable($this->directory)) {
+            $this->assertSame(2, $rejected);
+            $this->markTestSkipped('Linked and missing directories were checked; this filesystem/user does not enforce POSIX write permissions.');
+        }
 
         try {
             (new CompiledTemplateCache($this->directory, '1'))->remember('source', 'code', static fn (): string => 'x');
@@ -100,7 +105,7 @@ class CompiledTemplateCacheTest extends TestCase
         $cache = new CompiledTemplateCache($this->directory, '1');
 
         try {
-            $cache->write($this->directory.DIRECTORY_SEPARATOR.'..'.DIRECTORY_SEPARATOR.'evil.php', 'x');
+            $cache->write($this->directory . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'evil.php', 'x');
             $this->fail('Foreign cache paths must be rejected.');
         } catch (RuntimeException) {
         }
@@ -116,7 +121,7 @@ class CompiledTemplateCacheTest extends TestCase
     {
         if (is_dir($path) && ! is_link($path)) {
             foreach (array_diff(scandir($path), ['.', '..']) as $entry) {
-                $this->remove($path.DIRECTORY_SEPARATOR.$entry);
+                $this->remove($path . DIRECTORY_SEPARATOR . $entry);
             }
 
             rmdir($path);

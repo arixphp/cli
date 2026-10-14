@@ -98,6 +98,98 @@ CLI installations require the PHP version and extensions declared in
 requires PHP 8.4.1+ and mbstring. Developer-only dependencies are not required to
 run application tests with a distributed CLI.
 
+### Continuous integration and releases
+
+The `CI` workflow runs on pushes to `main` and `develop`, and on pull requests
+targeting those branches. It runs the full Pest suite on Linux, macOS and Windows,
+Pint separately, and Actionlint for workflow validation. Dependencies come from
+`composer.lock`; CI does not update them. Configure the resulting Pest, Pint and
+Actionlint checks as required checks in the rulesets for both branches after their
+first run. Repository settings are not changed by the workflows.
+
+The core packaging fixture is compiled with Box in a Linux job and shared with
+all three test runners. Each runner executes the same PHAR and verifies that
+compaction preserves the exact core bytes without a source tree or Composer.
+Box 4.7.0 cannot clean up its working directory on Windows, so Windows tests
+consume the Linux-built artifact instead of compiling it or skipping validation.
+For local testing, export it on Linux/macOS with
+`ARIX_EXPORT_CORE_PHAR=/absolute/path/core-packaging.phar ./vendor/bin/pest tests/Unit/Core/Update/CorePackagingTest.php`,
+then set `ARIX_TEST_CORE_PHAR` to that file's absolute path on the consuming host.
+Missing or invalid artifacts fail the test. Unix runs without that variable
+continue to build the fixture locally.
+
+The `Release` workflow starts when a SemVer tag such as `v1.2.3` is pushed. The
+tagged commit must belong to the history of `main`. Merge the workflow files and
+their release helpers into `main` before creating the first release tag.
+
+```sh
+# Run from this CLI repository, after verification and with a clean release commit:
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+The workflow creates or recovers a **draft release**, verifies the exact tagged
+commit using the same CI checks, and builds the intermediate PHAR in a disposable
+checkout with production dependencies. That PHAR is shared by all native builds:
+
+| Distribution | Native runner |
+|---|---|
+| Linux x64 | `ubuntu-24.04` |
+| Linux ARM64 | `ubuntu-24.04-arm` |
+| macOS x64 | `macos-15-intel` |
+| macOS ARM64 | `macos-15` |
+| Windows x64 | `windows-2022` |
+
+Unix distributions use `.tar.gz` and contain `arix`; Windows uses `.zip` and
+contains `arix.exe`. PHPacker does not provide a Windows ARM target in the pinned
+tooling version. Ensure these runners are enabled and the account has sufficient
+Actions minutes and artifact storage; unavailable or failing targets block the
+release rather than being omitted.
+
+PHPacker has its own locked Composer installation under `.github/phpacker/`.
+`.github/release/build.php` uses its packager with runtime downloads pinned by
+upstream commit and SHA-256 in `.github/release/runtimes.json`, instead of allowing
+PHPacker to fetch a changing `latest` runtime. To refresh release tooling, update
+its isolated lock or the runtime manifest deliberately and rerun all native
+checks. Keep embedded PHP security updates current; a pinned download is not an
+automatic update policy.
+
+Each distribution is extracted and tested on its native runner. Release tests
+require the correct version, PHP 8.4.1+, the production dependency extensions,
+and operation without system PHP in `PATH`. JUnit reports must contain executed
+tests with no skips, failures or errors. Ordinary CI may omit the optional native
+tests when there is no executable; a release may not.
+
+After every target passes, the workflow uploads the five archives and
+`SHA256SUMS`, downloads them again to verify their content, checks that the tag
+has not moved and that the release is still a draft, and only then publishes.
+Tags with SemVer prerelease identifiers, such as `v1.2.3-rc.1`, publish as
+prereleases without changing the latest stable release. PHARs remain internal
+workflow artifacts. Releases are not signed or notarized by this workflow.
+
+If any check, build or asset operation fails, the draft remains unpublished.
+Re-run the workflow, or choose **Actions → Release → Run workflow** from `main`
+and supply the existing tag. Retries may replace only the expected assets of the
+draft; they preserve its notes and unrelated assets, and stop whenever a check
+observes an already published release. Do not move a release tag to fix code:
+create a new version tag. Creating or editing a draft in the GitHub Releases UI alone does not
+trigger this workflow.
+
+Do not manually publish, delete or edit the draft while the workflow is running:
+workflow concurrency serializes Actions runs, not GitHub UI/API operations.
+Draft checks and subsequent writes are separate API calls, so they cannot provide
+an atomic lock against an external publisher. For server-enforced protection of
+published tags and assets, enable **Settings → General → Releases → Enable
+release immutability** before the first production release. This applies to future
+releases and is a maintainer-managed setting, not something this workflow changes.
+
+Workflows use read-only permissions except the jobs that manage the draft and
+publish it, which require `contents: write`. They use the repository's
+`GITHUB_TOKEN`; no personal access token is required. Publication with that token
+does not trigger another workflow listening to `release: published`, so all
+required verification is inside this workflow. Validate the first full release
+in a separate test repository before enabling production distribution.
+
 For full documentation, visit [laravel-zero.com](https://laravel-zero.com/).
 
 ## Support the development

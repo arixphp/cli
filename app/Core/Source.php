@@ -23,12 +23,12 @@ class Source
     public function import(string $vendor, string $core): array
     {
         foreach (array_keys(self::PACKAGES) as $package) {
-            $dirPackage = $vendor.DIRECTORY_SEPARATOR.$package;
+            $dirPackage = $vendor . DIRECTORY_SEPARATOR . $package;
             $this->assertUnlinkedPath($dirPackage);
 
             $sourceRoot = self::PACKAGES[$package][3];
 
-            if (! is_dir($dirPackage) || ! is_file($dirPackage.DIRECTORY_SEPARATOR.'LICENSE') || ($sourceRoot !== '' && ! is_dir($dirPackage.DIRECTORY_SEPARATOR.$sourceRoot))) {
+            if (! is_dir($dirPackage) || ! is_file($dirPackage . DIRECTORY_SEPARATOR . 'LICENSE') || ($sourceRoot !== '' && ! is_dir($dirPackage . DIRECTORY_SEPARATOR . $sourceRoot))) {
                 throw new RuntimeException("Missing package or license: {$package}");
             }
         }
@@ -40,9 +40,9 @@ class Source
         }
 
         $core = realpath($core);
-        $this->assertUnlinkedPath($core.DIRECTORY_SEPARATOR.'.import.lock');
+        $this->assertUnlinkedPath($core . DIRECTORY_SEPARATOR . '.import.lock');
 
-        $lock = fopen($core.DIRECTORY_SEPARATOR.'.import.lock', 'c');
+        $lock = fopen($core . DIRECTORY_SEPARATOR . '.import.lock', 'c');
 
         if ($lock === false || ! flock($lock, LOCK_EX | LOCK_NB)) {
             if (is_resource($lock)) {
@@ -52,7 +52,7 @@ class Source
             throw new RuntimeException('Cannot lock core import.');
         }
 
-        $stage = $core.DIRECTORY_SEPARATOR.'.import-'.bin2hex(random_bytes(8));
+        $stage = $core . DIRECTORY_SEPARATOR . '.import-' . bin2hex(random_bytes(8));
         $installed = [];
         $backups = [];
         $completed = false;
@@ -60,18 +60,18 @@ class Source
         try {
             $retired = $this->assertManaged($core);
             mkdir($stage, 0755);
-            mkdir($stage.DIRECTORY_SEPARATOR.'previous', 0755);
+            mkdir($stage . DIRECTORY_SEPARATOR . 'previous', 0755);
 
             $manifest = ['format' => 1, 'php' => '>=8.4.1', 'packages' => [], 'files' => []];
             $versions = $this->versions($vendor);
 
             foreach (self::PACKAGES as $package => [$destination, $from, $to, $sourceRoot]) {
-                $root = $vendor.DIRECTORY_SEPARATOR.$package;
-                $source = $sourceRoot === '' ? $root : $root.DIRECTORY_SEPARATOR.$sourceRoot;
+                $root = $vendor . DIRECTORY_SEPARATOR . $package;
+                $source = $sourceRoot === '' ? $root : $root . DIRECTORY_SEPARATOR . $sourceRoot;
                 // The standalone core autoloader replaces FastRoute's bootstrap.
-                $excluded = $package === 'nikic/fast-route' ? [$source.DIRECTORY_SEPARATOR.'bootstrap.php'] : [];
-                $this->copy($source, $stage.DIRECTORY_SEPARATOR.$destination, $from, $to, $excluded);
-                $this->copy($root.DIRECTORY_SEPARATOR.'LICENSE', $stage.DIRECTORY_SEPARATOR.$destination.DIRECTORY_SEPARATOR.'LICENSE', null, null);
+                $excluded = $package === 'nikic/fast-route' ? [$source . DIRECTORY_SEPARATOR . 'bootstrap.php'] : [];
+                $this->copy($source, $stage . DIRECTORY_SEPARATOR . $destination, $from, $to, $excluded);
+                $this->copy($root . DIRECTORY_SEPARATOR . 'LICENSE', $stage . DIRECTORY_SEPARATOR . $destination . DIRECTORY_SEPARATOR . 'LICENSE', null, null);
 
                 $manifest['packages'][$package] = [
                     'version' => $versions[$package] ?? 'unknown',
@@ -79,15 +79,15 @@ class Source
                     'namespace' => $to,
                 ];
 
-                $this->hashFiles($stage.DIRECTORY_SEPARATOR.$destination, $destination, $manifest['files']);
+                $this->hashFiles($stage . DIRECTORY_SEPARATOR . $destination, $destination, $manifest['files']);
             }
 
             ksort($manifest['files']);
 
-            $this->write($stage.DIRECTORY_SEPARATOR.'imports.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n");
+            $this->write($stage . DIRECTORY_SEPARATOR . 'imports.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n");
 
             foreach ($retired as $name) {
-                if (! $this->move($core.DIRECTORY_SEPARATOR.$name, $stage.DIRECTORY_SEPARATOR.'previous'.DIRECTORY_SEPARATOR.$name)) {
+                if (! $this->move($core . DIRECTORY_SEPARATOR . $name, $stage . DIRECTORY_SEPARATOR . 'previous' . DIRECTORY_SEPARATOR . $name)) {
                     throw new RuntimeException("Cannot back up {$name}");
                 }
 
@@ -95,15 +95,15 @@ class Source
             }
 
             foreach ([...$this->destinations(), 'imports.json'] as $name) {
-                if (file_exists($core.DIRECTORY_SEPARATOR.$name)) {
-                    if (! $this->move($core.DIRECTORY_SEPARATOR.$name, $stage.DIRECTORY_SEPARATOR.'previous'.DIRECTORY_SEPARATOR.$name)) {
+                if (file_exists($core . DIRECTORY_SEPARATOR . $name)) {
+                    if (! $this->move($core . DIRECTORY_SEPARATOR . $name, $stage . DIRECTORY_SEPARATOR . 'previous' . DIRECTORY_SEPARATOR . $name)) {
                         throw new RuntimeException("Cannot back up {$name}");
                     }
 
                     $backups[] = $name;
                 }
 
-                if (! $this->move($stage.DIRECTORY_SEPARATOR.$name, $core.DIRECTORY_SEPARATOR.$name)) {
+                if (! $this->move($stage . DIRECTORY_SEPARATOR . $name, $core . DIRECTORY_SEPARATOR . $name)) {
                     throw new RuntimeException("Cannot install {$name}");
                 }
 
@@ -115,18 +115,18 @@ class Source
             return $manifest;
         } catch (Throwable $exception) {
             foreach (array_reverse($installed) as $name) {
-                $this->remove($core.DIRECTORY_SEPARATOR.$name);
+                $this->remove($core . DIRECTORY_SEPARATOR . $name);
             }
 
             foreach ($backups as $name) {
-                if (! $this->move($stage.DIRECTORY_SEPARATOR.'previous'.DIRECTORY_SEPARATOR.$name, $core.DIRECTORY_SEPARATOR.$name)) {
+                if (! $this->move($stage . DIRECTORY_SEPARATOR . 'previous' . DIRECTORY_SEPARATOR . $name, $core . DIRECTORY_SEPARATOR . $name)) {
                     throw new RuntimeException("Import rollback failed; backup retained at {$stage}", previous: $exception);
                 }
             }
 
             throw $exception;
         } finally {
-            if (is_dir($stage) && (scandir($stage.DIRECTORY_SEPARATOR.'previous') ?: []) === ['.', '..']) {
+            if (is_dir($stage) && (scandir($stage . DIRECTORY_SEPARATOR . 'previous') ?: []) === ['.', '..']) {
                 $this->remove($stage);
             } elseif ($completed) {
                 $this->remove($stage);
@@ -141,12 +141,12 @@ class Source
     private function assertManaged(string $core): array
     {
         foreach ([...$this->destinations(), 'imports.json'] as $name) {
-            $this->assertUnlinkedPath($core.DIRECTORY_SEPARATOR.$name);
+            $this->assertUnlinkedPath($core . DIRECTORY_SEPARATOR . $name);
         }
 
-        if (! file_exists($core.DIRECTORY_SEPARATOR.'imports.json')) {
+        if (! file_exists($core . DIRECTORY_SEPARATOR . 'imports.json')) {
             foreach ($this->destinations() as $name) {
-                if (file_exists($core.DIRECTORY_SEPARATOR.$name)) {
+                if (file_exists($core . DIRECTORY_SEPARATOR . $name)) {
                     throw new RuntimeException('Refusing to replace an unmanaged component.');
                 }
             }
@@ -154,7 +154,7 @@ class Source
             return [];
         }
 
-        $manifest = json_decode(file_get_contents($core.DIRECTORY_SEPARATOR.'imports.json'), true, flags: JSON_THROW_ON_ERROR);
+        $manifest = json_decode(file_get_contents($core . DIRECTORY_SEPARATOR . 'imports.json'), true, flags: JSON_THROW_ON_ERROR);
 
         if (($manifest['format'] ?? null) !== 1 || ! is_array($manifest['files'] ?? null) || ! is_array($manifest['packages'] ?? null)) {
             throw new RuntimeException('Invalid import manifest.');
@@ -181,22 +181,22 @@ class Source
                 $retired[] = 'Routing';
             }
 
-            $this->assertUnlinkedPath($core.DIRECTORY_SEPARATOR.$metadata['destination']);
+            $this->assertUnlinkedPath($core . DIRECTORY_SEPARATOR . $metadata['destination']);
             $managed[] = $metadata['destination'];
         }
 
         foreach ($this->destinations() as $name) {
-            if (! in_array($name, $managed, true) && file_exists($core.DIRECTORY_SEPARATOR.$name)) {
+            if (! in_array($name, $managed, true) && file_exists($core . DIRECTORY_SEPARATOR . $name)) {
                 throw new RuntimeException("Refusing to replace unmanaged component: {$name}");
             }
         }
 
         foreach ($managed as $name) {
-            if (! is_dir($core.DIRECTORY_SEPARATOR.$name)) {
+            if (! is_dir($core . DIRECTORY_SEPARATOR . $name)) {
                 throw new RuntimeException("Managed component is missing: {$name}");
             }
 
-            $this->hashFiles($core.DIRECTORY_SEPARATOR.$name, $name, $actual);
+            $this->hashFiles($core . DIRECTORY_SEPARATOR . $name, $name, $actual);
         }
 
         ksort($actual);
@@ -251,7 +251,7 @@ class Source
             }
 
             foreach (array_diff(scandir($source), ['.', '..']) as $entry) {
-                $this->copy($source.DIRECTORY_SEPARATOR.$entry, $destination.DIRECTORY_SEPARATOR.$entry, $from, $to, $excluded);
+                $this->copy($source . DIRECTORY_SEPARATOR . $entry, $destination . DIRECTORY_SEPARATOR . $entry, $from, $to, $excluded);
             }
 
             return;
@@ -297,7 +297,7 @@ class Source
 
         if (is_dir($path)) {
             foreach (array_diff(scandir($path), ['.', '..']) as $entry) {
-                $this->hashFiles($path.DIRECTORY_SEPARATOR.$entry, $relative.DIRECTORY_SEPARATOR.$entry, $files);
+                $this->hashFiles($path . DIRECTORY_SEPARATOR . $entry, $relative . DIRECTORY_SEPARATOR . $entry, $files);
             }
         } else {
             $hash = hash_file('sha256', $path);
@@ -312,7 +312,7 @@ class Source
 
     private function versions(string $vendor): array
     {
-        $file = $vendor.DIRECTORY_SEPARATOR.'composer'.DIRECTORY_SEPARATOR.'installed.json';
+        $file = $vendor . DIRECTORY_SEPARATOR . 'composer' . DIRECTORY_SEPARATOR . 'installed.json';
 
         if (! is_file($file)) {
             return [];
@@ -332,7 +332,7 @@ class Source
     {
         if (is_dir($path) && ! is_link($path)) {
             foreach (array_diff(scandir($path), ['.', '..']) as $entry) {
-                $this->remove($path.DIRECTORY_SEPARATOR.$entry);
+                $this->remove($path . DIRECTORY_SEPARATOR . $entry);
             }
 
             if (! rmdir($path)) {

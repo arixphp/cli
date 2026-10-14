@@ -1,0 +1,231 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing SemVer tag on main (for example v1.2.3)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+      - run: composer install --no-dev --no-scripts --no-interaction --prefer-dist --no-progress
+      - name: Validate tag and main ancestry
+        id: release
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: php .github/release/run.php resolve
+
+  draft:
+    name: Prepare draft
+    needs: resolve
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+      - run: composer install --no-dev --no-scripts --no-interaction --prefer-dist --no-progress
+      - name: Create or recover draft
+        env:
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: php .github/release/run.php draft
+
+  verify:
+    name: Verify release commit
+    needs: [resolve, draft]
+    uses: ./.github/workflows/verify.yml
+    with:
+      ref: ${{ needs.resolve.outputs.sha }}
+
+  phar:
+    name: Build PHAR
+    needs: [resolve, verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, dom, xml, xmlwriter, xmlreader, simplexml, fileinfo, iconv, zip, phar
+          ini-values: phar.readonly=0
+          coverage: none
+          tools: composer:v2
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Build in disposable production checkout
+        env:
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+          RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          copy="$RUNNER_TEMP/arix-production"
+          mkdir "$copy"
+          git archive "$RELEASE_SHA" | tar -x -C "$copy"
+          composer install --working-dir="$copy" --no-dev --no-scripts --no-interaction --prefer-dist --no-progress
+          (
+            cd "$copy"
+            php arix app:build arix.phar --build-version="$RELEASE_VERSION" --no-interaction
+            php arix core:package --check
+          )
+          mkdir -p builds
+          cp "$copy/builds/arix.phar" builds/arix.phar
+          (cd builds && sha256sum arix.phar > arix.phar.sha256)
+      - name: Verify production PHAR
+        env:
+          ARIX_TEST_PHAR: ${{ github.workspace }}/builds/arix.phar
+          ARIX_RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: php vendor/bin/pest tests/Unit/Release/PackagedReleaseTest.php --log-junit=phar-tests.xml
+      - name: Require executed PHAR tests
+        run: php .github/release/run.php report phar-tests.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-phar
+          path: |
+            builds/arix.phar
+            builds/arix.phar.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  native:
+    name: Native (${{ matrix.target }})
+    needs: [resolve, phar]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, platform: linux, arch: x64, runner: ubuntu-24.04}
+          - {target: linux-arm64, platform: linux, arch: arm, runner: ubuntu-24.04-arm}
+          - {target: macos-x64, platform: mac, arch: x64, runner: macos-15-intel}
+          - {target: macos-arm64, platform: mac, arch: arm, runner: macos-15}
+          - {target: windows-x64, platform: windows, arch: x64, runner: windows-2022}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, dom, xml, xmlwriter, xmlreader, simplexml, fileinfo, iconv, curl, zip, phar
+          ini-values: phar.readonly=0
+          coverage: none
+          tools: composer:v2
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Install isolated PHPacker
+        run: composer install --working-dir=.github/phpacker --no-dev --no-scripts --no-interaction --prefer-dist --no-progress
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-phar
+          path: builds
+      - name: Verify PHAR checksum
+        shell: bash
+        run: |
+          # $sum belongs to PHP, not Bash; keep the PHP expression literal.
+          # shellcheck disable=SC2016
+          php -r '$sum = explode(" ", file_get_contents("builds/arix.phar.sha256"))[0]; if (!hash_equals($sum, hash_file("sha256", "builds/arix.phar"))) { exit(1); }'
+      - name: Build with pinned PHP runtime
+        id: build
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          ARCHITECTURE: ${{ matrix.arch }}
+        shell: bash
+        run: php .github/release/build.php "$PLATFORM" "$ARCHITECTURE" builds/arix.phar builds/bin
+      - name: Package and extract distribution
+        id: package
+        env:
+          BINARY: ${{ steps.build.outputs.binary }}
+          TARGET: ${{ matrix.target }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        shell: bash
+        run: php .github/release/package.php "$BINARY" "$TARGET" "$RELEASE_VERSION" dist
+      - name: Test distributed executable without system PHP
+        env:
+          ARIX_TEST_EXECUTABLE: ${{ steps.package.outputs.binary }}
+          ARIX_RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: php vendor/bin/pest tests/Unit/Testing/StandaloneExecutableTest.php tests/Unit/Release/PackagedReleaseTest.php --log-junit=native-tests.xml
+      - name: Require executed native tests
+        run: php .github/release/run.php report native-tests.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish verified release
+    needs: [resolve, native]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+      - run: composer install --no-dev --no-scripts --no-interaction --prefer-dist --no-progress
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: native-*
+          path: dist
+          merge-multiple: true
+      - name: Upload, download, verify and publish draft
+        env:
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: php .github/release/run.php publish dist

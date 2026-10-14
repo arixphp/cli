@@ -24,7 +24,9 @@ class InstallationFiles
         clearstatcache(true, $path);
 
         if (is_link($path) || is_file($path)) {
-            if (! @unlink($path)) {
+            // Windows directory links (including dangling ones) require
+            // rmdir; never recurse into a link's target.
+            if (! @unlink($path) && ! (PHP_OS_FAMILY === 'Windows' && is_link($path) && @rmdir($path))) {
                 throw new RuntimeException("Cannot remove installation temporary file: {$path}.");
             }
 

@@ -6,9 +6,10 @@ namespace Tests\Core;
 
 use Arix\Container\Container;
 use Arix\Container\UnknownServiceException;
+use Arix\HttpFoundation\Request;
 use Arix\Routing\ControllerDispatcher;
 use Arix\Routing\RouteDefinition;
-use Arix\HttpFoundation\Request;
+use Arix\Views\TemplateEngine;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -24,14 +25,14 @@ class ControllerDispatcherTest extends RoutingTestCase
     {
         $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("slug"), 201); } public function index(): Response { return new Response("index"); }');
         $unused = $this->controller('public function show(): Response { throw new \\LogicException("unused"); }', 'UnusedController');
-        $container = new Container;
+        $container = new Container();
         $request = Request::create('/article');
         $request->attributes->set('slug', 'article');
         $container->instance(Request::class, $request);
         $container->bind($class, function (Container $scope) use ($class, $request): object {
             $this->assertSame($request, $scope->get(Request::class));
 
-            return new $class;
+            return new $class();
         });
         $dispatcher = new ControllerDispatcher($this->directory);
         $response = $dispatcher->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), $request, $container);
@@ -46,8 +47,8 @@ class ControllerDispatcherTest extends RoutingTestCase
     public function it_rejects_invalid_action_contracts(string $body, string $action): void
     {
         $class = $this->controller($body);
-        $container = new Container;
-        $container->bind($class, static fn (): object => new $class);
+        $container = new Container();
+        $container->bind($class, static fn (): object => new $class());
         $this->expectException(RuntimeException::class);
         new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, $action), Request::create('/'), $container);
     }
@@ -77,8 +78,8 @@ class ControllerDispatcherTest extends RoutingTestCase
     public function it_accepts_response_subclass_declarations(): void
     {
         $class = $this->controller('public function show(): \\Arix\\HttpFoundation\\JsonResponse { return new \\Arix\\HttpFoundation\\JsonResponse(["ok" => true]); }');
-        $container = new Container;
-        $container->bind($class, static fn (): object => new $class);
+        $container = new Container();
+        $container->bind($class, static fn (): object => new $class());
         $response = new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), $container);
         $this->assertSame('{"ok":true}', $response->getContent());
     }
@@ -87,8 +88,8 @@ class ControllerDispatcherTest extends RoutingTestCase
     public function it_rejects_incompatible_bindings(): void
     {
         $class = $this->controller('public function show(): Response { return new Response; }');
-        $container = new Container;
-        $container->bind($class, static fn (): stdClass => new stdClass);
+        $container = new Container();
+        $container->bind($class, static fn (): stdClass => new stdClass());
         $this->expectException(RuntimeException::class);
         new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), $container);
     }
@@ -99,14 +100,14 @@ class ControllerDispatcherTest extends RoutingTestCase
         $class = $this->controller('public function __construct() { throw new \\LogicException("constructed"); } public function show(): Response { return new Response; }');
         $this->expectException(LogicException::class);
         $this->expectExceptionMessageIsOrContains('constructed');
-        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container);
+        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container());
     }
 
     #[Test]
     public function it_uses_default_values_for_optional_constructor_parameters(): void
     {
         $class = $this->controller('private string $mode = "fallback"; public function __construct(string $mode = "fallback") { $this->mode = $mode; } public function show(): Response { return new Response($this->mode); }');
-        $response = new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container);
+        $response = new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container());
         $this->assertSame('fallback', $response->getContent());
     }
 
@@ -116,7 +117,7 @@ class ControllerDispatcherTest extends RoutingTestCase
         $class = $this->controller('public function __construct(private \\stdClass $dependency) {} public function show(): Response { return new Response; }');
 
         try {
-            new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container);
+            new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container());
             $this->fail('Expected controller dependencies to require an explicit binding.');
         } catch (RuntimeException $exception) {
             $this->assertStringContainsString('register an explicit binding', $exception->getMessage());
@@ -129,29 +130,29 @@ class ControllerDispatcherTest extends RoutingTestCase
         $class = $this->controller('public function show(): Response { return new Response; }');
         $this->expectException(RuntimeException::class);
         $wrongCase = str_replace('SampleController', 'sampleController', $class);
-        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $wrongCase, 'show'), Request::create('/'), new Container);
+        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $wrongCase, 'show'), Request::create('/'), new Container());
     }
 
     #[Test]
     public function it_rejects_symlinked_controller_directories(): void
     {
         $class = $this->controller('public function show(): Response { return new Response; }');
-        $link = $this->directory.DIRECTORY_SEPARATOR.'linked';
+        $link = $this->directory . DIRECTORY_SEPARATOR . 'linked';
         symlink(dirname($this->directory), $link);
         $this->expectException(RuntimeException::class);
-        new ControllerDispatcher($link)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container);
+        new ControllerDispatcher($link)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container());
     }
 
     #[Test]
     public function it_rejects_linked_controller_files(): void
     {
         $class = $this->controller('public function show(): Response { return new Response; }');
-        $file = $this->directory.DIRECTORY_SEPARATOR.str_replace('App\\Controllers\\', '', str_replace('\\SampleController', '', $class)).DIRECTORY_SEPARATOR.'SampleController.php';
-        $outside = $this->directory.DIRECTORY_SEPARATOR.'outside.php';
+        $file = $this->directory . DIRECTORY_SEPARATOR . str_replace('App\\Controllers\\', '', str_replace('\\SampleController', '', $class)) . DIRECTORY_SEPARATOR . 'SampleController.php';
+        $outside = $this->directory . DIRECTORY_SEPARATOR . 'outside.php';
         rename($file, $outside);
         symlink($outside, $file);
         $this->expectException(RuntimeException::class);
-        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container);
+        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container());
     }
 
     #[Test]
@@ -159,12 +160,12 @@ class ControllerDispatcherTest extends RoutingTestCase
     {
         $class = $this->controller('public function show(): Response { return new Response; }');
         $namespace = substr($class, strlen('App\\Controllers\\'), -strlen('\\SampleController'));
-        $file = $this->directory.DIRECTORY_SEPARATOR.$namespace.DIRECTORY_SEPARATOR.'SampleController.php';
-        $other = $this->directory.DIRECTORY_SEPARATOR.'conflicting.php';
+        $file = $this->directory . DIRECTORY_SEPARATOR . $namespace . DIRECTORY_SEPARATOR . 'SampleController.php';
+        $other = $this->directory . DIRECTORY_SEPARATOR . 'conflicting.php';
         copy($file, $other);
         require $other;
         $this->expectException(RuntimeException::class);
-        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container);
+        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container());
     }
 
     #[Test]
@@ -172,23 +173,23 @@ class ControllerDispatcherTest extends RoutingTestCase
     {
         $class = $this->controller('public function show(): Response { return new Response; }');
         $namespace = substr($class, strlen('App\\Controllers\\'), -strlen('\\SampleController'));
-        $nested = $this->directory.DIRECTORY_SEPARATOR.$namespace;
-        $other = $this->directory.DIRECTORY_SEPARATOR.'other';
+        $nested = $this->directory . DIRECTORY_SEPARATOR . $namespace;
+        $other = $this->directory . DIRECTORY_SEPARATOR . 'other';
         rename($nested, $other);
         symlink($other, $nested);
         $this->expectException(RuntimeException::class);
-        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container);
+        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container());
     }
 
     #[Test]
     public function it_renders_view_returns_as_html_responses(): void
     {
         $views = $this->views();
-        file_put_contents($views.DIRECTORY_SEPARATOR.'page.arix.php', '<h1>{{ $title }}</h1>');
+        file_put_contents($views . DIRECTORY_SEPARATOR . 'page.arix.php', '<h1>{{ $title }}</h1>');
         $class = $this->controller('public function show(): \\Arix\\Views\\Contracts\\View { return new \\Arix\\Views\\View("page", ["title" => "Hi"]); }');
-        $container = new Container;
-        $container->bind($class, static fn (): object => new $class);
-        $container->instance(\Arix\Views\TemplateEngine::class, new \Arix\Views\TemplateEngine($views, $this->cache()));
+        $container = new Container();
+        $container->bind($class, static fn (): object => new $class());
+        $container->instance(TemplateEngine::class, new TemplateEngine($views, $this->cache()));
         $response = new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), $container);
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame('<h1>Hi</h1>', $response->getContent());
@@ -199,11 +200,11 @@ class ControllerDispatcherTest extends RoutingTestCase
     public function it_accepts_response_and_view_union_declarations(): void
     {
         $views = $this->views();
-        file_put_contents($views.DIRECTORY_SEPARATOR.'page.arix.php', '<h1>{{ $title }}</h1>');
+        file_put_contents($views . DIRECTORY_SEPARATOR . 'page.arix.php', '<h1>{{ $title }}</h1>');
         $class = $this->controller('public function show(Request $request): \\Arix\\HttpFoundation\\Response|\\Arix\\Views\\Contracts\\View { return $request->attributes->get("asView") ? new \\Arix\\Views\\View("page", ["title" => "Hi"]) : new Response("plain"); }');
-        $container = new Container;
-        $container->bind($class, static fn (): object => new $class);
-        $container->instance(\Arix\Views\TemplateEngine::class, new \Arix\Views\TemplateEngine($views, $this->cache()));
+        $container = new Container();
+        $container->bind($class, static fn (): object => new $class());
+        $container->instance(TemplateEngine::class, new TemplateEngine($views, $this->cache()));
         $dispatcher = new ControllerDispatcher($this->directory);
         $plain = Request::create('/');
         $this->assertSame('plain', $dispatcher->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), $plain, $container)->getContent());
@@ -218,8 +219,8 @@ class ControllerDispatcherTest extends RoutingTestCase
     public function it_rejects_nullable_view_declarations(): void
     {
         $class = $this->controller('public function show(): \\Arix\\Views\\Contracts\\View|null { return null; }');
-        $container = new Container;
-        $container->bind($class, static fn (): object => new $class);
+        $container = new Container();
+        $container->bind($class, static fn (): object => new $class());
         $this->expectException(RuntimeException::class);
         new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), $container);
     }
@@ -228,15 +229,15 @@ class ControllerDispatcherTest extends RoutingTestCase
     public function it_requires_view_services_for_view_returns(): void
     {
         $class = $this->controller('public function show(): \\Arix\\Views\\Contracts\\View { return new \\Arix\\Views\\View("page"); }');
-        $container = new Container;
-        $container->bind($class, static fn (): object => new $class);
+        $container = new Container();
+        $container->bind($class, static fn (): object => new $class());
         $this->expectException(UnknownServiceException::class);
         new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), $container);
     }
 
     private function views(): string
     {
-        $views = $this->directory.DIRECTORY_SEPARATOR.'views';
+        $views = $this->directory . DIRECTORY_SEPARATOR . 'views';
 
         if (! is_dir($views)) {
             mkdir($views, 0755, true);
@@ -247,7 +248,7 @@ class ControllerDispatcherTest extends RoutingTestCase
 
     private function cache(): string
     {
-        $cache = $this->directory.DIRECTORY_SEPARATOR.'cache'.DIRECTORY_SEPARATOR;
+        $cache = $this->directory . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR;
 
         if (! is_dir($cache)) {
             mkdir($cache, 0755, true);

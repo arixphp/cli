@@ -2,7 +2,8 @@
     "preset": "laravel",
     "exclude": [
         "core/HttpFoundation",
-        "core/FastRoute"
+        "core/FastRoute",
+        "core/BladeOne"
     ],
     "rules": {
         "new_with_parentheses": true,
