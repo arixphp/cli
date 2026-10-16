@@ -229,3 +229,66 @@ jobs:
           RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
           GH_TOKEN: ${{ github.token }}
         run: php .github/release/run.php publish dist
+
+  tap:
+    name: Propose Homebrew formula
+    needs: [resolve, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+        with:
+          php-version: '8.4'
+          coverage: none
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: native-*
+          path: dist
+          merge-multiple: true
+      - name: Update formula and open tap PR
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${HOMEBREW_TAP_TOKEN:-}" ]; then
+            echo 'Missing HOMEBREW_TAP_TOKEN secret (PAT with contents:write on arixphp/homebrew-tap).' >&2
+            exit 1
+          fi
+          export GH_TOKEN="$HOMEBREW_TAP_TOKEN"
+          rm -rf tap
+          gh repo clone arixphp/homebrew-tap tap
+          php .github/tap/run.php tap "$RELEASE_VERSION" dist
+          branch="arix-${RELEASE_VERSION}"
+          cd tap
+          git checkout -b "$branch"
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -am "Arix ${RELEASE_VERSION}"
+          git push -u origin "$branch"
+          if [ "$(gh pr list --head "$branch" --json number --jq 'length')" = "0" ]; then
+            gh pr create --title "Arix ${RELEASE_VERSION}" --body "Automated formula update for Arix ${RELEASE_VERSION}. Review and merge to publish." --head "$branch" --base main
+          fi
+
+  winget:
+    name: Submit winget manifest
+    needs: [resolve, publish]
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - name: Submit manifests with pinned wingetcreate
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrEmpty($env:WINGET_TOKEN)) { Write-Error 'Missing WINGET_TOKEN secret.'; exit 1 }
+          $tool = "$env:RUNNER_TEMP/wingetcreate.exe"
+          Invoke-WebRequest -Uri 'https://github.com/microsoft/winget-create/releases/download/v1.12.13.0/wingetcreate.exe' -OutFile $tool
+          $actual = (Get-FileHash $tool -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne '24042bd37915805615e6cf969ac57c6439124c3fe85823327f5f3fb24bd9ffea') { Write-Error 'wingetcreate checksum mismatch.'; exit 1 }
+          $url = "https://github.com/${{ github.repository }}/releases/download/$env:RELEASE_VERSION/arix-$env:RELEASE_VERSION-windows-x64.zip"
+          & $tool update ArixPHP.CLI --version $env:RELEASE_VERSION --urls $url --submit --token $env:WINGET_TOKEN

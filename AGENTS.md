@@ -130,7 +130,9 @@ in `composer.lock` or `vendor/`.
 
 Release tags trigger a draft-first build of Linux x64/ARM64, macOS x64/ARM64 and
 Windows x64 executables. Every target must pass native integration tests before
-the draft can be published. Release helpers reject moved tags, releases observed
+the draft can be published. Post-publish tap and winget jobs propose the
+Homebrew formula PR and submit the winget manifest; they require the
+HOMEBREW_TAP_TOKEN and WINGET_TOKEN secrets. Release helpers reject moved tags, releases observed
 as published, missing assets and mismatched checksums. Do not manually publish or
 edit a draft while its workflow is running; enable release immutability for
 server-side protection against concurrent asset changes after publication.
