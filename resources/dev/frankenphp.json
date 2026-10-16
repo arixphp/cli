@@ -1,0 +1,41 @@
+{
+    "version": "v1.13.0",
+    "targets": {
+        "linux-x86_64": {
+            "url": "https://github.com/php/frankenphp/releases/download/v1.13.0/frankenphp-linux-x86_64",
+            "sha256": "59209f89500d059e5481cd8b94c3f5a08dd87a3806639a619b9e69d7ba945405",
+            "max_bytes": 268435456,
+            "archive": false,
+            "executable": "frankenphp"
+        },
+        "linux-aarch64": {
+            "url": "https://github.com/php/frankenphp/releases/download/v1.13.0/frankenphp-linux-aarch64",
+            "sha256": "605ff4ae0ae4b8273026d92ee125405b8a589234a196e930f05eff067e9f2ca5",
+            "max_bytes": 268435456,
+            "archive": false,
+            "executable": "frankenphp"
+        },
+        "mac-arm64": {
+            "url": "https://github.com/php/frankenphp/releases/download/v1.13.0/frankenphp-mac-arm64",
+            "sha256": "2d6def85e2ee98f670da759a66de74b8af495bc3aacaa0db5a089ed47c466a45",
+            "max_bytes": 268435456,
+            "archive": false,
+            "executable": "frankenphp"
+        },
+        "mac-x86_64": {
+            "url": "https://github.com/php/frankenphp/releases/download/v1.13.0/frankenphp-mac-x86_64",
+            "sha256": "183932351a239ce49b7a1893056d4a1cf935780d854943329cd5041598799a35",
+            "max_bytes": 268435456,
+            "archive": false,
+            "executable": "frankenphp"
+        },
+        "windows-x86_64": {
+            "url": "https://github.com/php/frankenphp/releases/download/v1.13.0/frankenphp-windows-x86_64.zip",
+            "sha256": "45c6c4b008479d87e4b1a25f99fbbda13514aad17b7c351599fb80922c45ec79",
+            "max_bytes": 134217728,
+            "max_unpacked_bytes": 536870912,
+            "archive": true,
+            "executable": "frankenphp.exe"
+        }
+    }
+}
