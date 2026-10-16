@@ -1,0 +1,56 @@
+{
+    admin off
+    auto_https off
+    frankenphp {
+        php_ini {
+            display_errors Off
+            log_errors On
+            post_max_size 1M
+            upload_max_filesize 1M
+            opcache.validate_timestamps 1
+            opcache.revalidate_freq 0
+        }
+    }
+}
+
+{$ARIX_DEV_ADDRESS} {
+    bind {$ARIX_DEV_HOST}
+    root * ARIX_DEV_ROOT_PLACEHOLDER
+    encode zstd br gzip
+    header {
+        X-Content-Type-Options nosniff
+        Cache-Control no-store
+    }
+    request_body {
+        max_size 1048576
+    }
+    route {
+        @@MERCURE@@
+        @private path_regexp private `(?i)(?:^/(?:app|core|cli|tests|docs|storage)(?:/|$)|^/phpunit\.xml(?:\.dist)?$|(?:^|/)\.)`
+        respond @private 403
+
+        @fonts path_regexp fonts `^/assets/fonts/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.(?i:woff2?|ttf|otf)$`
+        file_server @fonts
+        @font_directory path /assets/fonts /assets/fonts/*
+        respond @font_directory 403
+
+        @public_files path_regexp public_files `^/(?:styles/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.(?i:css)|scripts/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.(?i:js)|assets/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.(?i:avif|gif|ico|jpe?g|png|webp|mp4|webm|ogv|woff2?|ttf|otf))$`
+        file_server @public_files {
+            pass_thru
+        }
+        @public_directories path /styles /styles/* /scripts /scripts/* /assets /assets/*
+        respond @public_directories 403
+
+        @robots {
+            path /robots.txt
+            file
+        }
+        file_server @robots
+
+        rewrite * /index.php
+        php_server {
+            file_server off
+            @@HOT_RELOAD@@
+        }
+    }
+}
