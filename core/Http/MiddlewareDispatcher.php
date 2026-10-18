@@ -15,10 +15,13 @@ class MiddlewareDispatcher
 
     public function dispatch(Request $request, Container $container, array $middleware, Closure $terminal): Response
     {
+        $resolver = $container->has(MiddlewareResolver::class)
+            ? $container->get(MiddlewareResolver::class)
+            : $this->resolver;
         $next = $terminal;
 
         foreach (array_reverse($middleware) as $name) {
-            $current = $this->resolver->resolve($name, $container);
+            $current = $resolver->resolve($name, $container);
             $previous = $next;
             $next = static fn (Request $request): Response => $current->handle($request, $previous);
         }

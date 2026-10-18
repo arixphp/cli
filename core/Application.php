@@ -8,6 +8,7 @@ use Arix\Assets\AssetServices;
 use Arix\Config\ConfigServices;
 use Arix\Config\Repository;
 use Arix\Container\Container;
+use Arix\Http\MiddlewareResolver;
 use Arix\Http\Kernel;
 use Arix\HttpFoundation\Request;
 use Arix\Routing\RouteRegistry;
@@ -90,6 +91,7 @@ class Application
     {
         $config = ConfigServices::register($container, $this->configDirectory);
         $container->instance(RouteRegistry::class, new RouteRegistry());
+        $container->instance(MiddlewareResolver::class, new MiddlewareResolver(Path::join($this->root, 'app', 'middleware')));
 
         if (is_file($this->servicesFile)) {
             self::servicesClosure($this->servicesFile)($container);
