@@ -35,6 +35,7 @@ class RouteRegistryTest extends TestCase
         $this->expectException(LogicException::class);
         $route->middleware('App\\Middleware\\Late');
     }
+
     #[Test]
     public function it_registers_dynamic_routes_without_loading_controllers(): void
     {

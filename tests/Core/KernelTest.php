@@ -7,8 +7,8 @@ namespace Tests\Core;
 use Arix\Constants\HttpStatusCode;
 use Arix\Container\Container;
 use Arix\Container\ContainerContext;
-use Arix\Contracts\RequestHandler;
 use Arix\Contracts\Middleware;
+use Arix\Contracts\RequestHandler;
 use Arix\Http\HttpException;
 use Arix\Http\Kernel;
 use Arix\HttpFoundation\Request;
@@ -52,7 +52,7 @@ class KernelTest extends TestCase
     #[Test]
     public function it_runs_global_middleware_after_request_configuration(): void
     {
-        $middleware = new class implements Middleware
+        $middleware = new class() implements Middleware
         {
             public function handle(Request $request, Closure $next): Response
             {
@@ -72,7 +72,7 @@ class KernelTest extends TestCase
     #[Test]
     public function it_allows_global_middleware_to_short_circuit_the_handler(): void
     {
-        $middleware = new class implements Middleware
+        $middleware = new class() implements Middleware
         {
             public function handle(Request $request, Closure $next): Response
             {

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Core;
 
 use Arix\Application;
-use Arix\Http\MiddlewareConfiguration;
 use Arix\Http\Kernel;
+use Arix\Http\MiddlewareConfiguration;
 use Arix\HttpFoundation\Request;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -59,6 +59,7 @@ PHP);
         $this->assertSame('es|Bienvenido', $kernel->handle($spanish)->getContent());
         $this->assertSame('en|Welcome', $kernel->handle(Request::create('/'))->getContent());
     }
+
     private string $root;
 
     private string $controllers;

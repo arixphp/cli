@@ -8,10 +8,11 @@ use Arix\Assets\AssetServices;
 use Arix\Config\ConfigServices;
 use Arix\Config\Repository;
 use Arix\Container\Container;
-use Arix\Http\MiddlewareResolver;
 use Arix\Contracts\RequestHandler;
 use Arix\Http\Kernel;
+use Arix\Http\MiddlewareResolver;
 use Arix\HttpFoundation\Request;
+use Arix\HttpFoundation\Response;
 use Arix\Routing\RouteRegistry;
 use Arix\Routing\RoutingHandler;
 use Arix\Routing\UrlGenerator;
@@ -84,7 +85,7 @@ class Application
             {
                 public function __construct(private readonly RequestHandler $routing, private readonly Closure $register) {}
 
-                public function handle(Request $request, Container $container): \Arix\HttpFoundation\Response
+                public function handle(Request $request, Container $container): Response
                 {
                     ($this->register)($container);
 

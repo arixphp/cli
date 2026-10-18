@@ -22,7 +22,7 @@ class RoutingHandlerTest extends RoutingTestCase
     public function it_runs_matched_route_middleware_around_the_controller(): void
     {
         $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("marker")); }');
-        $middleware = new class implements Middleware
+        $middleware = new class() implements Middleware
         {
             public function handle(Request $request, \Closure $next): Response
             {
@@ -40,6 +40,7 @@ class RoutingHandlerTest extends RoutingTestCase
 
         $this->assertSame('42', $kernel->handle(Request::create('/articles/42'))->getContent());
     }
+
     #[Test]
     public function it_routes_through_kernel_and_preserves_http_status_headers_and_head(): void
     {
