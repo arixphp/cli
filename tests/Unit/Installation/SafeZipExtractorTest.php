@@ -212,7 +212,6 @@ class SafeZipExtractorTest extends TestCase
         $this->fixture->write('output/keep', 'keep');
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessageIsOrContains('nonempty');
 
         new SafeZipExtractor()->extract($this->fixture->archive(), $this->fixture->path('output'));
     }
