@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Tests\Core;
 
 use Arix\Container\Container;
+use Arix\Contracts\Middleware;
 use Arix\Facades\Route;
 use Arix\Http\Kernel;
 use Arix\HttpFoundation\Request;
+use Arix\HttpFoundation\Response;
 use Arix\Routing\RouteRegistry;
 use Arix\Routing\RoutingHandler;
 use Arix\Views\ViewServices;
@@ -16,6 +18,28 @@ use stdClass;
 
 class RoutingHandlerTest extends RoutingTestCase
 {
+    #[Test]
+    public function it_runs_matched_route_middleware_around_the_controller(): void
+    {
+        $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("marker")); }');
+        $middleware = new class implements Middleware
+        {
+            public function handle(Request $request, \Closure $next): Response
+            {
+                $request->attributes->set('marker', $request->attributes->get('id'));
+
+                return $next($request);
+            }
+        };
+        $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class, $middleware): void {
+            $container->instance(RouteRegistry::class, new RouteRegistry());
+            $container->instance('Tests\\Core\\RouteMiddleware', $middleware);
+            $container->bind($class, static fn (): object => new $class());
+            Route::get('/articles/{id:\d+}', [$class, 'show'])->middleware('Tests\\Core\\RouteMiddleware');
+        });
+
+        $this->assertSame('42', $kernel->handle(Request::create('/articles/42'))->getContent());
+    }
     #[Test]
     public function it_routes_through_kernel_and_preserves_http_status_headers_and_head(): void
     {
