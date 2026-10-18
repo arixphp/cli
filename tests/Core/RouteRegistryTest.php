@@ -20,9 +20,24 @@ class RouteRegistryTest extends TestCase
     {
         $routes = new RouteRegistry();
         $route = $routes->get('/middleware', ['App\\Controllers\\ProbeController', 'show'])
-            ->middleware(['App\\Middleware\\First', 'App\\Middleware\\Second']);
+            ->middleware('App\\Middleware\\First')
+            ->middleware(['App\\Middleware\\Second', 'App\\Middleware\\Third']);
 
-        $this->assertSame(['App\\Middleware\\First', 'App\\Middleware\\Second'], $route->middleware);
+        $this->assertSame(['App\\Middleware\\First', 'App\\Middleware\\Second', 'App\\Middleware\\Third'], $route->middleware);
+    }
+
+    #[Test]
+    public function it_rejects_invalid_route_middleware_declarations(): void
+    {
+        foreach ([[], ['App\\Middleware\\Valid', ''], ['App\\Middleware\\Valid' => 'App\\Middleware\\Other']] as $middleware) {
+            $route = (new RouteRegistry())->get('/middleware', ['App\\Controllers\\ProbeController', 'show']);
+
+            try {
+                $route->middleware($middleware);
+                $this->fail('Invalid route middleware declarations must be rejected.');
+            } catch (InvalidArgumentException) {
+            }
+        }
     }
 
     #[Test]
