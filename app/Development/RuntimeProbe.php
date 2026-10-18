@@ -21,8 +21,17 @@ class RuntimeProbe
             $probe = $session->directory . DIRECTORY_SEPARATOR . 'probe.php';
 
             file_put_contents($probe, '<?php declare(strict_types=1); echo PHP_VERSION_ID >= 80401 && extension_loaded("mbstring") ? "ARIX_RUNTIME_OK" : "ARIX_RUNTIME_UNSUPPORTED";');
+            $environment = ['PHPRC' => false, 'PHP_INI_SCAN_DIR' => false];
+            $extensionDirectory = dirname($executable) . DIRECTORY_SEPARATOR . 'ext';
 
-            $process = new Process([$executable, 'php-cli', $probe], $session->directory, ['PHPRC' => false, 'PHP_INI_SCAN_DIR' => false], timeout: 20);
+            if (is_file($extensionDirectory . DIRECTORY_SEPARATOR . 'php_mbstring.dll')) {
+                $configuration = $session->directory . DIRECTORY_SEPARATOR . 'php.ini';
+                $path = str_replace(DIRECTORY_SEPARATOR, '/', $extensionDirectory);
+                file_put_contents($configuration, "extension_dir = \"{$path}\"\nextension = mbstring\n");
+                $environment['PHPRC'] = $configuration;
+            }
+
+            $process = new Process([$executable, 'php-cli', $probe], $session->directory, $environment, timeout: 20);
             $process->run();
 
             if (! $process->isSuccessful() || trim($process->getOutput()) !== 'ARIX_RUNTIME_OK') {
