@@ -67,7 +67,12 @@ class Application
         );
     }
 
-    public function kernel(): Kernel
+    public static function configure(string $basePath): ApplicationBuilder
+    {
+        return new ApplicationBuilder($basePath);
+    }
+
+    public function kernel(array $middleware = []): Kernel
     {
         return new Kernel(
             new RoutingHandler($this->controllerDirectory),
@@ -77,6 +82,7 @@ class Application
             debug: (bool) $this->defaults->get('app.debug', false),
             maxBodyBytes: (int) $this->defaults->get('app.max_body_bytes', 1048576),
             basePath: (string) $this->defaults->get('app.base_path', ''),
+            middleware: $middleware,
         );
     }
 

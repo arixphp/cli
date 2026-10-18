@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Core;
 
 use Arix\Application;
+use Arix\Http\MiddlewareConfiguration;
 use Arix\Http\Kernel;
 use Arix\HttpFoundation\Request;
 use PHPUnit\Framework\Attributes\Test;
@@ -15,6 +16,20 @@ use function strlen;
 
 class ApplicationTest extends TestCase
 {
+    #[Test]
+    public function it_builds_a_kernel_with_fluent_global_middleware_configuration(): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("hello"); }');
+        $this->routes('/', $class);
+
+        $kernel = Application::configure($this->root)
+            ->withMiddleware(static function (MiddlewareConfiguration $middleware): void {
+                $middleware->append('App\\Middleware\\SetLocale');
+            })
+            ->create();
+
+        $this->assertInstanceOf(Kernel::class, $kernel);
+    }
     private string $root;
 
     private string $controllers;
