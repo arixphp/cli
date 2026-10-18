@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Commands\Make;
 
 use App\Make\GenerationPolicy;
-
 use RuntimeException;
 
 use function base_path;
