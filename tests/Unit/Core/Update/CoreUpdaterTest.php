@@ -41,9 +41,9 @@ class CoreUpdaterTest extends TestCase
     #[Test]
     public function it_updates_a_previous_core_with_runtime_resources(): void
     {
-        $this->fixture->write('application/assets/site.css', 'application css');
+        $this->fixture->write('application/media/site.webp', 'application image');
         $preview = new CoreInspector()->inspect($this->application, $this->distribution);
-        $this->assertSame(['.htaccess', 'New.php', 'stubs/error.html'], $preview['added']);
+        $this->assertSame(['.htaccess', 'Assets/public-policy.json', 'New.php', 'stubs/error.html'], $preview['added']);
         $this->assertFileDoesNotExist($this->fixture->path('application/core/.htaccess'));
         $backup = new CoreUpdater()->update($this->application, $this->distribution, $this->previousId);
 
@@ -55,7 +55,7 @@ class CoreUpdaterTest extends TestCase
         $this->assertSame($this->distribution->manifest['id'], new CoreInspector()->installedManifest($this->fixture->path('application/core'))['id']);
         $this->assertSame('<?php // application entry point', file_get_contents($this->fixture->path('application/index.php')));
         $this->assertSame('<?php // application bootstrap', file_get_contents($this->fixture->path('application/app/bootstrap.php')));
-        $this->assertSame('application css', file_get_contents($this->fixture->path('application/assets/site.css')));
+        $this->assertSame('application image', file_get_contents($this->fixture->path('application/media/site.webp')));
         if (PHP_OS_FAMILY !== 'Windows') {
             $this->assertSame(0644, fileperms($this->fixture->path('application/core/.htaccess')) & 0777);
             $this->assertSame(0644, fileperms($this->fixture->path('application/core/stubs/error.html')) & 0777);

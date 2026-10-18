@@ -19,6 +19,14 @@ separate repositories with separate verification. Do not copy `cli/core/` into
 an application's `core/` manually; a future `update` command will own that
 migration once its integration is implemented and verified.
 
+## Local development
+
+Run `arix dev` from your application or `arix dev --path=../site`.
+The managed FrankenPHP server defaults to `http://127.0.0.1:8181`, with
+port fallback and optional browser live reload. See
+[development server](docs/development-server.md) and
+[asset caching](docs/asset-caching.md) for configuration and integration.
+
 ## Learning Arix
 
 The official documentation is available at

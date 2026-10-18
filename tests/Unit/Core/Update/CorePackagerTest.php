@@ -41,6 +41,21 @@ class CorePackagerTest extends TestCase
     }
 
     #[Test]
+    public function it_packages_the_public_asset_policy_without_allowing_arbitrary_json(): void
+    {
+        $source = $this->fixture->core('source');
+        $policy = file_get_contents(dirname(__DIR__, 4) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Assets' . DIRECTORY_SEPARATOR . 'public-policy.json');
+        $this->fixture->write('source/Assets/public-policy.json', $policy);
+        $packager = new CorePackager($source, $this->fixture->path('core.bundle'));
+        $distribution = $packager->build();
+        $this->assertSame($policy, $distribution->contents('Assets/public-policy.json'));
+        $this->fixture->write('source/secrets.json', '{"private":true}');
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains('secrets.json');
+        $packager->build();
+    }
+
+    #[Test]
     #[DataProvider('runtimeResources')]
     public function it_rejects_release_sources_missing_required_resources(string $missing): void
     {
@@ -63,7 +78,7 @@ class CorePackagerTest extends TestCase
     public static function runtimeResources(): array
     {
 
-        return [['.htaccess'], ['stubs/error.html']];
+        return [['.htaccess'], ['stubs/error.html'], ['Assets/public-policy.json']];
     }
 
     #[Test]

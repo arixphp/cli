@@ -94,6 +94,13 @@ jobs:
           ARIX_TEST_CORE_PHAR: ${{ runner.temp }}/core-packaging/core-packaging.phar
         run: php vendor/bin/pest
 
+      - name: Verify pinned FrankenPHP runtime natively
+        env:
+          ARIX_DEV_TEST_DOWNLOAD: '1'
+        run: php vendor/bin/pest tests/Unit/Development/RuntimeDownloadTest.php --log-junit=dev-native.xml
+      - name: Require executed development runtime tests
+        run: php .github/release/run.php report dev-native.xml
+
   style:
     name: Pint
     runs-on: ubuntu-24.04

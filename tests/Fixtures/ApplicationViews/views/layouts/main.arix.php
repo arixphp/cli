@@ -6,8 +6,8 @@
     <title>{{ $title }} · {{ config('app.name') }}</title>
     <meta name="description" content="{{ $description ?? '' }}">
     <link rel="canonical" href="{{ url()->current() }}">
-    <link rel="stylesheet" href="{{ asset('styles/app.css') }}?v=3">
-    <script type="module" src="{{ asset('scripts/app.js') }}?v=2"></script>
+    <link rel="stylesheet" href="{{ style('app.css') }}">
+    <script type="module" src="{{ script('app.js') }}"></script>
 </head>
 <body>
     <a class="skip-link" href="#main-content">{{ trans('nav.skip') }}</a>

@@ -16,6 +16,47 @@ use Throwable;
 class RouteRegistryTest extends TestCase
 {
     #[Test]
+    public function it_assigns_middleware_fluently_before_route_compilation(): void
+    {
+        $routes = new RouteRegistry();
+        $route = $routes->get('/middleware', ['App\\Controllers\\ProbeController', 'show'])
+            ->middleware('App\\Middleware\\First')
+            ->middleware(['App\\Middleware\\Second', 'App\\Middleware\\Third']);
+
+        $this->assertSame(['App\\Middleware\\First', 'App\\Middleware\\Second', 'App\\Middleware\\Third'], $route->middleware);
+    }
+
+    #[Test]
+    #[DataProvider('invalidMiddlewareDeclarations')]
+    public function it_rejects_invalid_route_middleware_declarations(array $middleware): void
+    {
+        $route = (new RouteRegistry())->get('/middleware', ['App\\Controllers\\ProbeController', 'show']);
+
+        $this->expectException(InvalidArgumentException::class);
+        $route->middleware($middleware);
+    }
+
+    public static function invalidMiddlewareDeclarations(): array
+    {
+        return [
+            [[]],
+            [['App\\Middleware\\Valid', '']],
+            [['App\\Middleware\\Valid' => 'App\\Middleware\\Other']],
+        ];
+    }
+
+    #[Test]
+    public function it_rejects_middleware_changes_after_route_compilation(): void
+    {
+        $routes = new RouteRegistry();
+        $route = $routes->get('/locked-middleware', ['App\\Controllers\\ProbeController', 'show']);
+        $routes->dispatcher();
+
+        $this->expectException(LogicException::class);
+        $route->middleware('App\\Middleware\\Late');
+    }
+
+    #[Test]
     public function it_registers_dynamic_routes_without_loading_controllers(): void
     {
         $registry = new RouteRegistry();

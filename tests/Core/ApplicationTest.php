@@ -6,6 +6,7 @@ namespace Tests\Core;
 
 use Arix\Application;
 use Arix\Http\Kernel;
+use Arix\Http\MiddlewareConfiguration;
 use Arix\HttpFoundation\Request;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -15,6 +16,76 @@ use function strlen;
 
 class ApplicationTest extends TestCase
 {
+    #[Test]
+    public function it_builds_a_kernel_with_fluent_global_middleware_configuration(): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("hello"); }');
+        $this->routes('/', $class);
+
+        $kernel = Application::configure($this->root)
+            ->withMiddleware(static function (MiddlewareConfiguration $middleware): void {
+                $middleware->append('App\\Middleware\\SetLocale');
+            })
+            ->create();
+
+        $this->assertInstanceOf(Kernel::class, $kernel);
+    }
+
+    #[Test]
+    public function it_uses_a_global_middleware_locale_before_registering_translations(): void
+    {
+        $class = $this->controller('public function show(): \\Arix\\Views\\Contracts\\View { $container = \\Arix\\Container\\ContainerContext::current(); return new \\Arix\\Views\\View("home", ["locale" => $container->get(\\Arix\\Config\\Repository::class)->get("app.locale"), "title" => $container->get(\\Arix\\Localization\\Translator::class)->get("home.title")]); }');
+        $this->routes('/', $class);
+        $this->config(['locales' => ['en', 'es'], 'default_locale' => 'en']);
+        mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'middleware', 0755, true);
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'middleware' . DIRECTORY_SEPARATOR . 'SetLocale.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace App\Middleware;
+use Arix\Contracts\Middleware;
+use Arix\HttpFoundation\Request;
+use Arix\HttpFoundation\Response;
+use Closure;
+class SetLocale implements Middleware { public function handle(Request $request, Closure $next): Response { $locales = \Arix\Container\ContainerContext::current()->get(\Arix\Config\Repository::class)->get('app.locales'); $request->setLocale($request->getPreferredLanguage($locales)); return $next($request); } }
+PHP);
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'en.php', "<?php return ['home' => ['title' => 'Welcome']];");
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'es.php', "<?php return ['home' => ['title' => 'Bienvenido']];");
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'home.arix.php', '<html lang="{{ $locale }}">{{ $title }}</html>');
+
+        $kernel = Application::configure($this->root)->withMiddleware(static function (MiddlewareConfiguration $middleware): void {
+            $middleware->append('App\\Middleware\\SetLocale');
+        })->create();
+
+        $spanish = Request::create('/', 'GET', server: ['HTTP_ACCEPT_LANGUAGE' => 'es-MX,es;q=0.9']);
+        $this->assertSame('<html lang="es">Bienvenido</html>', $kernel->handle($spanish)->getContent());
+        $this->assertSame('<html lang="en">Welcome</html>', $kernel->handle(Request::create('/'))->getContent());
+    }
+
+    #[Test]
+    public function it_resolves_explicitly_bound_global_middleware_dependencies(): void
+    {
+        $class = $this->controller('public function show(\Arix\HttpFoundation\Request $request): Response { return new Response($request->attributes->get("token")); }');
+        $this->routes('/', $class);
+        mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'middleware', 0755, true);
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'middleware' . DIRECTORY_SEPARATOR . 'RequiresDependency.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace App\Middleware;
+use Arix\Contracts\Middleware;
+use Arix\HttpFoundation\Request;
+use Arix\HttpFoundation\Response;
+use Closure;
+class RequiresDependency implements Middleware { public function __construct(private string $token) {} public function handle(Request $request, Closure $next): Response { $request->attributes->set('token', $this->token); return $next($request); } }
+PHP);
+        $this->services("require_once __DIR__ . DIRECTORY_SEPARATOR . 'middleware' . DIRECTORY_SEPARATOR . 'RequiresDependency.php'; \$container->instance(\\App\\Middleware\\RequiresDependency::class, new \\App\\Middleware\\RequiresDependency('bound'));");
+
+        $kernel = Application::configure($this->root)->withMiddleware(static function (MiddlewareConfiguration $middleware): void {
+            $middleware->append('App\\Middleware\\RequiresDependency');
+        })->create();
+
+        $this->assertSame('bound', $kernel->handle(Request::create('/'))->getContent());
+    }
+
     private string $root;
 
     private string $controllers;

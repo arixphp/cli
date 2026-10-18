@@ -100,7 +100,6 @@ class ViewHelpersTest extends TestCase
         $this->assertSame('/site/about', $urls->to('/about'));
         $this->assertSame('/site/about', $urls->current());
         $this->assertSame('/about', $urls->currentPath());
-        $this->assertSame('/site/styles/app.css', $urls->asset('styles/app.css'));
     }
 
     #[Test]
@@ -112,12 +111,6 @@ class ViewHelpersTest extends TestCase
         try {
             $urls->to($path);
             $this->fail("Path {$path} must be rejected.");
-        } catch (InvalidArgumentException) {
-        }
-
-        try {
-            $urls->asset($path);
-            $this->fail("Asset {$path} must be rejected.");
         } catch (InvalidArgumentException) {
         }
 
@@ -218,7 +211,9 @@ class ViewHelpersTest extends TestCase
     #[Test]
     public function it_exposes_helpers_without_composer(): void
     {
-        file_put_contents($this->views() . 'helper.arix.php', "{{ trans('home.title') }}|{{ config('app.name') }}|{{ url('/about') }}|{{ asset('styles/app.css') }}|{{ url()->current() }}|{{ url()->currentPath() }}");
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'styles');
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'styles' . DIRECTORY_SEPARATOR . 'app.css', 'body{}');
+        file_put_contents($this->views() . 'helper.arix.php', "{{ trans('home.title') }}|{{ config('app.name') }}|{{ url('/about') }}|{{ style('app.css') }}|{{ url()->current() }}|{{ url()->currentPath() }}");
         $autoload = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
         $program = 'require ' . var_export($autoload, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
@@ -250,7 +245,7 @@ class ViewHelpersTest extends TestCase
         fclose($pipes[1]);
         fclose($pipes[2]);
         $this->assertSame(0, proc_close($process), $errors);
-        $this->assertSame('Welcome|Test Site|/site/about|/site/styles/app.css|/site/about|/about', $output);
+        $this->assertSame('Welcome|Test Site|/site/about|/site/styles/app.css?v=7c98040a541657584690ae2a1cc3b42a8b53b159cc60c5d3abbfecbaeac6c94a|/site/about|/about', $output);
     }
 
     private function views(): string

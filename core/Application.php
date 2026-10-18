@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Arix;
 
+use Arix\Assets\AssetServices;
 use Arix\Config\ConfigServices;
 use Arix\Config\Repository;
 use Arix\Container\Container;
+use Arix\Contracts\RequestHandler;
 use Arix\Http\Kernel;
+use Arix\Http\MiddlewareResolver;
 use Arix\HttpFoundation\Request;
+use Arix\HttpFoundation\Response;
 use Arix\Routing\RouteRegistry;
 use Arix\Routing\RoutingHandler;
+use Arix\Routing\UrlGenerator;
 use Arix\Support\Path;
 use Arix\Views\ViewServices;
 use Closure;
@@ -65,16 +70,35 @@ class Application
         );
     }
 
-    public function kernel(): Kernel
+    public static function configure(string $basePath): ApplicationBuilder
     {
+        return new ApplicationBuilder($basePath);
+    }
+
+    public function kernel(array $middleware = []): Kernel
+    {
+        $routing = new RoutingHandler($this->controllerDirectory);
+        $register = $this->registerPresentation(...);
+
         return new Kernel(
-            new RoutingHandler($this->controllerDirectory),
+            new class($routing, $register) implements RequestHandler
+            {
+                public function __construct(private readonly RequestHandler $routing, private readonly Closure $register) {}
+
+                public function handle(Request $request, Container $container): Response
+                {
+                    ($this->register)($container);
+
+                    return $this->routing->handle($request, $container);
+                }
+            },
             configure: function (Container $container): void {
                 $this->register($container);
             },
             debug: (bool) $this->defaults->get('app.debug', false),
             maxBodyBytes: (int) $this->defaults->get('app.max_body_bytes', 1048576),
             basePath: (string) $this->defaults->get('app.base_path', ''),
+            middleware: $middleware,
         );
     }
 
@@ -82,11 +106,23 @@ class Application
     {
         $config = ConfigServices::register($container, $this->configDirectory);
         $container->instance(RouteRegistry::class, new RouteRegistry());
+        $container->instance(MiddlewareResolver::class, new MiddlewareResolver(Path::join($this->root, 'app', 'middleware')));
 
         if (is_file($this->servicesFile)) {
             self::servicesClosure($this->servicesFile)($container);
         }
 
+        $app = $config->get('app');
+
+        if (! is_array($app) || ! is_string($app['default_locale'] ?? null)) {
+            throw new RuntimeException('Application configuration is missing.');
+        }
+
+        $container->get(Request::class)->setDefaultLocale($app['default_locale']);
+    }
+
+    private function registerPresentation(Container $container): void
+    {
         $config = $container->get(Repository::class);
         $cachePath = $config->get('cache.path', 'storage/cache');
 
@@ -104,8 +140,12 @@ class Application
             throw new RuntimeException('Application configuration is missing.');
         }
 
-        $app['locale'] = $app['default_locale'] ?? null;
+        $app['locale'] = $container->get(Request::class)->getLocale();
         $container->instance(Repository::class, new Repository(array_replace($config->get(), ['app' => $app])));
+
+        $request = $container->get(Request::class);
+        $path = $request->attributes->get('_arix_path', '/');
+        AssetServices::register($container, $this->root, new UrlGenerator((string) ($app['base_path'] ?? ''), is_string($path) ? $path : '/'));
 
         ViewServices::register($container, $this->root, $container->get(Request::class), [
             'app' => $app,

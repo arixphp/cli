@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Core\Update;
 
+use Arix\Assets\AssetPolicy;
+use InvalidArgumentException;
 use RuntimeException;
 
 use function in_array;
@@ -81,10 +83,16 @@ class CorePackager
 
     private function assertRuntimeResources(array $hashes): void
     {
-        foreach (['.htaccess', 'stubs/error.html'] as $resource) {
+        foreach (['.htaccess', 'stubs/error.html', 'Assets/public-policy.json'] as $resource) {
             if (! isset($hashes[$resource])) {
                 throw new RuntimeException("Incomplete core release source: {$resource}");
             }
+        }
+
+        try {
+            new AssetPolicy(CoreFiles::local($this->source, 'Assets/public-policy.json'));
+        } catch (InvalidArgumentException $exception) {
+            throw new RuntimeException('Invalid public policy in core release source.', previous: $exception);
         }
     }
 

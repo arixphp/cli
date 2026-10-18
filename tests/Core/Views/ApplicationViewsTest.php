@@ -14,14 +14,23 @@ class ApplicationViewsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
         $this->directory = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-appviews-' . bin2hex(random_bytes(8));
+
         mkdir($this->directory, 0755, true);
+
         $reference = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'Fixtures' . DIRECTORY_SEPARATOR . 'ApplicationViews';
+
         $this->assertDirectoryExists($reference . DIRECTORY_SEPARATOR . 'views');
         $this->assertDirectoryExists($reference . DIRECTORY_SEPARATOR . 'lang');
         $this->copy($reference . DIRECTORY_SEPARATOR . 'views', $this->directory . DIRECTORY_SEPARATOR . 'views');
         $this->copy($reference . DIRECTORY_SEPARATOR . 'lang', $this->directory . DIRECTORY_SEPARATOR . 'lang');
+
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'cache', 0755, true);
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'styles');
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'scripts');
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'styles' . DIRECTORY_SEPARATOR . 'app.css', 'abc');
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'app.js', 'abc');
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config', 0755, true);
         file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', "<?php return ['name' => 'ArixPHP', 'locale' => 'en'];");
     }
@@ -79,6 +88,8 @@ class ApplicationViewsTest extends TestCase
         $this->assertStringContainsString('aria-current="page" >Home</a>', $index);
         $this->assertStringContainsString('Server-rendered HTML. JavaScript only when you need it.', $index);
         $this->assertStringContainsString('<link rel="canonical" href="/">', $index);
+        $this->assertStringContainsString('/styles/app.css?v=ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', $index);
+        $this->assertStringContainsString('/scripts/app.js?v=ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', $index);
 
         $this->assertStringContainsString('<title>About ArixPHP · ArixPHP</title>', $about);
         $this->assertStringContainsString('<h1>About ArixPHP</h1>', $about);

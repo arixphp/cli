@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Tests\Core;
 
 use Arix\Container\Container;
+use Arix\Contracts\Middleware;
 use Arix\Facades\Route;
 use Arix\Http\Kernel;
 use Arix\HttpFoundation\Request;
+use Arix\HttpFoundation\Response;
 use Arix\Routing\RouteRegistry;
 use Arix\Routing\RoutingHandler;
 use Arix\Views\ViewServices;
@@ -16,6 +18,82 @@ use stdClass;
 
 class RoutingHandlerTest extends RoutingTestCase
 {
+    #[Test]
+    public function it_runs_matched_route_middleware_around_the_controller(): void
+    {
+        $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("marker")); }');
+        $middleware = new class() implements Middleware
+        {
+            public function handle(Request $request, \Closure $next): Response
+            {
+                $request->attributes->set('marker', $request->attributes->get('id'));
+
+                return $next($request);
+            }
+        };
+        $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class, $middleware): void {
+            $container->instance(RouteRegistry::class, new RouteRegistry());
+            $container->instance('Tests\\Core\\RouteMiddleware', $middleware);
+            $container->bind($class, static fn (): object => new $class());
+            Route::get('/articles/{id:\d+}', [$class, 'show'])->middleware('Tests\\Core\\RouteMiddleware');
+        });
+
+        $this->assertSame('42', $kernel->handle(Request::create('/articles/42'))->getContent());
+    }
+
+    #[Test]
+    public function it_allows_route_middleware_to_short_circuit_only_matched_routes(): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("not reached"); }');
+        $calls = 0;
+        $middleware = new class($calls) implements Middleware
+        {
+            public function __construct(private int &$calls) {}
+
+            public function handle(Request $request, \Closure $next): Response
+            {
+                $this->calls++;
+
+                return new Response('blocked', 403);
+            }
+        };
+        $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class, $middleware): void {
+            $container->instance(RouteRegistry::class, new RouteRegistry());
+            $container->instance('Tests\\Core\\BlockingRouteMiddleware', $middleware);
+            $container->bind($class, static fn (): object => new $class());
+            Route::get('/protected', [$class, 'show'])->middleware('Tests\\Core\\BlockingRouteMiddleware');
+        });
+
+        $this->assertSame('blocked', $kernel->handle(Request::create('/protected'))->getContent());
+        $this->assertSame(404, $kernel->handle(Request::create('/missing'))->getStatusCode());
+        $this->assertSame(405, $kernel->handle(Request::create('/protected', 'POST'))->getStatusCode());
+        $this->assertSame(204, $kernel->handle(Request::create('/protected', 'OPTIONS'))->getStatusCode());
+        $this->assertSame(1, $calls);
+    }
+
+    #[Test]
+    public function it_converts_route_middleware_exceptions_to_safe_kernel_errors(): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("not reached"); }');
+        $middleware = new class() implements Middleware
+        {
+            public function handle(Request $request, \Closure $next): Response
+            {
+                throw new \RuntimeException('route middleware secret');
+            }
+        };
+        $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class, $middleware): void {
+            $container->instance(RouteRegistry::class, new RouteRegistry());
+            $container->instance('Tests\\Core\\ThrowingRouteMiddleware', $middleware);
+            $container->bind($class, static fn (): object => new $class());
+            Route::get('/failing', [$class, 'show'])->middleware('Tests\\Core\\ThrowingRouteMiddleware');
+        }, logger: static function (): void {});
+
+        $response = $kernel->handle(Request::create('/failing'));
+        $this->assertSame(500, $response->getStatusCode());
+        $this->assertStringNotContainsString('route middleware secret', $response->getContent());
+    }
+
     #[Test]
     public function it_routes_through_kernel_and_preserves_http_status_headers_and_head(): void
     {
@@ -106,14 +184,21 @@ class RoutingHandlerTest extends RoutingTestCase
     #[Test]
     public function it_runs_the_kernel_router_and_controller_without_composer(): void
     {
-        $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("id")); }');
+        $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("id") . ":" . $request->attributes->get("middleware")); }');
         $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
         $program = 'require ' . var_export($autoload, true) . '; $class = ' . var_export($class, true) . '; $directory = ' . var_export($this->directory, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
             $kernel = new Arix\Http\Kernel(new Arix\Routing\RoutingHandler($directory), configure: function ($container) use ($class) {
                 $container->instance(Arix\Routing\RouteRegistry::class, new Arix\Routing\RouteRegistry);
+                $container->instance('StandaloneMiddleware', new class implements Arix\Contracts\Middleware {
+                    public function handle(Arix\HttpFoundation\Request $request, Closure $next): Arix\HttpFoundation\Response {
+                        $request->attributes->set('middleware', 'yes');
+
+                        return $next($request);
+                    }
+                });
                 $container->bind($class, static fn () => new $class);
-                Arix\Facades\Route::get('/articles/{id:\d+}', [$class, 'show']);
+                Arix\Facades\Route::get('/articles/{id:\d+}', [$class, 'show'])->middleware('StandaloneMiddleware');
             });
             $response = $kernel->handle(Arix\HttpFoundation\Request::create('/articles/42'));
             echo $response->getStatusCode().':'.$response->getContent();
@@ -124,7 +209,7 @@ class RoutingHandlerTest extends RoutingTestCase
         fclose($pipes[1]);
         fclose($pipes[2]);
         $this->assertSame(0, proc_close($process), $errors);
-        $this->assertSame('200:42', $output);
+        $this->assertSame('200:42:yes', $output);
     }
 
     #[Test]

@@ -1,0 +1,37 @@
+{
+    admin off
+    auto_https off
+    frankenphp {
+        php_ini {
+            display_errors Off
+            log_errors On
+            post_max_size 1M
+            upload_max_filesize 1M
+            opcache.validate_timestamps 1
+            opcache.revalidate_freq 0
+        }
+    }
+}
+
+{$ARIX_DEV_ADDRESS} {
+    bind {$ARIX_DEV_HOST}
+    root * ARIX_DEV_ROOT_PLACEHOLDER
+    encode zstd br gzip
+    header {
+        X-Content-Type-Options nosniff
+        Cache-Control no-store
+    }
+    request_body {
+        max_size 1048576
+    }
+    route {
+        @@MERCURE@@
+        @@ASSET_POLICY@@
+
+        rewrite * /index.php
+        php_server {
+            file_server off
+            @@HOT_RELOAD@@
+        }
+    }
+}

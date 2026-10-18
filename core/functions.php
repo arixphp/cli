@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Arix\Assets\AssetType;
+use Arix\Assets\AssetUrlGenerator;
 use Arix\Config\Repository;
 use Arix\Container\ContainerContext;
 use Arix\Localization\Translator;
@@ -63,10 +65,31 @@ if (! function_exists('config')) {
     }
 }
 
-if (! function_exists('asset')) {
-    function asset(string $path): string
+if (! function_exists('style')) {
+    function style(string $path): string
     {
-        return ContainerContext::current()->get(UrlGenerator::class)->asset($path);
+        return ContainerContext::current()->get(AssetUrlGenerator::class)->to(AssetType::Style, $path, true);
+    }
+}
+
+if (! function_exists('script')) {
+    function script(string $path): string
+    {
+        return ContainerContext::current()->get(AssetUrlGenerator::class)->to(AssetType::Script, $path, true);
+    }
+}
+
+if (! function_exists('font')) {
+    function font(string $path, bool $versioned = false): string
+    {
+        return ContainerContext::current()->get(AssetUrlGenerator::class)->to(AssetType::Font, $path, $versioned);
+    }
+}
+
+if (! function_exists('media')) {
+    function media(string $path, bool $versioned = false): string
+    {
+        return ContainerContext::current()->get(AssetUrlGenerator::class)->to(AssetType::Media, $path, $versioned);
     }
 }
 

@@ -7,6 +7,7 @@ namespace Tests\Core;
 use Arix\Constants\HttpStatusCode;
 use Arix\Container\Container;
 use Arix\Container\ContainerContext;
+use Arix\Contracts\Middleware;
 use Arix\Contracts\RequestHandler;
 use Arix\Http\HttpException;
 use Arix\Http\Kernel;
@@ -44,6 +45,68 @@ class KernelTest extends TestCase
         $this->assertNotSame($scopes[0][0], $scopes[1][0]);
         $this->assertNotSame($scopes[0][1], $scopes[1][1]);
         $this->assertNotSame($scopes[0][2], $scopes[1][2]);
+        $this->expectException(LogicException::class);
+        ContainerContext::current();
+    }
+
+    #[Test]
+    public function it_runs_global_middleware_after_request_configuration(): void
+    {
+        $middleware = new class() implements Middleware
+        {
+            public function handle(Request $request, Closure $next): Response
+            {
+                $request->attributes->set('middleware', $request->attributes->get('_arix_path'));
+
+                return $next($request);
+            }
+        };
+        $kernel = new Kernel($this->handler(static fn (Request $request): Response => new Response($request->attributes->get('middleware'))),
+            configure: static function (Container $container) use ($middleware): void {
+                $container->instance('test.middleware', $middleware);
+            }, middleware: ['test.middleware']);
+
+        $this->assertSame('/configured', $kernel->handle(Request::create('/configured'))->getContent());
+    }
+
+    #[Test]
+    public function it_allows_global_middleware_to_short_circuit_the_handler(): void
+    {
+        $middleware = new class() implements Middleware
+        {
+            public function handle(Request $request, Closure $next): Response
+            {
+                return new Response('blocked', 403);
+            }
+        };
+        $kernel = new Kernel($this->handler(static fn (): Response => new Response('not reached')),
+            configure: static function (Container $container) use ($middleware): void {
+                $container->instance('Tests\\Core\\BlockingMiddleware', $middleware);
+            }, middleware: ['Tests\\Core\\BlockingMiddleware']);
+
+        $response = $kernel->handle(Request::create('/'));
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertSame('blocked', $response->getContent());
+    }
+
+    #[Test]
+    public function it_converts_global_middleware_exceptions_and_closes_the_request_scope(): void
+    {
+        $middleware = new class() implements Middleware
+        {
+            public function handle(Request $request, Closure $next): Response
+            {
+                throw new RuntimeException('middleware secret');
+            }
+        };
+        $kernel = new Kernel($this->handler(static fn (): Response => new Response('not reached')),
+            configure: static function (Container $container) use ($middleware): void {
+                $container->instance('Tests\\Core\\ThrowingMiddleware', $middleware);
+            }, middleware: ['Tests\\Core\\ThrowingMiddleware'], logger: static function (): void {});
+
+        $response = $kernel->handle(Request::create('/'));
+        $this->assertSame(500, $response->getStatusCode());
+        $this->assertStringNotContainsString('middleware secret', $response->getContent());
         $this->expectException(LogicException::class);
         ContainerContext::current();
     }

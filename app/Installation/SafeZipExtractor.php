@@ -207,10 +207,16 @@ class SafeZipExtractor
 
     private function validateSkeleton(string $destination): void
     {
-        foreach (['index.php', 'core' . DIRECTORY_SEPARATOR . 'autoload.php', '.arix.json'] as $required) {
-            if (! is_file($destination . DIRECTORY_SEPARATOR . $required)) {
+        foreach ($this->skeletonFiles() as $required) {
+            $file = $destination . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $required);
+
+            if (! is_file($file)) {
                 throw new RuntimeException("Skeleton is missing required file: {$required}.");
             }
+        }
+
+        if (file_exists($destination . DIRECTORY_SEPARATOR . 'assets')) {
+            throw new RuntimeException('Skeleton contains the legacy assets tree.');
         }
 
         if (! is_dir($destination . DIRECTORY_SEPARATOR . 'app')) {
@@ -239,5 +245,25 @@ class SafeZipExtractor
         if (! is_array($contract) || ($contract['format'] ?? null) !== 1 || ($contract['core_contract'] ?? null) !== 'arix-core-v1') {
             throw new RuntimeException('Unsupported skeleton contract. Update the CLI or use a compatible skeleton.');
         }
+    }
+
+    private function skeletonFiles(): array
+    {
+        return [
+            'index.php',
+            'core/autoload.php',
+            '.arix.json',
+            'scripts/arix/index.js',
+            'scripts/arix/dev-reload.js',
+            'styles/arix/base.css',
+            'styles/arix/components.css',
+            'styles/arix/tokens.css',
+            'styles/arix/utilities.css',
+            'fonts/.htaccess',
+            'media/.htaccess',
+            'media/arix-icon.webp',
+            'media/arix-emblem.webp',
+            'media/arix-combinationmark.webp',
+        ];
     }
 }
