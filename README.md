@@ -109,6 +109,27 @@ xattr -d com.apple.quarantine /usr/local/bin/arix
 Releases are not signed, so Windows SmartScreen may warn on first run; use
 More info → Run anyway after verifying the checksum.
 
+### Generating application files
+
+From an Arix application root, generate conventional application files without
+Composer or a deployment build step:
+
+```sh
+arix make:controller Admin/Post
+arix make:middleware Audit
+arix make:view blog.post
+arix make:test Posts/Show
+arix make:test Posts/Show --unit
+```
+
+The commands use the current directory by default; pass `--path=/path/to/app`
+to select another compatible Arix application. `--force` replaces an existing
+generated file. Controllers, middleware and tests accept nested names with
+slashes or backslashes. Views also accept Laravel-style dot notation, so
+`blog.post`, `blog/post`, and `Blog\Post` produce
+`app/views/blog/post.arix.php`. Generated middleware is not registered
+automatically; append it explicitly in `app/bootstrap.php`.
+
 ### Testing Arix applications
 
 Pest is included as a runtime dependency of the Arix CLI. The target application

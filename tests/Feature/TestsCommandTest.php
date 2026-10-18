@@ -34,6 +34,24 @@ class TestsCommandTest extends TestCase
     }
 
     #[Test]
+    public function it_discovers_feature_and_unit_tests_recursively(): void
+    {
+        $this->fixture->write('tests/Feature/HttpTest.php', '<?php test("feature discovery marker", fn () => expect("feature")->toBe("feature"));');
+        $this->fixture->write('tests/Unit/ValueTest.php', '<?php test("unit discovery marker", fn () => expect("unit")->toBe("unit"));');
+
+        $process = new Process(
+            [PHP_BINARY, dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'arix', 'tests', '--path=' . $this->fixture->root, '--no-ansi'],
+            dirname(__DIR__, 2),
+            ['XDEBUG_MODE' => 'off'],
+        );
+        $process->run();
+        $output = $process->getOutput() . $process->getErrorOutput();
+        $this->assertSame(0, $process->getExitCode(), $output);
+        $this->assertStringContainsString('feature discovery marker', $process->getOutput());
+        $this->assertStringContainsString('unit discovery marker', $process->getOutput());
+    }
+
+    #[Test]
     public function it_rejects_missing_configuration(): void
     {
         unlink($this->fixture->path('phpunit.xml'));
