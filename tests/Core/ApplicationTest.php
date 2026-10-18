@@ -30,6 +30,35 @@ class ApplicationTest extends TestCase
 
         $this->assertInstanceOf(Kernel::class, $kernel);
     }
+
+    #[Test]
+    public function it_uses_a_global_middleware_locale_before_registering_translations(): void
+    {
+        $class = $this->controller('public function show(): Response { $container = \\Arix\\Container\\ContainerContext::current(); return new Response($container->get(\\Arix\\Config\\Repository::class)->get("app.locale") . "|" . $container->get(\\Arix\\Localization\\Translator::class)->get("home.title")); }');
+        $this->routes('/', $class);
+        $this->config(['locales' => ['en', 'es'], 'default_locale' => 'en']);
+        mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'middleware', 0755, true);
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'middleware' . DIRECTORY_SEPARATOR . 'SetLocale.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace App\Middleware;
+use Arix\Contracts\Middleware;
+use Arix\HttpFoundation\Request;
+use Arix\HttpFoundation\Response;
+use Closure;
+class SetLocale implements Middleware { public function handle(Request $request, Closure $next): Response { $locales = \Arix\Container\ContainerContext::current()->get(\Arix\Config\Repository::class)->get('app.locales'); $request->setLocale($request->getPreferredLanguage($locales)); return $next($request); } }
+PHP);
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'en.php', "<?php return ['home' => ['title' => 'Welcome']];");
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'es.php', "<?php return ['home' => ['title' => 'Bienvenido']];");
+
+        $kernel = Application::configure($this->root)->withMiddleware(static function (MiddlewareConfiguration $middleware): void {
+            $middleware->append('App\\Middleware\\SetLocale');
+        })->create();
+
+        $spanish = Request::create('/', 'GET', server: ['HTTP_ACCEPT_LANGUAGE' => 'es-MX,es;q=0.9']);
+        $this->assertSame('es|Bienvenido', $kernel->handle($spanish)->getContent());
+        $this->assertSame('en|Welcome', $kernel->handle(Request::create('/'))->getContent());
+    }
     private string $root;
 
     private string $controllers;
