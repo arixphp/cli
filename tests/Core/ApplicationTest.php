@@ -34,7 +34,7 @@ class ApplicationTest extends TestCase
     #[Test]
     public function it_uses_a_global_middleware_locale_before_registering_translations(): void
     {
-        $class = $this->controller('public function show(): Response { $container = \\Arix\\Container\\ContainerContext::current(); return new Response($container->get(\\Arix\\Config\\Repository::class)->get("app.locale") . "|" . $container->get(\\Arix\\Localization\\Translator::class)->get("home.title")); }');
+        $class = $this->controller('public function show(): \\Arix\\Views\\Contracts\\View { $container = \\Arix\\Container\\ContainerContext::current(); return new \\Arix\\Views\\View("home", ["locale" => $container->get(\\Arix\\Config\\Repository::class)->get("app.locale"), "title" => $container->get(\\Arix\\Localization\\Translator::class)->get("home.title")]); }');
         $this->routes('/', $class);
         $this->config(['locales' => ['en', 'es'], 'default_locale' => 'en']);
         mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'middleware', 0755, true);
@@ -50,14 +50,15 @@ class SetLocale implements Middleware { public function handle(Request $request,
 PHP);
         file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'en.php', "<?php return ['home' => ['title' => 'Welcome']];");
         file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'es.php', "<?php return ['home' => ['title' => 'Bienvenido']];");
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'home.arix.php', '<html lang="{{ $locale }}">{{ $title }}</html>');
 
         $kernel = Application::configure($this->root)->withMiddleware(static function (MiddlewareConfiguration $middleware): void {
             $middleware->append('App\\Middleware\\SetLocale');
         })->create();
 
         $spanish = Request::create('/', 'GET', server: ['HTTP_ACCEPT_LANGUAGE' => 'es-MX,es;q=0.9']);
-        $this->assertSame('es|Bienvenido', $kernel->handle($spanish)->getContent());
-        $this->assertSame('en|Welcome', $kernel->handle(Request::create('/'))->getContent());
+        $this->assertSame('<html lang="es">Bienvenido</html>', $kernel->handle($spanish)->getContent());
+        $this->assertSame('<html lang="en">Welcome</html>', $kernel->handle(Request::create('/'))->getContent());
     }
 
     #[Test]
