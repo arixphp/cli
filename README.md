@@ -130,6 +130,54 @@ slashes or backslashes. Views also accept Laravel-style dot notation, so
 `app/views/blog/post.arix.php`. Generated middleware is not registered
 automatically; append it explicitly in `app/bootstrap.php`.
 
+### Formatting application code
+
+The `format` command formats PHP code in an Arix application using Pint as its
+internal formatter. It targets only the `app` and `tests` directories, always
+excluding `app/views`.
+
+```sh
+# From an application root (uses .arix-format.json if present):
+arix format
+
+# With an explicit application root:
+arix format --path=/path/to/application
+
+# With an explicit user rules file:
+arix format --path=/path/to/application --config=/path/to/rules.json
+```
+
+The optional `--config` accepts a path to a user format rules file. If omitted,
+the command reads `.arix-format.json` from the application root. The file
+supports only `version` and `rules`; directory keys such as `paths` are
+rejected. The CLI decides which directories to format (`app` and `tests`,
+excluding `app/views`), not the configuration file.
+
+Pint is a development dependency of the CLI and is not part of a deployed Arix
+application. The command requires `vendor/bin/pint` to be available.
+
+The user rules file, `.arix-format.json`, is a hidden file (leading dot) and is
+denied by the existing server access rules in `.htaccess`, `Caddyfile` and
+`web.config` without needing server-level changes.
+
+Example `arix/.arix-format.json`:
+
+```json
+{
+    "version": 1,
+    "rules": {
+        "new_with_parentheses": true,
+        "concat_space": { "spacing": "one" },
+        "declare_strict_types": true,
+        "nullable_type_declaration": { "syntax": "union" },
+        "ordered_imports": {
+            "sort_algorithm": "alpha",
+            "imports_order": ["class", "function", "const"]
+        }
+    }
+}
+```
+
 ### Testing Arix applications
 
 Pest is included as a runtime dependency of the Arix CLI. The target application
