@@ -69,6 +69,26 @@ class KernelTest extends TestCase
         $this->assertSame('/configured', $kernel->handle(Request::create('/configured'))->getContent());
     }
 
+    #[Test]
+    public function it_allows_global_middleware_to_short_circuit_the_handler(): void
+    {
+        $middleware = new class implements Middleware
+        {
+            public function handle(Request $request, Closure $next): Response
+            {
+                return new Response('blocked', 403);
+            }
+        };
+        $kernel = new Kernel($this->handler(static fn (): Response => new Response('not reached')),
+            configure: static function (Container $container) use ($middleware): void {
+                $container->instance('Tests\\Core\\BlockingMiddleware', $middleware);
+            }, middleware: ['Tests\\Core\\BlockingMiddleware']);
+
+        $response = $kernel->handle(Request::create('/'));
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertSame('blocked', $response->getContent());
+    }
+
     #[DataProvider('emptyResponses')]
     #[Test]
     public function it_preparation_suppresses_head_and_empty_status_bodies(string $method, int $status): void

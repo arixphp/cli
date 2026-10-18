@@ -24,6 +24,17 @@ class RouteRegistryTest extends TestCase
 
         $this->assertSame(['App\\Middleware\\First', 'App\\Middleware\\Second'], $route->middleware);
     }
+
+    #[Test]
+    public function it_rejects_middleware_changes_after_route_compilation(): void
+    {
+        $routes = new RouteRegistry();
+        $route = $routes->get('/locked-middleware', ['App\\Controllers\\ProbeController', 'show']);
+        $routes->dispatcher();
+
+        $this->expectException(LogicException::class);
+        $route->middleware('App\\Middleware\\Late');
+    }
     #[Test]
     public function it_registers_dynamic_routes_without_loading_controllers(): void
     {
