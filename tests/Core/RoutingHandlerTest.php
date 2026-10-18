@@ -161,14 +161,21 @@ class RoutingHandlerTest extends RoutingTestCase
     #[Test]
     public function it_runs_the_kernel_router_and_controller_without_composer(): void
     {
-        $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("id")); }');
+        $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("id") . ":" . $request->attributes->get("middleware")); }');
         $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
         $program = 'require ' . var_export($autoload, true) . '; $class = ' . var_export($class, true) . '; $directory = ' . var_export($this->directory, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
             $kernel = new Arix\Http\Kernel(new Arix\Routing\RoutingHandler($directory), configure: function ($container) use ($class) {
                 $container->instance(Arix\Routing\RouteRegistry::class, new Arix\Routing\RouteRegistry);
+                $container->instance('StandaloneMiddleware', new class implements Arix\Contracts\Middleware {
+                    public function handle(Arix\HttpFoundation\Request $request, Closure $next): Arix\HttpFoundation\Response {
+                        $request->attributes->set('middleware', 'yes');
+
+                        return $next($request);
+                    }
+                });
                 $container->bind($class, static fn () => new $class);
-                Arix\Facades\Route::get('/articles/{id:\d+}', [$class, 'show']);
+                Arix\Facades\Route::get('/articles/{id:\d+}', [$class, 'show'])->middleware('StandaloneMiddleware');
             });
             $response = $kernel->handle(Arix\HttpFoundation\Request::create('/articles/42'));
             echo $response->getStatusCode().':'.$response->getContent();
@@ -179,7 +186,7 @@ class RoutingHandlerTest extends RoutingTestCase
         fclose($pipes[1]);
         fclose($pipes[2]);
         $this->assertSame(0, proc_close($process), $errors);
-        $this->assertSame('200:42', $output);
+        $this->assertSame('200:42:yes', $output);
     }
 
     #[Test]
