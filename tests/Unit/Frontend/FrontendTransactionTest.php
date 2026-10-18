@@ -61,7 +61,8 @@ class FrontendTransactionTest extends TestCase
     #[Test]
     public function it_rolls_back_both_directories_if_the_second_install_fails(): void
     {
-        $transaction = new class() extends FrontendTransaction {
+        $transaction = new class() extends FrontendTransaction
+        {
             private bool $failed = false;
 
             protected function move(string $from, string $to): void
