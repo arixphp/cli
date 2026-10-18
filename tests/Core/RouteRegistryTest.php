@@ -27,17 +27,22 @@ class RouteRegistryTest extends TestCase
     }
 
     #[Test]
-    public function it_rejects_invalid_route_middleware_declarations(): void
+    #[DataProvider('invalidMiddlewareDeclarations')]
+    public function it_rejects_invalid_route_middleware_declarations(array $middleware): void
     {
-        foreach ([[], ['App\\Middleware\\Valid', ''], ['App\\Middleware\\Valid' => 'App\\Middleware\\Other']] as $middleware) {
-            $route = (new RouteRegistry())->get('/middleware', ['App\\Controllers\\ProbeController', 'show']);
+        $route = (new RouteRegistry())->get('/middleware', ['App\\Controllers\\ProbeController', 'show']);
 
-            try {
-                $route->middleware($middleware);
-                $this->fail('Invalid route middleware declarations must be rejected.');
-            } catch (InvalidArgumentException) {
-            }
-        }
+        $this->expectException(InvalidArgumentException::class);
+        $route->middleware($middleware);
+    }
+
+    public static function invalidMiddlewareDeclarations(): array
+    {
+        return [
+            [[]],
+            [['App\\Middleware\\Valid', '']],
+            [['App\\Middleware\\Valid' => 'App\\Middleware\\Other']],
+        ];
     }
 
     #[Test]
