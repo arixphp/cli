@@ -72,6 +72,29 @@ class RoutingHandlerTest extends RoutingTestCase
     }
 
     #[Test]
+    public function it_converts_route_middleware_exceptions_to_safe_kernel_errors(): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("not reached"); }');
+        $middleware = new class() implements Middleware
+        {
+            public function handle(Request $request, \Closure $next): Response
+            {
+                throw new \RuntimeException('route middleware secret');
+            }
+        };
+        $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class, $middleware): void {
+            $container->instance(RouteRegistry::class, new RouteRegistry());
+            $container->instance('Tests\\Core\\ThrowingRouteMiddleware', $middleware);
+            $container->bind($class, static fn (): object => new $class());
+            Route::get('/failing', [$class, 'show'])->middleware('Tests\\Core\\ThrowingRouteMiddleware');
+        }, logger: static function (): void {});
+
+        $response = $kernel->handle(Request::create('/failing'));
+        $this->assertSame(500, $response->getStatusCode());
+        $this->assertStringNotContainsString('route middleware secret', $response->getContent());
+    }
+
+    #[Test]
     public function it_routes_through_kernel_and_preserves_http_status_headers_and_head(): void
     {
         $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("id"), 201, ["X-Route" => "yes"]); }');
