@@ -93,6 +93,47 @@ PHP);
     }
 
     #[Test]
+    public function it_rejects_case_mismatched_and_linked_nested_middleware_paths(): void
+    {
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'Nested', 0755, true);
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'Nested' . DIRECTORY_SEPARATOR . 'Probe.php', '<?php');
+        $resolver = new MiddlewareResolver($this->directory);
+
+        try {
+            $resolver->resolve('App\\Middleware\\Nested\\probe', new Container());
+            $this->fail('Case-mismatched middleware paths must be rejected.');
+        } catch (\RuntimeException) {
+        }
+
+        $outside = $this->directory . DIRECTORY_SEPARATOR . 'outside';
+        mkdir($outside, 0755, true);
+        symlink($outside, $this->directory . DIRECTORY_SEPARATOR . 'Linked');
+        $this->expectException(\RuntimeException::class);
+        $resolver->resolve('App\\Middleware\\Linked\\Probe', new Container());
+    }
+
+    #[Test]
+    public function it_creates_fresh_unbound_middleware_instances(): void
+    {
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'Fresh.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace App\Middleware;
+use Arix\Contracts\Middleware;
+use Arix\HttpFoundation\Request;
+use Arix\HttpFoundation\Response;
+use Closure;
+class Fresh implements Middleware { public function handle(Request $request, Closure $next): Response { return $next($request); } }
+PHP);
+
+        $resolver = new MiddlewareResolver($this->directory);
+        $this->assertNotSame(
+            $resolver->resolve('App\\Middleware\\Fresh', new Container()),
+            $resolver->resolve('App\\Middleware\\Fresh', new Container()),
+        );
+    }
+
+    #[Test]
     public function it_dispatches_middleware_in_declaration_order(): void
     {
         $events = [];
