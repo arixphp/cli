@@ -9,6 +9,7 @@ use Arix\Config\ConfigServices;
 use Arix\Config\Repository;
 use Arix\Container\Container;
 use Arix\Http\MiddlewareResolver;
+use Arix\Contracts\RequestHandler;
 use Arix\Http\Kernel;
 use Arix\HttpFoundation\Request;
 use Arix\Routing\RouteRegistry;
@@ -75,8 +76,21 @@ class Application
 
     public function kernel(array $middleware = []): Kernel
     {
+        $routing = new RoutingHandler($this->controllerDirectory);
+        $register = $this->registerPresentation(...);
+
         return new Kernel(
-            new RoutingHandler($this->controllerDirectory),
+            new class($routing, $register) implements RequestHandler
+            {
+                public function __construct(private readonly RequestHandler $routing, private readonly Closure $register) {}
+
+                public function handle(Request $request, Container $container): \Arix\HttpFoundation\Response
+                {
+                    ($this->register)($container);
+
+                    return $this->routing->handle($request, $container);
+                }
+            },
             configure: function (Container $container): void {
                 $this->register($container);
             },
@@ -97,6 +111,19 @@ class Application
             self::servicesClosure($this->servicesFile)($container);
         }
 
+        $app = $config->get('app');
+
+        if (! is_array($app) || ! is_string($app['default_locale'] ?? null)) {
+            throw new RuntimeException('Application configuration is missing.');
+        }
+
+        $container->get(Request::class)->setDefaultLocale($app['default_locale']);
+    }
+
+    private function registerPresentation(Container $container): void
+    {
+        $config = $container->get(Repository::class);
+
         $config = $container->get(Repository::class);
         $cachePath = $config->get('cache.path', 'storage/cache');
 
@@ -114,7 +141,7 @@ class Application
             throw new RuntimeException('Application configuration is missing.');
         }
 
-        $app['locale'] = $app['default_locale'] ?? null;
+        $app['locale'] = $container->get(Request::class)->getLocale();
         $container->instance(Repository::class, new Repository(array_replace($config->get(), ['app' => $app])));
 
         $request = $container->get(Request::class);
