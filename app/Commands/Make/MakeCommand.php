@@ -7,6 +7,7 @@ namespace App\Commands\Make;
 use App\Core\Update\ApplicationTarget;
 use App\Make\GenerationPolicy;
 use App\Make\Generator;
+use InvalidArgumentException;
 use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
 
@@ -31,7 +32,18 @@ abstract class MakeCommand extends Command
 
         try {
             $root = ApplicationTarget::resolve($path, $cwd);
+        } catch (RuntimeException $exception) {
+            $this->error($exception->getMessage());
+
+            return self::INVALID;
+        }
+
+        try {
             $result = $generator->generate($root, $this->policy(), $name, (bool) $this->option('force'));
+        } catch (InvalidArgumentException $exception) {
+            $this->error($exception->getMessage());
+
+            return self::INVALID;
         } catch (RuntimeException $exception) {
             $this->error($exception->getMessage());
 

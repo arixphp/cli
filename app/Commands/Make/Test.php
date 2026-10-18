@@ -6,6 +6,9 @@ namespace App\Commands\Make;
 
 use App\Make\GenerationPolicy;
 
+use function base_path;
+use function file_get_contents;
+
 class Test extends MakeCommand
 {
     protected $signature = 'make:test
@@ -18,12 +21,18 @@ class Test extends MakeCommand
 
     protected function policy(): GenerationPolicy
     {
+        $stub = file_get_contents(base_path('resources' . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR . ($this->option('unit') ? 'test.unit.stub' : 'test.feature.stub')));
+
+        if ($stub === false) {
+            throw new \RuntimeException('Test stub is missing.');
+        }
+
         return new GenerationPolicy(
             $this->option('unit') ? 'tests/Unit' : 'tests/Feature',
             '',
             'Test',
             '.php',
-            "<?php\n\ndeclare(strict_types=1);\n\nit('has an example assertion', function (): void {\n    expect(true)->toBeTrue();\n});\n",
+            $stub,
             GenerationPolicy::CLASS_NAME
         );
     }

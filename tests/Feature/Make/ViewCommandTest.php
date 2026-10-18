@@ -26,4 +26,36 @@ class ViewCommandTest extends TestCase
             $fixture->cleanup();
         }
     }
+
+    #[Test]
+    public function it_normalizes_all_supported_view_notations_and_rejects_extensions(): void
+    {
+        foreach (['blog.post', 'blog/post', 'Blog\\Post'] as $name) {
+            $fixture = new NewApplicationFixture();
+
+            try {
+                $fixture->write('.arix.json', '{"format":1,"core_contract":"arix-core-v1"}');
+                $fixture->write('index.php', '<?php');
+                $fixture->write('app/bootstrap.php', '<?php');
+
+                $this->artisan('make:view', ['name' => $name, '--path' => $fixture->root])->assertExitCode(0);
+                $this->assertSame('', file_get_contents($fixture->path('app/views/blog/post.arix.php')));
+            } finally {
+                $fixture->cleanup();
+            }
+        }
+
+        $fixture = new NewApplicationFixture();
+
+        try {
+            $fixture->write('.arix.json', '{"format":1,"core_contract":"arix-core-v1"}');
+            $fixture->write('index.php', '<?php');
+            $fixture->write('app/bootstrap.php', '<?php');
+
+            $this->artisan('make:view', ['name' => 'blog.post.arix.php', '--path' => $fixture->root])->assertExitCode(2);
+            $this->assertFileDoesNotExist($fixture->path('app/views/blog/post.arix.php'));
+        } finally {
+            $fixture->cleanup();
+        }
+    }
 }

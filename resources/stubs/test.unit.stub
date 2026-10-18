@@ -1,0 +1,7 @@
+<?php
+
+declare(strict_types=1);
+
+it('{{ class }} can be exercised in isolation', function (): void {
+    expect(true)->toBeTrue();
+});

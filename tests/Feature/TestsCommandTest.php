@@ -34,6 +34,18 @@ class TestsCommandTest extends TestCase
     }
 
     #[Test]
+    public function it_discovers_feature_and_unit_tests_recursively(): void
+    {
+        $this->fixture->write('tests/Feature/HttpTest.php', '<?php test("feature discovery marker", fn () => expect("feature")->toBe("feature"));');
+        $this->fixture->write('tests/Unit/ValueTest.php', '<?php test("unit discovery marker", fn () => expect("unit")->toBe("unit"));');
+
+        $this->artisan('tests', ['--path' => $this->fixture->root])
+            ->expectsOutputToContain('feature discovery marker')
+            ->expectsOutputToContain('unit discovery marker')
+            ->assertExitCode(0);
+    }
+
+    #[Test]
     public function it_rejects_missing_configuration(): void
     {
         unlink($this->fixture->path('phpunit.xml'));

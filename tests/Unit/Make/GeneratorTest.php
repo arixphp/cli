@@ -7,6 +7,7 @@ namespace Tests\Unit\Make;
 use App\Core\Update\ApplicationTarget;
 use App\Make\GenerationPolicy;
 use App\Make\Generator;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -58,7 +59,7 @@ class GeneratorTest extends TestCase
             try {
                 (new Generator())->generate($root, $policy, $name, false);
                 $this->fail("Expected {$name} to be rejected.");
-            } catch (RuntimeException) {
+            } catch (RuntimeException|InvalidArgumentException) {
                 $this->assertFileDoesNotExist($this->root . DIRECTORY_SEPARATOR . 'EscapeController.php');
             }
         }
