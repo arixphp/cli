@@ -39,10 +39,16 @@ class TestsCommandTest extends TestCase
         $this->fixture->write('tests/Feature/HttpTest.php', '<?php test("feature discovery marker", fn () => expect("feature")->toBe("feature"));');
         $this->fixture->write('tests/Unit/ValueTest.php', '<?php test("unit discovery marker", fn () => expect("unit")->toBe("unit"));');
 
-        $this->artisan('tests', ['--path' => $this->fixture->root])
-            ->expectsOutputToContain('feature discovery marker')
-            ->expectsOutputToContain('unit discovery marker')
-            ->assertExitCode(0);
+        $process = new Process(
+            [PHP_BINARY, dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'arix', 'tests', '--path=' . $this->fixture->root, '--no-ansi'],
+            dirname(__DIR__, 2),
+            ['XDEBUG_MODE' => 'off'],
+        );
+        $process->run();
+        $output = $process->getOutput() . $process->getErrorOutput();
+        $this->assertSame(0, $process->getExitCode(), $output);
+        $this->assertStringContainsString('feature discovery marker', $process->getOutput());
+        $this->assertStringContainsString('unit discovery marker', $process->getOutput());
     }
 
     #[Test]
