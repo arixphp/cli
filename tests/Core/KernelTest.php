@@ -8,6 +8,7 @@ use Arix\Constants\HttpStatusCode;
 use Arix\Container\Container;
 use Arix\Container\ContainerContext;
 use Arix\Contracts\RequestHandler;
+use Arix\Contracts\Middleware;
 use Arix\Http\HttpException;
 use Arix\Http\Kernel;
 use Arix\HttpFoundation\Request;
@@ -46,6 +47,26 @@ class KernelTest extends TestCase
         $this->assertNotSame($scopes[0][2], $scopes[1][2]);
         $this->expectException(LogicException::class);
         ContainerContext::current();
+    }
+
+    #[Test]
+    public function it_runs_global_middleware_after_request_configuration(): void
+    {
+        $middleware = new class implements Middleware
+        {
+            public function handle(Request $request, Closure $next): Response
+            {
+                $request->attributes->set('middleware', $request->attributes->get('_arix_path'));
+
+                return $next($request);
+            }
+        };
+        $kernel = new Kernel($this->handler(static fn (Request $request): Response => new Response($request->attributes->get('middleware'))),
+            configure: static function (Container $container) use ($middleware): void {
+                $container->instance('test.middleware', $middleware);
+            }, middleware: ['test.middleware']);
+
+        $this->assertSame('/configured', $kernel->handle(Request::create('/configured'))->getContent());
     }
 
     #[DataProvider('emptyResponses')]
