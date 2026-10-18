@@ -42,6 +42,36 @@ class RoutingHandlerTest extends RoutingTestCase
     }
 
     #[Test]
+    public function it_allows_route_middleware_to_short_circuit_only_matched_routes(): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("not reached"); }');
+        $calls = 0;
+        $middleware = new class($calls) implements Middleware
+        {
+            public function __construct(private int &$calls) {}
+
+            public function handle(Request $request, \Closure $next): Response
+            {
+                $this->calls++;
+
+                return new Response('blocked', 403);
+            }
+        };
+        $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class, $middleware): void {
+            $container->instance(RouteRegistry::class, new RouteRegistry());
+            $container->instance('Tests\\Core\\BlockingRouteMiddleware', $middleware);
+            $container->bind($class, static fn (): object => new $class());
+            Route::get('/protected', [$class, 'show'])->middleware('Tests\\Core\\BlockingRouteMiddleware');
+        });
+
+        $this->assertSame('blocked', $kernel->handle(Request::create('/protected'))->getContent());
+        $this->assertSame(404, $kernel->handle(Request::create('/missing'))->getStatusCode());
+        $this->assertSame(405, $kernel->handle(Request::create('/protected', 'POST'))->getStatusCode());
+        $this->assertSame(204, $kernel->handle(Request::create('/protected', 'OPTIONS'))->getStatusCode());
+        $this->assertSame(1, $calls);
+    }
+
+    #[Test]
     public function it_routes_through_kernel_and_preserves_http_status_headers_and_head(): void
     {
         $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("id"), 201, ["X-Route" => "yes"]); }');

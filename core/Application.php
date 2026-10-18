@@ -124,8 +124,6 @@ class Application
     private function registerPresentation(Container $container): void
     {
         $config = $container->get(Repository::class);
-
-        $config = $container->get(Repository::class);
         $cachePath = $config->get('cache.path', 'storage/cache');
 
         if (! is_string($cachePath) || $cachePath === '') {

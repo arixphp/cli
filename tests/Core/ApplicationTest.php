@@ -60,6 +60,31 @@ PHP);
         $this->assertSame('en|Welcome', $kernel->handle(Request::create('/'))->getContent());
     }
 
+    #[Test]
+    public function it_resolves_explicitly_bound_global_middleware_dependencies(): void
+    {
+        $class = $this->controller('public function show(\Arix\HttpFoundation\Request $request): Response { return new Response($request->attributes->get("token")); }');
+        $this->routes('/', $class);
+        mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'middleware', 0755, true);
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'middleware' . DIRECTORY_SEPARATOR . 'RequiresDependency.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace App\Middleware;
+use Arix\Contracts\Middleware;
+use Arix\HttpFoundation\Request;
+use Arix\HttpFoundation\Response;
+use Closure;
+class RequiresDependency implements Middleware { public function __construct(private string $token) {} public function handle(Request $request, Closure $next): Response { $request->attributes->set('token', $this->token); return $next($request); } }
+PHP);
+        $this->services("require_once __DIR__ . DIRECTORY_SEPARATOR . 'middleware' . DIRECTORY_SEPARATOR . 'RequiresDependency.php'; \$container->instance(\\App\\Middleware\\RequiresDependency::class, new \\App\\Middleware\\RequiresDependency('bound'));");
+
+        $kernel = Application::configure($this->root)->withMiddleware(static function (MiddlewareConfiguration $middleware): void {
+            $middleware->append('App\\Middleware\\RequiresDependency');
+        })->create();
+
+        $this->assertSame('bound', $kernel->handle(Request::create('/'))->getContent());
+    }
+
     private string $root;
 
     private string $controllers;

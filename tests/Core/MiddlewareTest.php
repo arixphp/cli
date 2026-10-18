@@ -63,6 +63,36 @@ PHP);
     }
 
     #[Test]
+    public function it_requires_explicit_bindings_for_middleware_constructor_dependencies(): void
+    {
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'RequiresBinding.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace App\Middleware;
+use Arix\Contracts\Middleware;
+use Arix\HttpFoundation\Request;
+use Arix\HttpFoundation\Response;
+use Closure;
+class RequiresBinding implements Middleware { public function __construct(string $token) {} public function handle(Request $request, Closure $next): Response { return $next($request); } }
+PHP);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('requires an explicit binding');
+        (new MiddlewareResolver($this->directory))->resolve('App\\Middleware\\RequiresBinding', new Container());
+    }
+
+    #[Test]
+    public function it_rejects_linked_application_middleware_files(): void
+    {
+        $outside = $this->directory . DIRECTORY_SEPARATOR . 'outside.php';
+        file_put_contents($outside, '<?php');
+        symlink($outside, $this->directory . DIRECTORY_SEPARATOR . 'Linked.php');
+
+        $this->expectException(\RuntimeException::class);
+        (new MiddlewareResolver($this->directory))->resolve('App\\Middleware\\Linked', new Container());
+    }
+
+    #[Test]
     public function it_dispatches_middleware_in_declaration_order(): void
     {
         $events = [];

@@ -89,6 +89,28 @@ class KernelTest extends TestCase
         $this->assertSame('blocked', $response->getContent());
     }
 
+    #[Test]
+    public function it_converts_global_middleware_exceptions_and_closes_the_request_scope(): void
+    {
+        $middleware = new class() implements Middleware
+        {
+            public function handle(Request $request, Closure $next): Response
+            {
+                throw new RuntimeException('middleware secret');
+            }
+        };
+        $kernel = new Kernel($this->handler(static fn (): Response => new Response('not reached')),
+            configure: static function (Container $container) use ($middleware): void {
+                $container->instance('Tests\\Core\\ThrowingMiddleware', $middleware);
+            }, middleware: ['Tests\\Core\\ThrowingMiddleware'], logger: static function (): void {});
+
+        $response = $kernel->handle(Request::create('/'));
+        $this->assertSame(500, $response->getStatusCode());
+        $this->assertStringNotContainsString('middleware secret', $response->getContent());
+        $this->expectException(LogicException::class);
+        ContainerContext::current();
+    }
+
     #[DataProvider('emptyResponses')]
     #[Test]
     public function it_preparation_suppresses_head_and_empty_status_bodies(string $method, int $status): void
