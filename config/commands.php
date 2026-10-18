@@ -7,6 +7,7 @@ use Illuminate\Console\Scheduling\ScheduleListCommand;
 use Illuminate\Console\Scheduling\ScheduleRunCommand;
 use Illuminate\Foundation\Console\VendorPublishCommand;
 use LaravelZero\Framework\Commands\StubPublishCommand;
+use LaravelZero\Framework\Commands\TestMakeCommand;
 use NunoMaduro\LaravelConsoleSummary\SummaryCommand;
 use Symfony\Component\Console\Command\DumpCompletionCommand;
 use Symfony\Component\Console\Command\HelpCommand;
@@ -88,7 +89,7 @@ return [
     */
 
     'remove' => [
-        //
+        TestMakeCommand::class,
     ],
 
 ];
