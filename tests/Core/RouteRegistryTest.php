@@ -16,6 +16,15 @@ use Throwable;
 class RouteRegistryTest extends TestCase
 {
     #[Test]
+    public function it_assigns_middleware_fluently_before_route_compilation(): void
+    {
+        $routes = new RouteRegistry();
+        $route = $routes->get('/middleware', ['App\\Controllers\\ProbeController', 'show'])
+            ->middleware(['App\\Middleware\\First', 'App\\Middleware\\Second']);
+
+        $this->assertSame(['App\\Middleware\\First', 'App\\Middleware\\Second'], $route->middleware);
+    }
+    #[Test]
     public function it_registers_dynamic_routes_without_loading_controllers(): void
     {
         $registry = new RouteRegistry();
