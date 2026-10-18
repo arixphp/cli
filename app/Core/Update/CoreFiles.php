@@ -108,7 +108,8 @@ class CoreFiles
             }
 
             if ($source && ! str_ends_with($relative, '.php') && $entry->getFilename() !== 'LICENSE'
-                && $relative !== 'imports.json' && $relative !== '.htaccess' && $relative !== 'stubs/error.html') {
+                && $relative !== 'imports.json' && $relative !== '.htaccess' && $relative !== 'stubs/error.html'
+                && $relative !== 'Assets/public-policy.json') {
                 throw new RuntimeException("Unsupported distribution file: {$relative}");
             }
 

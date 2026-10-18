@@ -68,6 +68,17 @@ class NewApplicationFixture
             'app-sha/index.php' => '<?php throw new RuntimeException("Do not execute downloaded PHP");',
             'app-sha/core/autoload.php' => '<?php // downloaded core',
             'app-sha/app/routes.php' => '<?php // routes',
+            'app-sha/scripts/arix/index.js' => 'export const version = "test";',
+            'app-sha/scripts/arix/dev-reload.js' => '// reload',
+            'app-sha/styles/arix/base.css' => '/* base */',
+            'app-sha/styles/arix/components.css' => '/* components */',
+            'app-sha/styles/arix/tokens.css' => '/* tokens */',
+            'app-sha/styles/arix/utilities.css' => '/* utilities */',
+            'app-sha/fonts/.htaccess' => 'Require all denied',
+            'app-sha/media/.htaccess' => 'Require all denied',
+            'app-sha/media/arix-icon.webp' => 'icon',
+            'app-sha/media/arix-emblem.webp' => 'emblem',
+            'app-sha/media/arix-combinationmark.webp' => 'combinationmark',
         ];
     }
 }

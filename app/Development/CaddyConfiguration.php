@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Development;
 
+use App\Assets\ServerPolicyRenderer;
+use Arix\Assets\AssetPolicy;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -14,9 +16,6 @@ class CaddyConfiguration
 {
     private const array WATCH_PATTERNS = [
         'app/**/*.php',
-        'styles/**/*.css',
-        'scripts/**/*.js',
-        'assets/**/*.{avif,gif,ico,jpg,jpeg,png,webp,mp4,webm,ogv,woff,woff2,ttf,otf}',
         'index.php',
         'robots.txt',
     ];
@@ -87,14 +86,24 @@ class CaddyConfiguration
 
         $hotReload = $options->reload ? $this->buildWatchBlock() : '';
 
-        return str_replace(['@@MERCURE@@', '@@HOT_RELOAD@@'], [$mercure, $hotReload], $contents);
+        return str_replace(
+            ['@@MERCURE@@', '@@HOT_RELOAD@@', '@@ASSET_POLICY@@'],
+            [$mercure, $hotReload, (new ServerPolicyRenderer(new AssetPolicy()))->render('caddy')],
+            $contents,
+        );
     }
 
     private function buildWatchBlock(): string
     {
         $watch = "hot_reload {\n" . "topic arix-dev-{$this->token}\n";
 
-        foreach (self::WATCH_PATTERNS as $pattern) {
+        $patterns = self::WATCH_PATTERNS;
+
+        foreach (new AssetPolicy()->directories() as $directory => $extensions) {
+            $patterns[] = $directory . '/**/*.{' . implode(',', $extensions) . '}';
+        }
+
+        foreach ($patterns as $pattern) {
             $watch .= "watch {$pattern}\n";
         }
 

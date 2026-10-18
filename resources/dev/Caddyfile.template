@@ -26,26 +26,7 @@
     }
     route {
         @@MERCURE@@
-        @private path_regexp private `(?i)(?:^/(?:app|core|cli|tests|docs|storage)(?:/|$)|^/phpunit\.xml(?:\.dist)?$|(?:^|/)\.)`
-        respond @private 403
-
-        @fonts path_regexp fonts `^/assets/fonts/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.(?i:woff2?|ttf|otf)$`
-        file_server @fonts
-        @font_directory path /assets/fonts /assets/fonts/*
-        respond @font_directory 403
-
-        @public_files path_regexp public_files `^/(?:styles/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.(?i:css)|scripts/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.(?i:js)|assets/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.(?i:avif|gif|ico|jpe?g|png|webp|mp4|webm|ogv|woff2?|ttf|otf))$`
-        file_server @public_files {
-            pass_thru
-        }
-        @public_directories path /styles /styles/* /scripts /scripts/* /assets /assets/*
-        respond @public_directories 403
-
-        @robots {
-            path /robots.txt
-            file
-        }
-        file_server @robots
+        @@ASSET_POLICY@@
 
         rewrite * /index.php
         php_server {

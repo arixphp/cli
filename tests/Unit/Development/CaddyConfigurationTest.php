@@ -35,6 +35,10 @@ class CaddyConfigurationTest extends TestCase
         $this->fixture->write('styles/app.css', 'body{color:red}');
         $this->fixture->write('other.php', '<?php echo "EXPOSED";');
         $this->fixture->write('phpunit.xml', 'PRIVATE');
+        $this->fixture->write('scripts/arix/index.js', 'export const value = 1;');
+        $this->fixture->write('favicon.ico', 'ICON');
+        $this->fixture->write('assets/Fonts/image.png', 'PRIVATE');
+        $this->fixture->write('.frontend-backup-test/index.js', 'PRIVATE');
     }
 
     protected function tearDown(): void
@@ -54,6 +58,10 @@ class CaddyConfigurationTest extends TestCase
         $configuration = new CaddyConfiguration(dirname(__DIR__, 3));
         $env = $configuration->environment($options, $port);
         $file = $configuration->prepare($options, $port, $this->fixture->root, $this->runtime);
+        $generated = file_get_contents($file);
+        $this->assertStringContainsString('fonts/**/*', $generated);
+        $this->assertStringContainsString('media/**/*', $generated);
+        $this->assertStringNotContainsString('assets/**/*', $generated);
         $server = new Process([$this->runtime, 'run', '--config', $file], $options->root, $env, timeout: null);
         $server->start();
         $multi = null;
@@ -76,12 +84,15 @@ class CaddyConfigurationTest extends TestCase
             $this->assertSame('/index.php', $page['script']);
             $this->assertNotEmpty($page['reload']);
 
-            foreach (['/app/bootstrap.php', '/core/autoload.php', '/phpunit.xml', '/.git/config', '/styles/missing.css', '/styles/file.php'] as $path) {
+            foreach (['/app/bootstrap.php', '/core/autoload.php', '/phpunit.xml', '/.git/config', '/styles/missing.css', '/styles/file.php', '/assets/Fonts/image.png', '/.frontend-backup-test/index.js'] as $path) {
                 $this->assertSame(403, $this->request($port, $path)[0], $path);
+                $this->assertStringNotContainsString('PRIVATE', $this->request($port, $path)[1], $path);
             }
 
             $this->assertStringNotContainsString('EXPOSED', $this->request($port, '/other.php')[1]);
             $this->assertSame('body{color:red}', $this->request($port, '/styles/app.css')[1]);
+            $this->assertSame('export const value = 1;', $this->request($port, '/scripts/arix/index.js')[1]);
+            $this->assertSame('ICON', $this->request($port, '/favicon.ico')[1]);
             $this->assertSame('POST', json_decode($this->request($port, '/article', 'POST')[1], true)['method']);
 
             $events = '';

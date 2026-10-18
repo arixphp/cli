@@ -49,6 +49,7 @@ class CoreUpdateFixture
             $files = array_replace([
                 '.htaccess' => "Require all denied\n",
                 'stubs/error.html' => '<html lang="{{locale}}"><title>{{status}} — {{name}}</title><pre>{{message}}</pre></html>',
+                'Assets/public-policy.json' => file_get_contents(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Assets' . DIRECTORY_SEPARATOR . 'public-policy.json'),
             ], $files);
         }
 
@@ -74,7 +75,7 @@ class CoreUpdateFixture
         $application = $this->application($relative);
         $core = $this->core("{$relative}/core", $files, $includeResources);
         $hashes = [];
-        $resources = $includeResources ? ['.htaccess', 'stubs/error.html'] : [];
+        $resources = $includeResources ? ['.htaccess', 'stubs/error.html', 'Assets/public-policy.json'] : [];
 
         foreach (['autoload.php', 'functions.php', 'Http/Kernel.php', 'imports.json', ...$resources, ...array_keys($files)] as $name) {
             $hashes[$name] = hash_file('sha256', $core . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $name));

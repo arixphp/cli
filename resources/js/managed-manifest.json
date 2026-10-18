@@ -1,0 +1,9 @@
+{
+    "format": 2,
+    "releases": {
+        "1.0.0": {
+            "index.js": "285d1732a149b920271c665f6821fc73dc74d867a89b8f96c12dab9ede3eebf9",
+            "dev-reload.js": "9a55bcb1f9d5390439b2d21de419b8ba84393f7cec125b0262c1c7bbce12195a"
+        }
+    }
+}

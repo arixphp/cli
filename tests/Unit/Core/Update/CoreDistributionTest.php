@@ -50,7 +50,7 @@ class CoreDistributionTest extends TestCase
         CoreDistribution::build($source, $bundle);
         $distribution = CoreDistribution::load($bundle);
 
-        $this->assertSame(['.htaccess', 'Http/Kernel.php', 'autoload.php', 'functions.php', 'imports.json', 'stubs/error.html'], array_keys($distribution->manifest['files']));
+        $this->assertSame(['.htaccess', 'Assets/public-policy.json', 'Http/Kernel.php', 'autoload.php', 'functions.php', 'imports.json', 'stubs/error.html'], array_keys($distribution->manifest['files']));
         $this->assertSame("<?php\ndeclare(strict_types=1);\n// kernel\n", $distribution->contents('Http/Kernel.php'));
         $this->assertSame(hash('sha256', $distribution->contents('Http/Kernel.php')), $distribution->manifest['files']['Http/Kernel.php']);
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $distribution->manifest['id']);

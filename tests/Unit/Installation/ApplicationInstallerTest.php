@@ -63,6 +63,31 @@ class ApplicationInstallerTest extends TestCase
     }
 
     #[Test]
+    public function it_publishes_managed_frontend_directories_with_private_boundaries(): void
+    {
+        $archive = $this->fixture->archive(array_replace(NewApplicationFixture::skeleton(), [
+            'app-sha/.arix.json' => '{"format":1,"core_contract":"arix-core-v1"}',
+            'app-sha/index.php' => '<?php // entry',
+            'app-sha/app/routes.php' => '<?php // routes',
+            'app-sha/core/autoload.php' => '<?php // core',
+            'app-sha/scripts/app.js' => '// entry',
+            'app-sha/scripts/arix/index.js' => '// managed',
+            'app-sha/styles/app.css' => '/* entry */',
+            'app-sha/styles/arix/tokens.css' => '/* managed */',
+        ]));
+        $this->installer(new FixtureSkeletonSource($archive))->install(InstallationTarget::resolve('site', '.', $this->fixture->root));
+        $this->assertFileExists($this->fixture->path('site/index.php'));
+        $this->assertFileExists($this->fixture->path('site/core/autoload.php'));
+        $this->assertFileExists($this->fixture->path('site/scripts/arix/index.js'));
+        $this->assertFileExists($this->fixture->path('site/styles/arix/tokens.css'));
+        $this->assertFileExists($this->fixture->path('site/media/arix-icon.webp'));
+        $this->assertFileExists($this->fixture->path('site/fonts/.htaccess'));
+        $this->assertSame('// entry', file_get_contents($this->fixture->path('site/scripts/app.js')));
+        $this->assertDirectoryDoesNotExist($this->fixture->path('site/vendor'));
+        $this->assertDirectoryDoesNotExist($this->fixture->path('site/.git'));
+    }
+
+    #[Test]
     public function it_cleans_staging_after_a_download_failure(): void
     {
         $source = new FixtureSkeletonSource($this->fixture->archive(), static function (): void {

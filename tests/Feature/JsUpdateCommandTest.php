@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Js\Update\JsDistribution;
+use App\Frontend\JsManagedDistribution;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Support\JsUpdateFixture;
 use Tests\TestCase;
@@ -22,7 +22,15 @@ class JsUpdateCommandTest extends TestCase
         $installed = $this->fixture->framework('1.0.0');
         $root = $this->fixture->distribution('dist', '2.0.0', $this->fixture->framework('2.0.0'), ['1.0.0' => hash('sha256', $installed)]);
         $this->application = $this->fixture->application();
-        $this->app->instance(JsDistribution::class, JsDistribution::bundled($root));
+        $reload = '// reload client';
+        $this->fixture->write('dist/resources/js/dev-reload.js', $reload);
+        $this->fixture->write('dist/resources/js/managed-manifest.json', json_encode(['format' => 2, 'releases' => [
+            '1.0.0' => ['index.js' => hash('sha256', $installed), 'dev-reload.js' => hash('sha256', $reload)],
+            '2.0.0' => ['index.js' => hash('sha256', $this->fixture->framework('2.0.0')), 'dev-reload.js' => hash('sha256', $reload)],
+        ]], JSON_THROW_ON_ERROR));
+        $this->fixture->write('application/scripts/arix/index.js', $installed);
+        $this->fixture->write('application/scripts/arix/dev-reload.js', $reload);
+        $this->app->instance(JsManagedDistribution::class, JsManagedDistribution::bundled($root));
     }
 
     protected function tearDown(): void
@@ -52,13 +60,14 @@ class JsUpdateCommandTest extends TestCase
             ->expectsOutputToContain('Backup retained')
             ->assertExitCode(0);
 
-        $this->assertSame($this->fixture->framework('2.0.0'), file_get_contents($this->fixture->path('application/scripts/arix.js')));
+        $this->assertSame($this->fixture->framework('2.0.0'), file_get_contents($this->fixture->path('application/scripts/arix/index.js')));
+        $this->assertSame($this->fixture->framework('1.0.0'), file_get_contents($this->fixture->path('application/scripts/arix.js')));
     }
 
     #[Test]
     public function it_reports_up_to_date_without_writing(): void
     {
-        $this->fixture->write('application/scripts/arix.js', $this->fixture->framework('2.0.0'));
+        $this->fixture->write('application/scripts/arix/index.js', $this->fixture->framework('2.0.0'));
 
         $this->artisan('js:update', ['--path' => $this->application, '--yes' => true])
             ->expectsOutputToContain('up to date')
@@ -81,7 +90,7 @@ class JsUpdateCommandTest extends TestCase
     public function it_does_not_write_when_confirmation_is_declined(): void
     {
         $this->artisan('js:update', ['--path' => $this->application])
-            ->expectsConfirmation('Replace scripts/arix.js 1.0.0 with 2.0.0?', 'no')
+            ->expectsConfirmation('Replace managed scripts 1.0.0 with 2.0.0?', 'no')
             ->expectsOutputToContain('Cancelled')
             ->assertExitCode(0);
 
@@ -91,13 +100,13 @@ class JsUpdateCommandTest extends TestCase
     #[Test]
     public function it_requires_force_for_modified_content(): void
     {
-        $this->fixture->write('application/scripts/arix.js', "export const version = '9.9.9';\n// locally edited\n");
+        $this->fixture->write('application/scripts/arix/index.js', "export const version = '9.9.9';\n// locally edited\n");
 
         $this->artisan('js:update', ['--path' => $this->application, '--yes' => true])
             ->expectsOutputToContain('--force')
             ->assertExitCode(2);
 
-        $this->assertStringContainsString('locally edited', file_get_contents($this->fixture->path('application/scripts/arix.js')));
+        $this->assertStringContainsString('locally edited', file_get_contents($this->fixture->path('application/scripts/arix/index.js')));
     }
 
     #[Test]

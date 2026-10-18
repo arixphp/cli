@@ -25,6 +25,9 @@ class CssUpdateCommandTest extends TestCase
         $this->installedBodies = $this->fixture->versionSet('1.0.0');
         $root = $this->fixture->distribution('dist', '2.0.0', $this->fixture->versionSet('2.0.0'), ['1.0.0' => $this->fixture->hashes($this->installedBodies)]);
         $this->application = $this->fixture->application();
+        foreach ($this->installedBodies as $file => $body) {
+            $this->fixture->write("application/styles/arix/{$file}", $body);
+        }
         $this->app->instance(CssDistribution::class, CssDistribution::bundled($root));
     }
 
@@ -43,7 +46,7 @@ class CssUpdateCommandTest extends TestCase
             ->expectsOutputToContain('Dry run')
             ->assertExitCode(0);
 
-        $this->assertSame($this->installedBodies['base.css'], file_get_contents($this->fixture->path('application/styles/base.css')));
+        $this->assertSame($this->installedBodies['base.css'], file_get_contents($this->fixture->path('application/styles/arix/base.css')));
         $this->assertFileDoesNotExist($this->fixture->path('application/.css-update.lock'));
         $this->assertSame([], glob($this->fixture->path('application/.styles-backup-*')));
     }
@@ -55,14 +58,15 @@ class CssUpdateCommandTest extends TestCase
             ->expectsOutputToContain('Backup retained')
             ->assertExitCode(0);
 
-        $this->assertSame($this->fixture->stylesheet('base.css', '2.0.0'), file_get_contents($this->fixture->path('application/styles/base.css')));
+        $this->assertSame($this->fixture->stylesheet('base.css', '2.0.0'), file_get_contents($this->fixture->path('application/styles/arix/base.css')));
+        $this->assertSame($this->installedBodies['base.css'], file_get_contents($this->fixture->path('application/styles/base.css')));
     }
 
     #[Test]
     public function it_reports_up_to_date_without_writing(): void
     {
         foreach ($this->installedBodies as $file => $body) {
-            $this->fixture->write("application/styles/{$file}", $this->fixture->stylesheet($file, '2.0.0'));
+            $this->fixture->write("application/styles/arix/{$file}", $this->fixture->stylesheet($file, '2.0.0'));
         }
 
         $this->artisan('css:update', ['--path' => $this->application, '--yes' => true])
@@ -96,13 +100,13 @@ class CssUpdateCommandTest extends TestCase
     #[Test]
     public function it_requires_force_for_modified_content(): void
     {
-        $this->fixture->write('application/styles/tokens.css', "/* locally edited */\n");
+        $this->fixture->write('application/styles/arix/tokens.css', "/* locally edited */\n");
 
         $this->artisan('css:update', ['--path' => $this->application, '--yes' => true])
             ->expectsOutputToContain('--force')
             ->assertExitCode(2);
 
-        $this->assertStringContainsString('locally edited', file_get_contents($this->fixture->path('application/styles/tokens.css')));
+        $this->assertStringContainsString('locally edited', file_get_contents($this->fixture->path('application/styles/arix/tokens.css')));
     }
 
     #[Test]

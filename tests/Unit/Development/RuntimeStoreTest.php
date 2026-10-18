@@ -37,7 +37,8 @@ class RuntimeStoreTest extends TestCase
         $platform = RuntimePlatform::detect();
         $manifest = $this->fixture->write('manifest.json', json_encode(['version' => 'v1.13.0', 'targets' => [$platform => ['url' => 'https://github.com/php/frankenphp/releases/download/v1.13.0/test', 'sha256' => hash('sha256', 'binary'), 'max_bytes' => 100, 'archive' => false, 'executable' => 'frankenphp']]]));
 
-        $probe = new class() extends RuntimeProbe {
+        $probe = new class() extends RuntimeProbe
+        {
             public function verify(string $executable, bool $reload = true): void {}
         };
 

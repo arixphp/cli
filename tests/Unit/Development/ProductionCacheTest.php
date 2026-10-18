@@ -22,13 +22,15 @@ class ProductionCacheTest extends TestCase
         }
 
         $fixture = new NewApplicationFixture();
-        $fixture->write('index.php', '<?php header("Content-Type: text/html"); echo "<p>HTML</p>";');
+        $fixture->write('index.php', '<?php header("Content-Type: text/html"); if ($_SERVER["REQUEST_URI"] === "/sensitive") { header("Cache-Control: no-store"); } echo "<p>HTML</p>";');
         $fixture->write('Caddyfile', file_get_contents($configuration));
         $fixture->write('styles/app.css', '@import "base.css";');
         $fixture->write('styles/base.css', 'body{color:red}');
         $fixture->write('scripts/app.js', 'import "./arix.js";');
         $fixture->write('scripts/arix.js', 'export const value = 1;');
-        $fixture->write('assets/image.png', 'image');
+        $fixture->write('scripts/arix/index.js', 'export const value = 1;');
+        $fixture->write('styles/arix/base.css', 'body{color:red}');
+        $fixture->write('media/image.png', 'image');
 
         $socket = stream_socket_server('tcp://127.0.0.1:0');
         $port = (int) substr(strrchr(stream_socket_get_name($socket, false), ':'), 1);
@@ -53,8 +55,9 @@ class ProductionCacheTest extends TestCase
 
             $this->assertSame(200, $html[0], $server->getErrorOutput());
             $this->assertSame('no-cache', $html[2]['cache-control'] ?? null);
+            $this->assertSame('no-store', $this->request($port, '/sensitive')[2]['cache-control'] ?? null);
 
-            foreach (['/styles/app.css', '/styles/base.css', '/scripts/app.js', '/scripts/arix.js'] as $path) {
+            foreach (['/styles/app.css', '/styles/base.css', '/styles/arix/base.css', '/scripts/app.js', '/scripts/arix.js', '/scripts/arix/index.js'] as $path) {
                 $first = $this->request($port, $path);
 
                 $this->assertSame('no-cache', $first[2]['cache-control'] ?? null, $path);
@@ -63,7 +66,7 @@ class ProductionCacheTest extends TestCase
 
                 $this->assertSame(304, $this->request($port, $path, ['If-None-Match: ' . $etag])[0]);
 
-                if ($path === '/styles/base.css' || $path === '/scripts/arix.js') {
+                if (in_array($path, ['/styles/base.css', '/styles/arix/base.css', '/scripts/arix.js', '/scripts/arix/index.js'], true)) {
                     $fixture->write(ltrim($path, '/'), 'new content with a different size');
 
                     touch($fixture->path(ltrim($path, '/')), time() + 2);
@@ -75,7 +78,10 @@ class ProductionCacheTest extends TestCase
                 }
             }
 
-            $this->assertNotSame('no-cache', $this->request($port, '/assets/image.png')[2]['cache-control'] ?? null);
+            $media = $this->request($port, '/media/image.png');
+            $this->assertSame(200, $media[0]);
+            $this->assertSame('image', $media[1]);
+            $this->assertNotSame('no-cache', $media[2]['cache-control'] ?? null);
         } finally {
             $server->stop(1);
             $fixture->cleanup();

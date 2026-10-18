@@ -20,9 +20,10 @@ class StandaloneViewsTest extends TestCase
             foreach (['Arix\Views\Contracts\View', 'Arix\Views\View', 'Arix\Views\ViewFactory', 'Arix\BladeOne\BladeOne', 'Arix\Views\TemplateEngine'] as $class) {
                 $files[$class] = (new ReflectionClass($class))->getFileName();
             }
-            foreach (['view', 'trans', 'url', 'config', 'asset'] as $helper) {
+            foreach (['view', 'trans', 'url', 'config', 'style', 'script', 'font', 'media'] as $helper) {
                 if (! function_exists($helper)) { exit(3); }
             }
+            if (function_exists('asset') || function_exists('versioned_asset') || method_exists(Arix\Routing\UrlGenerator::class, 'asset')) { exit(4); }
             echo json_encode($files);
             PHP;
         $process = proc_open([PHP_BINARY, '-r', $program], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
