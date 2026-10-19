@@ -130,7 +130,6 @@ class ClientTest extends TestCase
             $this->fail('A refused connection must be reported.');
         } catch (HttpClientException $exception) {
             $this->assertStringStartsWith('Network error: ', $exception->getMessage());
-            $this->expectExceptionMessageIsOrContains('Network error: ');
             $this->assertSame(CURLE_COULDNT_CONNECT, $exception->getCode());
         }
     }
