@@ -14,8 +14,19 @@ use function is_resource;
 
 class CoreUpdater
 {
+    /** @var list<string> */
+    private array $cleanupWarnings = [];
+
+    /** @return list<string> */
+    public function cleanupWarnings(): array
+    {
+
+        return $this->cleanupWarnings;
+    }
+
     public function update(string $application, CoreDistribution $distribution, string $expectedId): string|null
     {
+        $this->cleanupWarnings = [];
         $application = ApplicationTarget::resolve($application, $application);
         $lockPath = $application . DIRECTORY_SEPARATOR . '.core-update.lock';
 
@@ -52,7 +63,12 @@ class CoreUpdater
                 return null;
             }
 
-            return $this->install($application, $distribution, $preview['installed'], $inspector);
+            $backup = $this->install($application, $distribution, $preview['installed'], $inspector);
+
+            // Installation is committed. Cleanup must never trigger rollback.
+            $this->pruneBackups($application, $backup, $inspector);
+
+            return $backup;
         } finally {
             flock($lock, LOCK_UN);
             fclose($lock);
@@ -137,7 +153,7 @@ class CoreUpdater
                     }
                 }
 
-                $this->removeStage($stage);
+                $this->removeTree($stage);
 
                 foreach ([$temporaryJournal, $journal] as $file) {
                     if (file_exists($file)) {
@@ -175,7 +191,39 @@ class CoreUpdater
         }
     }
 
-    private function removeStage(string $stage): void
+    private function pruneBackups(string $application, string $retained, CoreInspector $inspector): void
+    {
+        try {
+            $entries = @scandir($application);
+
+            if ($entries === false) {
+                throw new RuntimeException('Cannot list old core backups.');
+            }
+
+            foreach ($entries as $entry) {
+                if (! preg_match('/^\.core-backup-[a-f0-9]{24}$/D', $entry)) {
+                    continue;
+                }
+
+                $backup = $application . DIRECTORY_SEPARATOR . $entry;
+
+                if ($backup === $retained) {
+                    continue;
+                }
+
+                try {
+                    $inspector->installedManifest($backup);
+                    $this->removeTree($backup);
+                } catch (Throwable $exception) {
+                    $this->cleanupWarnings[] = "Could not clean old core backup {$backup}: {$exception->getMessage()}";
+                }
+            }
+        } catch (Throwable $exception) {
+            $this->cleanupWarnings[] = "Could not clean old core backups: {$exception->getMessage()}";
+        }
+    }
+
+    protected function removeTree(string $stage): void
     {
         CoreFiles::assertUnlinked($stage);
 
@@ -197,7 +245,7 @@ class CoreUpdater
 
             if ($entry->isDir()) {
                 if (! @rmdir($entry->getPathname())) {
-                    throw new RuntimeException('Cannot remove update staging directory.');
+                    throw new RuntimeException("Cannot remove update directory: {$stage}");
                 }
             } else {
                 $this->unlink($entry->getPathname());
@@ -205,7 +253,7 @@ class CoreUpdater
         }
 
         if (! @rmdir($stage)) {
-            throw new RuntimeException('Cannot remove update staging directory.');
+            throw new RuntimeException("Cannot remove update directory: {$stage}");
         }
     }
 
