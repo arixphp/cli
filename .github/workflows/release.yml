@@ -267,7 +267,8 @@ jobs:
           branch="arix-${RELEASE_VERSION}"
           cd tap
           git checkout -b "$branch"
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -am "Arix ${RELEASE_VERSION}"
+          git add Formula/arix.rb
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Arix ${RELEASE_VERSION}"
           git push -u origin "$branch"
           if [ "$(gh pr list --head "$branch" --json number --jq 'length')" = "0" ]; then
             gh pr create --title "Arix ${RELEASE_VERSION}" --body "Automated formula update for Arix ${RELEASE_VERSION}. Review and merge to publish." --head "$branch" --base main
@@ -275,6 +276,7 @@ jobs:
 
   winget:
     name: Submit winget manifest
+    if: ${{ vars.WINGET_ENABLED == 'true' }}
     needs: [resolve, publish]
     runs-on: windows-2022
     timeout-minutes: 10
