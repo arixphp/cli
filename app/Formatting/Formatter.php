@@ -20,7 +20,7 @@ class Formatter
 {
     private const array ALLOWED_CONFIG_KEYS = ['version', 'rules'];
 
-    public function format(string|null $path, string|null $config, string $cwd, OutputInterface $output): int
+    public function format(string|null $path, string|null $config, string $cwd, OutputInterface $output, bool $test = false): int
     {
         $application = ApplicationTarget::resolve($path, $cwd);
 
@@ -46,7 +46,13 @@ class Formatter
 
             $stderr = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
 
-            $process = new Process([PHP_BINARY, $pint, '--config=' . $tempConfig, '--no-ansi'], $application);
+            $arguments = [PHP_BINARY, $pint, '--config=' . $tempConfig, '--no-ansi'];
+
+            if ($test) {
+                $arguments[] = '--test';
+            }
+
+            $process = new Process($arguments, $application);
             $process->run(static function (string $type, string $buffer) use ($stderr): void {
                 $stderr->write($buffer, false);
             });
@@ -85,10 +91,9 @@ class Formatter
     private function buildTempConfig(string $application, array $userConfig): string
     {
         $config = $userConfig;
-        $config['paths'] = [
-            'include' => ['app', 'tests'],
-            'exclude' => ['app/views'],
-        ];
+        $config['in'] = [$application];
+        $config['exclude'] = ['app/views'];
+        $config['notPath'] = ['~^(?!(?:app|tests)/)~'];
 
         $temp = tempnam($application, 'arix-format-');
 

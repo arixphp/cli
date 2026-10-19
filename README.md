@@ -145,7 +145,17 @@ arix format --path=/path/to/application
 
 # With an explicit user rules file:
 arix format --path=/path/to/application --config=/path/to/rules.json
+
+# Check formatting without correcting code (for CI/CD):
+arix format --test
+arix format --test --path=/path/to/application
 ```
+
+The `--test` option checks the same directories and respects `--config` without
+rewriting PHP code. It exits with `0` when formatting is correct or `1` when
+corrections are needed. Validation errors handled by the command return `2`;
+other Pint failures retain their original exit code. Without `--test`, the command
+continues to apply formatting corrections.
 
 The optional `--config` accepts a path to a user format rules file. If omitted,
 the command reads `.arix-format.json` from the application root. The file

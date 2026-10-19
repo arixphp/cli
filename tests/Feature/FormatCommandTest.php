@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\Finder\Finder;
 use Tests\Support\ApplicationTestingFixture;
 use Tests\TestCase;
 
@@ -72,5 +73,119 @@ class FormatCommandTest extends TestCase
         $this->artisan('format', ['--path' => '/nonexistent/path'])
             ->expectsOutputToContain('does not exist')
             ->assertExitCode(2);
+    }
+
+    #[Test]
+    public function it_reports_formatting_violations_without_modifying_code(): void
+    {
+        $this->fixture->write('app/Controller.php', "<?php\ndeclare(strict_types=1);\nclass Controller{public function index(){return 1;}}\n");
+        $this->fixture->write('tests/ExampleTest.php', "<?php\ndeclare(strict_types=1);\ntest('example',function(){expect(1)->toBe(1);});\n");
+        $contents = $this->applicationPhpContents();
+
+        $this->artisan('format', ['--path' => $this->fixture->root, '--test' => true])
+            ->assertExitCode(1);
+
+        $this->assertSame($contents, $this->applicationPhpContents());
+    }
+
+    #[Test]
+    public function it_passes_test_mode_for_formatted_code(): void
+    {
+        $this->artisan('format', ['--path' => $this->fixture->root])
+            ->assertExitCode(0);
+
+        $contents = $this->applicationPhpContents();
+
+        $this->artisan('format', ['--path' => $this->fixture->root, '--test' => true])
+            ->assertExitCode(0);
+
+        $this->assertSame($contents, $this->applicationPhpContents());
+    }
+
+    #[Test]
+    public function it_applies_custom_rules_in_test_mode(): void
+    {
+        $this->fixture->write('.arix-format.json', '{"rules":{"no_unused_imports":false}}');
+        $this->fixture->write('app/Controller.php', <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
+namespace App;
+
+use RuntimeException;
+
+class Controller {}
+PHP);
+
+        $this->artisan('format', ['--path' => $this->fixture->root])
+            ->assertExitCode(0);
+
+        $contents = file_get_contents($this->fixture->path('app/Controller.php'));
+        $this->assertStringContainsString('use RuntimeException;', $contents);
+        $this->fixture->write('rules.json', '{"rules":{"no_unused_imports":true}}');
+
+        $this->artisan('format', [
+            '--path' => $this->fixture->root,
+            '--config' => $this->fixture->path('rules.json'),
+            '--test' => true,
+        ])->assertExitCode(1);
+
+        $this->assertSame($contents, file_get_contents($this->fixture->path('app/Controller.php')));
+    }
+
+    #[Test]
+    public function it_excludes_app_views_in_test_mode(): void
+    {
+        $this->artisan('format', ['--path' => $this->fixture->root])
+            ->assertExitCode(0);
+
+        $view = "<?php\ndeclare(strict_types=1);\necho( 'view' );\n";
+        $this->fixture->write('app/views/Layout.arix.php', $view);
+
+        $this->artisan('format', ['--path' => $this->fixture->root, '--test' => true])
+            ->assertExitCode(0);
+
+        $this->assertSame($view, file_get_contents($this->fixture->path('app/views/Layout.arix.php')));
+    }
+
+    #[Test]
+    public function it_rejects_missing_application_in_test_mode(): void
+    {
+        $this->artisan('format', ['--path' => '/nonexistent/path', '--test' => true])
+            ->expectsOutputToContain('does not exist')
+            ->assertExitCode(2);
+    }
+
+    #[Test]
+    public function it_only_checks_application_owned_php_directories(): void
+    {
+        $this->artisan('format', ['--path' => $this->fixture->root])
+            ->assertExitCode(0);
+
+        $code = "<?php\ndeclare(strict_types=1);\necho( 'outside' );\n";
+        $this->fixture->write('core/Outside.php', $code);
+        $this->fixture->write('outside.php', $code);
+
+        $this->artisan('format', ['--path' => $this->fixture->root, '--test' => true])
+            ->assertExitCode(0);
+
+        $this->assertSame($code, file_get_contents($this->fixture->path('core/Outside.php')));
+        $this->assertSame($code, file_get_contents($this->fixture->path('outside.php')));
+    }
+
+    private function applicationPhpContents(): array
+    {
+        $files = Finder::create()->files()->name('*.php')->in([
+            $this->fixture->path('app'),
+            $this->fixture->path('tests'),
+        ])->sortByName();
+        $contents = [];
+
+        foreach ($files as $file) {
+            $contents[$file->getPathname()] = $file->getContents();
+        }
+
+        return $contents;
     }
 }
