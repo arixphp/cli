@@ -23,27 +23,85 @@ class Source
 
     public function import(string $vendor, string $core): array
     {
+        $this->assertPackagesAvailable($vendor);
+
+        $core = $this->prepareCore($core);
+        $lock = $this->lockCore($core);
+        $stage = $core . DIRECTORY_SEPARATOR . '.import-' . bin2hex(random_bytes(8));
+
+        $installed = [];
+        $backups = [];
+        $completed = false;
+
+        try {
+            $manifest = $this->performImport($vendor, $core, $stage, $installed, $backups);
+
+            $completed = true;
+
+            return $manifest;
+        } catch (Throwable $exception) {
+            $this->rollback($core, $stage, $installed, $backups, $exception);
+
+            throw $exception;
+        } finally {
+            $this->discardStage($stage, $completed);
+
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    /** Ensure every supported package is vendored, licensed and free of links. */
+    private function assertPackagesAvailable(string $vendor): void
+    {
         foreach (array_keys(self::PACKAGES) as $package) {
-            $dirPackage = $vendor . DIRECTORY_SEPARATOR . $package;
-            $this->assertUnlinkedPath($dirPackage);
+            $directory = $vendor . DIRECTORY_SEPARATOR . $package;
+            $this->assertUnlinkedPath($directory);
 
-            $sourceRoot = self::PACKAGES[$package][3];
-
-            if (! is_dir($dirPackage) || ! is_file($dirPackage . DIRECTORY_SEPARATOR . 'LICENSE') || ($sourceRoot !== '' && ! is_dir($dirPackage . DIRECTORY_SEPARATOR . $sourceRoot))) {
+            if (! $this->packageIsAvailable($directory, self::PACKAGES[$package][3])) {
                 throw new RuntimeException("Missing package or license: {$package}");
             }
         }
+    }
 
+    private function packageIsAvailable(string $directory, string $sourceRoot): bool
+    {
+        if (! is_dir($directory) || ! is_file($directory . DIRECTORY_SEPARATOR . 'LICENSE')) {
+            return false;
+        }
+
+        return $sourceRoot === '' || is_dir($directory . DIRECTORY_SEPARATOR . $sourceRoot);
+    }
+
+    /** Create the core directory when it is missing and resolve it to a real path. */
+    private function prepareCore(string $core): string
+    {
         $this->assertUnlinkedPath($core);
 
         if (! is_dir($core) && ! mkdir($core, 0755, true)) {
             throw new RuntimeException('Cannot create core directory.');
         }
 
-        $core = realpath($core);
-        $this->assertUnlinkedPath($core . DIRECTORY_SEPARATOR . '.import.lock');
+        $resolved = realpath($core);
 
-        $lock = fopen($core . DIRECTORY_SEPARATOR . '.import.lock', 'c');
+        if ($resolved === false) {
+            throw new RuntimeException('Cannot resolve core directory.');
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Acquire the exclusive import lock of the core directory.
+     *
+     * @return resource
+     */
+    private function lockCore(string $core): mixed
+    {
+        $path = $core . DIRECTORY_SEPARATOR . '.import.lock';
+        $this->assertUnlinkedPath($path);
+
+        $lock = fopen($path, 'c');
 
         if ($lock === false || ! flock($lock, LOCK_EX | LOCK_NB)) {
             if (is_resource($lock)) {
@@ -53,88 +111,150 @@ class Source
             throw new RuntimeException('Cannot lock core import.');
         }
 
-        $stage = $core . DIRECTORY_SEPARATOR . '.import-' . bin2hex(random_bytes(8));
-        $installed = [];
-        $backups = [];
-        $completed = false;
+        return $lock;
+    }
 
-        try {
-            $retired = $this->assertManaged($core);
-            mkdir($stage, 0755);
-            mkdir($stage . DIRECTORY_SEPARATOR . 'previous', 0755);
+    /**
+     * Stage every supported package and install it over the managed destinations.
+     *
+     * @param  list<string>  $installed
+     * @param  list<string>  $backups
+     * @return array<string, mixed>
+     */
+    private function performImport(string $vendor, string $core, string $stage, array &$installed, array &$backups): array
+    {
+        $retired = $this->assertManaged($core);
 
-            $manifest = ['format' => 1, 'php' => '>=8.4.1', 'packages' => [], 'files' => []];
-            $versions = $this->versions($vendor);
+        mkdir($stage, 0755);
+        mkdir($stage . DIRECTORY_SEPARATOR . 'previous', 0755);
 
-            foreach (self::PACKAGES as $package => [$destination, $from, $to, $sourceRoot]) {
-                $root = $vendor . DIRECTORY_SEPARATOR . $package;
-                $source = $sourceRoot === '' ? $root : $root . DIRECTORY_SEPARATOR . $sourceRoot;
-                // The standalone core autoloader replaces FastRoute's bootstrap.
-                $excluded = $package === 'nikic/fast-route' ? [$source . DIRECTORY_SEPARATOR . 'bootstrap.php'] : [];
-                $this->copy($source, $stage . DIRECTORY_SEPARATOR . $destination, $from, $to, $excluded);
-                $this->copy($root . DIRECTORY_SEPARATOR . 'LICENSE', $stage . DIRECTORY_SEPARATOR . $destination . DIRECTORY_SEPARATOR . 'LICENSE', null, null);
+        $manifest = $this->stagePackages($vendor, $stage);
 
-                $manifest['packages'][$package] = [
-                    'version' => $versions[$package] ?? 'unknown',
-                    'destination' => $destination,
-                    'namespace' => $to,
-                ];
+        $this->retireComponents($retired, $core, $stage, $backups);
+        $this->installComponents($core, $stage, $installed, $backups);
 
-                $this->hashFiles($stage . DIRECTORY_SEPARATOR . $destination, $destination, $manifest['files']);
+        return $manifest;
+    }
+
+    /**
+     * Copy every supported package into the staging area and record its manifest.
+     *
+     * @return array<string, mixed>
+     */
+    private function stagePackages(string $vendor, string $stage): array
+    {
+        $manifest = ['format' => 1, 'php' => '>=8.4.1', 'packages' => [], 'files' => []];
+        $versions = $this->versions($vendor);
+
+        foreach (self::PACKAGES as $package => [$destination, $from, $to, $sourceRoot]) {
+            $root = $vendor . DIRECTORY_SEPARATOR . $package;
+            $source = $sourceRoot === '' ? $root : $root . DIRECTORY_SEPARATOR . $sourceRoot;
+            // The standalone core autoloader replaces FastRoute's bootstrap.
+            $excluded = $package === 'nikic/fast-route' ? [$source . DIRECTORY_SEPARATOR . 'bootstrap.php'] : [];
+            $this->copy($source, $stage . DIRECTORY_SEPARATOR . $destination, $from, $to, $excluded);
+            $this->copy($root . DIRECTORY_SEPARATOR . 'LICENSE', $stage . DIRECTORY_SEPARATOR . $destination . DIRECTORY_SEPARATOR . 'LICENSE', null, null);
+
+            $manifest['packages'][$package] = [
+                'version' => $versions[$package] ?? 'unknown',
+                'destination' => $destination,
+                'namespace' => $to,
+            ];
+
+            $this->hashFiles($stage . DIRECTORY_SEPARATOR . $destination, $destination, $manifest['files']);
+        }
+
+        ksort($manifest['files']);
+
+        $this->write($stage . DIRECTORY_SEPARATOR . 'imports.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n");
+
+        return $manifest;
+    }
+
+    /**
+     * Move historical imports out of the core directory.
+     *
+     * @param  list<string>  $retired
+     * @param  list<string>  $backups
+     */
+    private function retireComponents(array $retired, string $core, string $stage, array &$backups): void
+    {
+        foreach ($retired as $name) {
+            if (! $this->move($core . DIRECTORY_SEPARATOR . $name, $stage . DIRECTORY_SEPARATOR . 'previous' . DIRECTORY_SEPARATOR . $name)) {
+                throw new RuntimeException("Cannot back up {$name}");
             }
 
-            ksort($manifest['files']);
+            $backups[] = $name;
+        }
+    }
 
-            $this->write($stage . DIRECTORY_SEPARATOR . 'imports.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n");
+    /**
+     * Replace every managed destination with its staged copy.
+     *
+     * @param  list<string>  $installed
+     * @param  list<string>  $backups
+     */
+    private function installComponents(string $core, string $stage, array &$installed, array &$backups): void
+    {
+        foreach ([...$this->destinations(), 'imports.json'] as $name) {
+            $this->backupComponent($core, $stage, $name, $backups);
+            $this->installComponent($core, $stage, $name, $installed);
+        }
+    }
 
-            foreach ($retired as $name) {
-                if (! $this->move($core . DIRECTORY_SEPARATOR . $name, $stage . DIRECTORY_SEPARATOR . 'previous' . DIRECTORY_SEPARATOR . $name)) {
-                    throw new RuntimeException("Cannot back up {$name}");
-                }
+    /** @param list<string> $backups */
+    private function backupComponent(string $core, string $stage, string $name, array &$backups): void
+    {
+        if (! file_exists($core . DIRECTORY_SEPARATOR . $name)) {
+            return;
+        }
 
-                $backups[] = $name;
+        if (! $this->move($core . DIRECTORY_SEPARATOR . $name, $stage . DIRECTORY_SEPARATOR . 'previous' . DIRECTORY_SEPARATOR . $name)) {
+            throw new RuntimeException("Cannot back up {$name}");
+        }
+
+        $backups[] = $name;
+    }
+
+    /** @param list<string> $installed */
+    private function installComponent(string $core, string $stage, string $name, array &$installed): void
+    {
+        if (! $this->move($stage . DIRECTORY_SEPARATOR . $name, $core . DIRECTORY_SEPARATOR . $name)) {
+            throw new RuntimeException("Cannot install {$name}");
+        }
+
+        $installed[] = $name;
+    }
+
+    /**
+     * Restore the previous core contents after a failed import.
+     *
+     * @param  list<string>  $installed
+     * @param  list<string>  $backups
+     */
+    private function rollback(string $core, string $stage, array $installed, array $backups, Throwable $exception): void
+    {
+        foreach (array_reverse($installed) as $name) {
+            $this->remove($core . DIRECTORY_SEPARATOR . $name);
+        }
+
+        foreach ($backups as $name) {
+            if (! $this->move($stage . DIRECTORY_SEPARATOR . 'previous' . DIRECTORY_SEPARATOR . $name, $core . DIRECTORY_SEPARATOR . $name)) {
+                throw new RuntimeException("Import rollback failed; backup retained at {$stage}", previous: $exception);
             }
+        }
+    }
 
-            foreach ([...$this->destinations(), 'imports.json'] as $name) {
-                if (file_exists($core . DIRECTORY_SEPARATOR . $name)) {
-                    if (! $this->move($core . DIRECTORY_SEPARATOR . $name, $stage . DIRECTORY_SEPARATOR . 'previous' . DIRECTORY_SEPARATOR . $name)) {
-                        throw new RuntimeException("Cannot back up {$name}");
-                    }
+    /** Remove the staging area unless it still holds recovery evidence. */
+    private function discardStage(string $stage, bool $completed): void
+    {
+        if (is_dir($stage) && (scandir($stage . DIRECTORY_SEPARATOR . 'previous') ?: []) === ['.', '..']) {
+            $this->remove($stage);
 
-                    $backups[] = $name;
-                }
+            return;
+        }
 
-                if (! $this->move($stage . DIRECTORY_SEPARATOR . $name, $core . DIRECTORY_SEPARATOR . $name)) {
-                    throw new RuntimeException("Cannot install {$name}");
-                }
-
-                $installed[] = $name;
-            }
-
-            $completed = true;
-
-            return $manifest;
-        } catch (Throwable $exception) {
-            foreach (array_reverse($installed) as $name) {
-                $this->remove($core . DIRECTORY_SEPARATOR . $name);
-            }
-
-            foreach ($backups as $name) {
-                if (! $this->move($stage . DIRECTORY_SEPARATOR . 'previous' . DIRECTORY_SEPARATOR . $name, $core . DIRECTORY_SEPARATOR . $name)) {
-                    throw new RuntimeException("Import rollback failed; backup retained at {$stage}", previous: $exception);
-                }
-            }
-
-            throw $exception;
-        } finally {
-            if (is_dir($stage) && (scandir($stage . DIRECTORY_SEPARATOR . 'previous') ?: []) === ['.', '..']) {
-                $this->remove($stage);
-            } elseif ($completed) {
-                $this->remove($stage);
-            }
-
-            flock($lock, LOCK_UN);
-            fclose($lock);
+        if ($completed) {
+            $this->remove($stage);
         }
     }
 
