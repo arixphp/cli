@@ -65,6 +65,7 @@ class NewApplicationFixture
             'app-sha/.arix.json' => '{"format":1,"core_contract":"arix-core-v1"}',
             'app-sha/.htaccess' => 'RewriteEngine On',
             'app-sha/.gitignore' => '/storage/cache',
+            'app-sha/AGENTS.md' => 'Skeleton instructions.',
             'app-sha/index.php' => '<?php throw new RuntimeException("Do not execute downloaded PHP");',
             'app-sha/core/autoload.php' => '<?php // downloaded core',
             'app-sha/app/routes.php' => '<?php // routes',

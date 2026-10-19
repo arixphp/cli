@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Installation\ApplicationInstructions;
 use App\Installation\SkeletonSource;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\Process\Process;
@@ -77,6 +78,30 @@ class CreateNewAppCommandTest extends TestCase
     }
 
     #[Test]
+    public function it_writes_the_cli_instructions_over_the_skeleton_file(): void
+    {
+        $this->artisan('new', ['name' => 'guided', 'directory' => $this->fixture->root])
+            ->assertExitCode(0);
+
+        $written = file_get_contents($this->fixture->path('guided/AGENTS.md'));
+
+        $this->assertNotSame('Skeleton instructions.', $written);
+        $this->assertSame($this->stub(), $written);
+    }
+
+    #[Test]
+    public function it_does_not_publish_the_application_when_the_instructions_cannot_be_written(): void
+    {
+        $this->app->instance(ApplicationInstructions::class, new ApplicationInstructions($this->fixture->path('absent.md')));
+
+        $this->artisan('new', ['name' => 'unwritten', 'directory' => $this->fixture->root])
+            ->expectsOutputToContain('Cannot')
+            ->assertExitCode(1);
+
+        $this->assertDirectoryDoesNotExist($this->fixture->path('unwritten'));
+    }
+
+    #[Test]
     public function it_rejects_invalid_names_with_invalid_exit_code(): void
     {
         $this->artisan('new', ['name' => '../escape', 'directory' => $this->fixture->root])
@@ -102,5 +127,14 @@ class CreateNewAppCommandTest extends TestCase
         $process = new Process([PHP_BINARY, dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'arix', 'new', '--no-ansi'], $this->fixture->root, ['XDEBUG_MODE' => 'off']);
         $process->run();
         $this->assertSame(2, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+    }
+
+    private function stub(): string
+    {
+        $path = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR . 'AGENTS.md';
+
+        $this->assertFileExists($path);
+
+        return (string) file_get_contents($path);
     }
 }
