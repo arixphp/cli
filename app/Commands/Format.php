@@ -15,7 +15,8 @@ class Format extends Command
 {
     protected $signature = 'format
         {--path= : Application root, relative to invocation directory or absolute}
-        {--config= : Optional path to a user format rules configuration file}';
+        {--config= : Optional path to a user format rules configuration file}
+        {--test : Check formatting without modifying code}';
 
     protected $description = 'Format application PHP code using Pint.';
 
@@ -36,7 +37,7 @@ class Format extends Command
                 throw new RuntimeException('Console output is unavailable.');
             }
 
-            return $formatter->format(is_string($path) ? $path : null, is_string($config) ? $config : null, $cwd, $output);
+            return $formatter->format(is_string($path) ? $path : null, is_string($config) ? $config : null, $cwd, $output, (bool) $this->option('test'));
         } catch (RuntimeException $exception) {
             $this->error($exception->getMessage());
 
