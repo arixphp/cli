@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Installation;
 
 use App\Installation\ApplicationInstaller;
+use App\Installation\ApplicationInstructions;
 use App\Installation\ApplicationPublisher;
 use App\Installation\InstallationFiles;
 use App\Installation\InstallationTarget;
@@ -31,10 +32,11 @@ class ApplicationInstallerTest extends TestCase
         $this->fixture->cleanup();
     }
 
-    private function installer(FixtureSkeletonSource|null $source = null, ApplicationPublisher|null $publisher = null, InstallationFiles|null $files = null): ApplicationInstaller
+    private function installer(FixtureSkeletonSource|null $source = null, ApplicationPublisher|null $publisher = null, InstallationFiles|null $files = null, ApplicationInstructions|null $instructions = null): ApplicationInstaller
     {
+        $instructions ??= new ApplicationInstructions($this->fixture->write('instructions.md', "# Instructions\n"));
 
-        return new ApplicationInstaller($source ?? new FixtureSkeletonSource($this->fixture->archive()), new SafeZipExtractor(), $publisher ?? new ApplicationPublisher(), $files ?? new InstallationFiles());
+        return new ApplicationInstaller($source ?? new FixtureSkeletonSource($this->fixture->archive()), new SafeZipExtractor(), $publisher ?? new ApplicationPublisher(), $files ?? new InstallationFiles(), $instructions);
     }
 
     #[Test]
@@ -85,6 +87,16 @@ class ApplicationInstallerTest extends TestCase
         $this->assertSame('// entry', file_get_contents($this->fixture->path('site/scripts/app.js')));
         $this->assertDirectoryDoesNotExist($this->fixture->path('site/vendor'));
         $this->assertDirectoryDoesNotExist($this->fixture->path('site/.git'));
+    }
+
+    #[Test]
+    public function it_publishes_the_application_instructions(): void
+    {
+        $instructions = new ApplicationInstructions($this->fixture->write('instructions.md', "# Instructions\n"));
+
+        $this->installer(instructions: $instructions)->install(InstallationTarget::resolve('app', '.', $this->fixture->root));
+
+        $this->assertSame("# Instructions\n", file_get_contents($this->fixture->path('app/AGENTS.md')));
     }
 
     #[Test]

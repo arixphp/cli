@@ -12,6 +12,7 @@
         "core/Assets/AssetType.php",
         "core/Assets/public-policy.json",
         "resources/core.bundle",
+        "resources/stubs/AGENTS.md",
         "resources/stubs/controller.stub",
         "resources/stubs/middleware.stub",
         "resources/stubs/test.feature.stub",

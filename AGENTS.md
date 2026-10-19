@@ -33,6 +33,10 @@ unless the user explicitly requests a cross-project change.
   Pest.
 - `tests/Feature/` and `tests/Unit/` cover the Laravel Zero application.
 - `docs/` documents current architecture and historical implementation work.
+- `resources/stubs/AGENTS.md` is the application agent guide that `arix new`
+  writes into every created application, replacing the copy shipped by the
+  skeleton. The skeleton repository keeps the same base text plus its own
+  repository-specific section; keep both copies in sync.
 - `vendor/` supplies CLI dependencies, including Pest as a runtime dependency;
   it must never be copied into `../arix/` or standalone core.
 - `app/Testing/` launches isolated application tests, including the standalone

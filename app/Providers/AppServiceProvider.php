@@ -10,6 +10,7 @@ use App\Css\Update\CssDistribution;
 use App\Development\CaddyConfiguration;
 use App\Development\RuntimeManifest;
 use App\Frontend\JsManagedDistribution;
+use App\Installation\ApplicationInstructions;
 use App\Installation\CurlTransport;
 use App\Installation\GitHubSkeleton;
 use App\Installation\HttpTransport;
@@ -52,6 +53,9 @@ class AppServiceProvider extends ServiceProvider
         ));
         $this->app->bind(HttpTransport::class, CurlTransport::class);
         $this->app->bind(SkeletonSource::class, GitHubSkeleton::class);
+        $this->app->bind(ApplicationInstructions::class, fn (): ApplicationInstructions => new ApplicationInstructions(
+            $this->app->basePath('resources' . DIRECTORY_SEPARATOR . 'stubs' . DIRECTORY_SEPARATOR . 'AGENTS.md'),
+        ));
         $this->app->bind(CaddyConfiguration::class, fn (): CaddyConfiguration => new CaddyConfiguration($this->app->basePath()));
         $this->app->bind(RuntimeManifest::class, fn (): RuntimeManifest => new RuntimeManifest($this->app->basePath('resources' . DIRECTORY_SEPARATOR . 'dev' . DIRECTORY_SEPARATOR . 'frankenphp.json')));
     }

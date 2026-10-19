@@ -14,6 +14,7 @@ class ApplicationInstaller
         private readonly SafeZipExtractor $extractor,
         private readonly ApplicationPublisher $publisher,
         private readonly InstallationFiles $files,
+        private readonly ApplicationInstructions $instructions,
     ) {}
 
     public function install(InstallationTarget $target): string
@@ -30,6 +31,7 @@ class ApplicationInstaller
             }
 
             $this->extractor->extract($workspace . DIRECTORY_SEPARATOR . 'skeleton.zip', $prepared);
+            $this->instructions->write($prepared);
             $this->publisher->publish($target, $workspace);
         } catch (RecoveryFailed $exception) {
             throw $exception;
