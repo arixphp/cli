@@ -388,6 +388,8 @@ imported into the standalone core:
   `core/FastRoute/` as `Arix\FastRoute`.
 - [eftec/bladeone](https://github.com/EFTEC/BladeOne) — imported into
   `core/BladeOne/` as `Arix\BladeOne`.
+- [dragonmantank/cron-expression](https://github.com/dragonmantank/cron-expression) —
+  imported into `core/Cron/` as `Arix\Cron`.
 
 Imported sources are namespace-relocated, managed copies; each managed
 directory keeps its upstream `LICENSE` file. Do not hand-edit them; regenerate
