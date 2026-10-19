@@ -295,6 +295,18 @@ class TemplateCacheCleanupTest extends TestCase
     }
 
     #[Test]
+    public function it_resolves_relative_application_cache_paths_against_the_application_root(): void
+    {
+        $this->scenario('application', ['path_form' => 'relative', 'policy' => ['interval' => 1, 'max_age' => 10, 'max_deletions' => 1], 'remaining' => 1]);
+    }
+
+    #[Test]
+    public function it_accepts_absolute_application_cache_paths_with_forward_slashes(): void
+    {
+        $this->scenario('application', ['path_form' => 'forward-slashes', 'policy' => ['interval' => 1, 'max_age' => 10, 'max_deletions' => 1], 'remaining' => 1]);
+    }
+
+    #[Test]
     public function it_rejects_explicit_null_in_application_configuration(): void
     {
         $this->scenario('application', ['policy' => null, 'invalid' => true]);

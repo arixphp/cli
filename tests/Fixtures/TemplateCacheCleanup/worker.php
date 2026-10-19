@@ -92,7 +92,12 @@ switch ($scenario) {
         mkdir($root . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'app', 0700, true);
         $app = $root . DIRECTORY_SEPARATOR . 'app';
         file_put_contents($app . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', '<?php declare(strict_types=1); return ["locales" => ["en"], "default_locale" => "en", "debug" => true];');
-        $cacheConfig = ['path' => $cache, 'version' => 'application-version', 'templates' => $options['policy']];
+        $configuredCache = match ($options['path_form'] ?? 'absolute') {
+            'relative' => 'cache',
+            'forward-slashes' => str_replace('\\', '/', $cache),
+            default => $cache,
+        };
+        $cacheConfig = ['path' => $configuredCache, 'version' => 'application-version', 'templates' => $options['policy']];
         file_put_contents($app . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'cache.php', '<?php declare(strict_types=1); return ' . var_export($cacheConfig, true) . ';');
         file_put_contents($app . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'page.arix.php', 'Configured');
         file_put_contents($app . DIRECTORY_SEPARATOR . 'routes.php', <<<'PHP'
