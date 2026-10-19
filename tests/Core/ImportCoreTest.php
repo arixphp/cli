@@ -34,7 +34,7 @@ class ImportCoreTest extends TestCase
 
         $this->assertFileExists($core . DIRECTORY_SEPARATOR . 'HttpFoundation' . DIRECTORY_SEPARATOR . 'LICENSE');
         $this->assertDirectoryDoesNotExist($core . DIRECTORY_SEPARATOR . 'Dependencies');
-        $this->assertSame(['symfony/http-foundation', 'nikic/fast-route', 'eftec/bladeone'], array_keys($first['packages']));
+        $this->assertSame(['symfony/http-foundation', 'nikic/fast-route', 'eftec/bladeone', 'dragonmantank/cron-expression'], array_keys($first['packages']));
         $this->assertFileExists($core . DIRECTORY_SEPARATOR . 'FastRoute' . DIRECTORY_SEPARATOR . 'RouteCollector.php');
         $this->assertDirectoryDoesNotExist($core . DIRECTORY_SEPARATOR . 'FastRoute' . DIRECTORY_SEPARATOR . 'src');
         $this->assertFileDoesNotExist($core . DIRECTORY_SEPARATOR . 'FastRoute' . DIRECTORY_SEPARATOR . 'bootstrap.php');
@@ -69,6 +69,31 @@ class ImportCoreTest extends TestCase
     }
 
     #[Test]
+    public function it_import_relocates_the_cron_namespace_without_rewriting_the_cron_expression_class(): void
+    {
+        $vendor = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'vendor';
+        $core = $this->directory . DIRECTORY_SEPARATOR . 'core';
+        $manifest = (new Source())->import($vendor, $core);
+
+        $this->assertFileExists($core . DIRECTORY_SEPARATOR . 'Cron' . DIRECTORY_SEPARATOR . 'CronExpression.php');
+        $this->assertFileExists($core . DIRECTORY_SEPARATOR . 'Cron' . DIRECTORY_SEPARATOR . 'LICENSE');
+        $this->assertArrayHasKey('Cron' . DIRECTORY_SEPARATOR . 'CronExpression.php', $manifest['files']);
+
+        $source = file_get_contents($core . DIRECTORY_SEPARATOR . 'Cron' . DIRECTORY_SEPARATOR . 'CronExpression.php');
+
+        $this->assertStringContainsString('namespace Arix\\Cron;', $source);
+        $this->assertStringContainsString('class CronExpression', $source);
+        $this->assertStringNotContainsString('Arix\\CronExpression', $source);
+        $this->assertStringNotContainsString('namespace Cron;', $source);
+
+        $factory = file_get_contents($core . DIRECTORY_SEPARATOR . 'Cron' . DIRECTORY_SEPARATOR . 'FieldFactory.php');
+
+        $this->assertStringContainsString('namespace Arix\\Cron;', $factory);
+        $this->assertStringContainsString('CronExpression::MINUTE', $factory);
+        $this->assertStringNotContainsString('Arix\\CronExpression', $factory);
+    }
+
+    #[Test]
     public function it_missing_sources_do_not_change_existing_destination(): void
     {
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'core');
@@ -96,11 +121,18 @@ class ImportCoreTest extends TestCase
             'symfony/http-foundation' => 'HttpFoundation',
             'nikic/fast-route' => 'FastRoute',
             'eftec/bladeone' => 'BladeOne',
+            'dragonmantank/cron-expression' => 'Cron',
+        ];
+        $roots = [
+            'nikic/fast-route' => 'src',
+            'eftec/bladeone' => 'lib',
+            'dragonmantank/cron-expression' => 'src/Cron',
         ];
         $excluded = ['README.md', 'composer.json', 'NOTICE', '.gitignore', 'LICENSE.txt', 'example.php.txt', 'UPPER.PHP'];
 
         foreach ($packages as $package => $_) {
-            $source = $vendor . DIRECTORY_SEPARATOR . $package . ($package === 'nikic/fast-route' ? DIRECTORY_SEPARATOR . 'src' : ($package === 'eftec/bladeone' ? DIRECTORY_SEPARATOR . 'lib' : ''));
+            $root = $roots[$package] ?? '';
+            $source = $vendor . DIRECTORY_SEPARATOR . $package . ($root === '' ? '' : DIRECTORY_SEPARATOR . $root);
             mkdir($source . DIRECTORY_SEPARATOR . 'nested', 0755, true);
             file_put_contents($vendor . DIRECTORY_SEPARATOR . $package . DIRECTORY_SEPARATOR . 'LICENSE', 'License text');
             file_put_contents($source . DIRECTORY_SEPARATOR . 'nested' . DIRECTORY_SEPARATOR . 'Example.php', '<?php // source');
@@ -133,7 +165,7 @@ class ImportCoreTest extends TestCase
             }
         }
 
-        $this->assertCount(6, $manifest['files']);
+        $this->assertCount(8, $manifest['files']);
         $this->assertFileDoesNotExist($core . DIRECTORY_SEPARATOR . 'FastRoute' . DIRECTORY_SEPARATOR . 'not-in-src.php');
         $this->assertFileDoesNotExist($core . DIRECTORY_SEPARATOR . 'BladeOne' . DIRECTORY_SEPARATOR . 'bladeonecli');
         $this->assertSame([], array_values(array_filter(array_keys($manifest['files']), static fn (string $file): bool => str_starts_with($file, 'Dependencies' . DIRECTORY_SEPARATOR))));
@@ -287,10 +319,11 @@ class ImportCoreTest extends TestCase
         $core = $this->directory . DIRECTORY_SEPARATOR . 'core';
         $vendor = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'vendor';
         $manifest = new Source()->import($vendor, $core);
-        unset($manifest['packages']['nikic/fast-route'], $manifest['packages']['eftec/bladeone']);
+        unset($manifest['packages']['nikic/fast-route'], $manifest['packages']['eftec/bladeone'], $manifest['packages']['dragonmantank/cron-expression']);
         $manifest['files'] = array_filter($manifest['files'], static fn (string $name): bool => str_starts_with($name, 'HttpFoundation' . DIRECTORY_SEPARATOR), ARRAY_FILTER_USE_KEY);
         $this->remove($core . DIRECTORY_SEPARATOR . 'FastRoute');
         $this->remove($core . DIRECTORY_SEPARATOR . 'BladeOne');
+        $this->remove($core . DIRECTORY_SEPARATOR . 'Cron');
         file_put_contents($core . DIRECTORY_SEPARATOR . 'imports.json', json_encode($manifest));
         $before = file_get_contents($core . DIRECTORY_SEPARATOR . 'HttpFoundation' . DIRECTORY_SEPARATOR . 'Request.php');
         $updated = new Source()->import($vendor, $core);
@@ -309,12 +342,15 @@ class ImportCoreTest extends TestCase
         mkdir($vendor . DIRECTORY_SEPARATOR . 'symfony' . DIRECTORY_SEPARATOR . 'http-foundation', 0755, true);
         mkdir($vendor . DIRECTORY_SEPARATOR . 'nikic' . DIRECTORY_SEPARATOR . 'fast-route' . DIRECTORY_SEPARATOR . 'src', 0755, true);
         mkdir($vendor . DIRECTORY_SEPARATOR . 'eftec' . DIRECTORY_SEPARATOR . 'bladeone' . DIRECTORY_SEPARATOR . 'lib', 0755, true);
+        mkdir($vendor . DIRECTORY_SEPARATOR . 'dragonmantank' . DIRECTORY_SEPARATOR . 'cron-expression' . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Cron', 0755, true);
         file_put_contents($vendor . DIRECTORY_SEPARATOR . 'autoload.php', '<?php require ' . var_export($root . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php', true) . ';');
         file_put_contents($vendor . DIRECTORY_SEPARATOR . 'symfony' . DIRECTORY_SEPARATOR . 'http-foundation' . DIRECTORY_SEPARATOR . 'LICENSE', 'license');
         file_put_contents($vendor . DIRECTORY_SEPARATOR . 'nikic' . DIRECTORY_SEPARATOR . 'fast-route' . DIRECTORY_SEPARATOR . 'LICENSE', 'license');
         file_put_contents($vendor . DIRECTORY_SEPARATOR . 'eftec' . DIRECTORY_SEPARATOR . 'bladeone' . DIRECTORY_SEPARATOR . 'LICENSE', 'license');
+        file_put_contents($vendor . DIRECTORY_SEPARATOR . 'dragonmantank' . DIRECTORY_SEPARATOR . 'cron-expression' . DIRECTORY_SEPARATOR . 'LICENSE', 'license');
         file_put_contents($vendor . DIRECTORY_SEPARATOR . 'nikic' . DIRECTORY_SEPARATOR . 'fast-route' . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Example.php', '<?php namespace FastRoute;');
         file_put_contents($vendor . DIRECTORY_SEPARATOR . 'eftec' . DIRECTORY_SEPARATOR . 'bladeone' . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'Example.php', '<?php namespace eftec\\bladeone;');
+        file_put_contents($vendor . DIRECTORY_SEPARATOR . 'dragonmantank' . DIRECTORY_SEPARATOR . 'cron-expression' . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Cron' . DIRECTORY_SEPARATOR . 'Example.php', '<?php namespace Cron;');
         $source = $this->directory . DIRECTORY_SEPARATOR . 'source';
         copy($root . DIRECTORY_SEPARATOR . 'source', $source);
 
@@ -325,7 +361,7 @@ class ImportCoreTest extends TestCase
             fclose($pipes[1]);
             fclose($pipes[2]);
             $this->assertSame(0, proc_close($process), $errors);
-            $this->assertStringContainsString('Imported 3 packages', $output);
+            $this->assertStringContainsString('Imported 4 packages', $output);
             $this->assertFileExists($this->directory . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'FastRoute' . DIRECTORY_SEPARATOR . 'Example.php');
             $this->assertFileExists($this->directory . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'BladeOne' . DIRECTORY_SEPARATOR . 'Example.php');
             $this->assertFileExists($this->directory . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'HttpFoundation' . DIRECTORY_SEPARATOR . 'LICENSE');

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "aada9c6e457c73d82cc9a11852c3ba11",
+    "content-hash": "c5cae3241e1bd28385472564299af485",
     "packages": [
         {
             "name": "brianium/paratest",

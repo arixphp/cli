@@ -5,9 +5,16 @@ declare(strict_types=1);
 namespace Tests\Core;
 
 use Arix\Application;
+use Arix\Config\Repository;
+use Arix\Container\Container;
+use Arix\Container\ContainerContext;
 use Arix\Http\Kernel;
 use Arix\Http\MiddlewareConfiguration;
 use Arix\HttpFoundation\Request;
+use Arix\Localization\Translator;
+use Arix\Routing\RouteRegistry;
+use Arix\Scheduling\Schedule;
+use Arix\Storage\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -139,6 +146,34 @@ PHP);
         symlink($this->root . DIRECTORY_SEPARATOR . 'app', $link);
         $this->expectException(RuntimeException::class);
         Application::create($link);
+    }
+
+    #[Test]
+    public function it_registers_the_console_services_without_loading_the_routes(): void
+    {
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'routes.php', "<?php\ndeclare(strict_types=1);\n\\Arix\\Facades\\Route::get('/', static fn (): \\Arix\\HttpFoundation\\Response => new \\Arix\\HttpFoundation\\Response('home'));\n");
+        $container = new Container();
+
+        ContainerContext::run($container, function () use ($container): void {
+            Application::create($this->root)->registerConsole($container);
+        });
+
+        $this->assertTrue($container->has(Repository::class));
+        $this->assertTrue($container->has(Storage::class));
+        $this->assertTrue($container->has(Translator::class));
+        $this->assertSame([], $container->get(RouteRegistry::class)->methods());
+    }
+
+    #[Test]
+    public function it_registers_the_application_schedules(): void
+    {
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'routes.php', "<?php\ndeclare(strict_types=1);\n");
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'schedules.php', "<?php\ndeclare(strict_types=1);\nreturn static function (\\Arix\\Scheduling\\Schedule \$schedule): void { \$schedule->call('report:daily', static fn (): null => null); };\n");
+        $schedule = new Schedule();
+
+        Application::create($this->root)->schedules($schedule);
+
+        $this->assertTrue($schedule->has('report:daily'));
     }
 
     #[Test]

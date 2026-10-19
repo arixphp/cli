@@ -18,6 +18,7 @@ class Source
         'symfony/http-foundation' => ['HttpFoundation', 'Symfony\\Component\\HttpFoundation', 'Arix\\HttpFoundation', ''],
         'nikic/fast-route' => ['FastRoute', 'FastRoute', 'Arix\\FastRoute', 'src'],
         'eftec/bladeone' => ['BladeOne', 'eftec\\bladeone', 'Arix\\BladeOne', 'lib'],
+        'dragonmantank/cron-expression' => ['Cron', 'Cron', 'Arix\\Cron', 'src/Cron'],
     ];
 
     public function import(string $vendor, string $core): array
@@ -268,18 +269,35 @@ class Source
         }
 
         if ($from !== null && str_ends_with($source, '.php')) {
-            $replacements = [$from => $to];
-            $escaped = str_replace('\\', '\\\\', $from);
-
-            if ($escaped !== $from) {
-                $replacements[$escaped] = str_replace('\\', '\\\\', $to);
-            }
-
-            // One pass: FastRoute is also a substring of Arix\FastRoute.
-            $content = strtr($content, $replacements);
+            $content = $this->relocate($content, $from, $to);
         }
 
         $this->write($destination, $content);
+    }
+
+    /**
+     * Rewrite a namespace token, but only where it is a namespace reference.
+     *
+     * A flat replacement is unsafe when a class name starts with the namespace
+     * token, as "CronExpression" does for the "Cron" namespace.
+     */
+    private function relocate(string $content, string $from, string $to): string
+    {
+        $escaped = str_replace('\\', '\\\\', $from);
+
+        if ($escaped !== $from) {
+            $content = preg_replace_callback(
+                '/' . preg_quote($escaped, '/') . '(?![A-Za-z0-9_])/',
+                static fn (): string => str_replace('\\', '\\\\', $to),
+                $content
+            ) ?? $content;
+        }
+
+        return preg_replace_callback(
+            '/' . preg_quote($from, '/') . '(?![A-Za-z0-9_])/',
+            static fn (): string => $to,
+            $content
+        ) ?? $content;
     }
 
     private function write(string $file, string $content): void
