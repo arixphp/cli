@@ -3,7 +3,8 @@
     "exclude": [
         "core/HttpFoundation",
         "core/FastRoute",
-        "core/BladeOne"
+        "core/BladeOne",
+        "core/Cron"
     ],
     "rules": {
         "new_with_parentheses": true,
