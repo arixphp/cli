@@ -299,8 +299,110 @@ class CoreUpdaterTest extends TestCase
         $this->assertSame([], glob($this->fixture->path('application/.core-stage-*')));
     }
 
+    #[Test]
+    public function it_keeps_only_the_new_backup_after_consecutive_updates(): void
+    {
+        $updater = new CoreUpdater();
+        $oldBackup = $updater->update($this->application, $this->distribution, $this->previousId);
+
+        foreach (['second', 'third'] as $version) {
+            $previousId = new CoreInspector()->installedManifest($this->fixture->path('application/core'))['id'];
+            $source = $this->fixture->core('next-source', ['New.php' => "<?php // {$version}"]);
+            CoreDistribution::build($source, $this->fixture->path('next.bundle'));
+            $distribution = CoreDistribution::load($this->fixture->path('next.bundle'));
+            $backup = $updater->update($this->application, $distribution, $previousId);
+
+            $this->assertDirectoryDoesNotExist($oldBackup);
+            $this->assertSame([$backup], glob($this->fixture->path('application/.core-backup-*')));
+            $this->assertSame($previousId, new CoreInspector()->installedManifest($backup)['id']);
+            $this->assertSame($distribution->manifest['id'], new CoreInspector()->installedManifest($this->fixture->path('application/core'))['id']);
+            $oldBackup = $backup;
+        }
+    }
+
+    #[Test]
+    #[DataProvider('unsafeBackups')]
+    public function it_preserves_unsafe_old_backups_and_reports_a_warning(string $kind): void
+    {
+        $this->fixture->installed('historical');
+        $relative = 'application/.core-backup-' . str_repeat('a', 24);
+        $path = $this->fixture->path($relative);
+        rename($this->fixture->path('historical/core'), $path);
+
+        if ($kind === 'modified') {
+            $this->fixture->write("{$relative}/autoload.php", '<?php // local edit');
+        } elseif ($kind === 'extra-file') {
+            $this->fixture->write("{$relative}/notes.txt", 'user work');
+        } elseif ($kind === 'extra-directory') {
+            mkdir($path . DIRECTORY_SEPARATOR . 'notes');
+        } elseif ($kind === 'missing-manifest') {
+            unlink($path . DIRECTORY_SEPARATOR . 'distribution.json');
+        } else {
+            $target = $kind === 'root-link' ? $path : $path . DIRECTORY_SEPARATOR . 'linked';
+
+            if ($kind === 'root-link') {
+                rename($path, $this->fixture->path('saved-core'));
+            }
+
+            if (! @symlink($this->fixture->path('historical'), $target)) {
+                $this->markTestSkipped('Symbolic links are unavailable.');
+            }
+        }
+
+        $updater = new CoreUpdater();
+        $backup = $updater->update($this->application, $this->distribution, $this->previousId);
+
+        $this->assertDirectoryExists($path);
+        $this->assertFileExists($this->fixture->path('historical/index.php'));
+        $this->assertSame($this->previousId, new CoreInspector()->installedManifest($backup)['id']);
+        $this->assertCount(1, $updater->cleanupWarnings());
+        $this->assertStringContainsString($path, $updater->cleanupWarnings()[0]);
+        $this->assertSame($this->distribution->manifest['id'], new CoreInspector()->installedManifest($this->fixture->path('application/core'))['id']);
+    }
+
+    public static function unsafeBackups(): array
+    {
+
+        return [['modified'], ['extra-file'], ['extra-directory'], ['missing-manifest'], ['root-link'], ['nested-link']];
+    }
+
+    #[Test]
+    public function it_does_not_prune_backups_when_an_update_requires_recovery(): void
+    {
+        $this->fixture->installed('historical');
+        $path = $this->fixture->path('application/.core-backup-' . str_repeat('b', 24));
+        rename($this->fixture->path('historical/core'), $path);
+        $this->fixture->write('application/.core-update.json', '{"state":"verifying"}');
+
+        try {
+            new CoreUpdater()->update($this->application, $this->distribution, $this->previousId);
+            $this->fail('Pending recovery was ignored.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('recovery', $exception->getMessage());
+        }
+
+        $this->assertDirectoryExists($path);
+        $this->assertFileExists($this->fixture->path('application/.core-update.json'));
+    }
+
+    #[Test]
+    public function it_does_not_delete_directories_with_unrecognized_backup_names(): void
+    {
+        $this->fixture->installed('historical');
+        $path = $this->fixture->path('application/.core-backup-my-files');
+        rename($this->fixture->path('historical/core'), $path);
+        new CoreUpdater()->update($this->application, $this->distribution, $this->previousId);
+
+        $this->assertDirectoryExists($path);
+    }
+
     private function assertRestoredAfterFailure(CoreUpdater $updater, string $message): void
     {
+        $this->fixture->installed('historical');
+        $oldBackup = $this->fixture->path('application/.core-backup-' . str_repeat('c', 24));
+        rename($this->fixture->path('historical/core'), $oldBackup);
+        $oldId = new CoreInspector()->installedManifest($oldBackup)['id'];
+
         try {
             $updater->update($this->application, $this->distribution, $this->previousId);
             $this->fail('Simulated failure was ignored.');
@@ -311,5 +413,6 @@ class CoreUpdaterTest extends TestCase
         $this->assertSame($this->previousId, new CoreInspector()->installedManifest($this->fixture->path('application/core'))['id']);
         $this->assertFileDoesNotExist($this->fixture->path('application/.core-update.json'));
         $this->assertSame([], glob($this->fixture->path('application/.core-stage-*')));
+        $this->assertSame($oldId, new CoreInspector()->installedManifest($oldBackup)['id']);
     }
 }

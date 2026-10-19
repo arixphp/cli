@@ -6,7 +6,9 @@ namespace Tests\Feature;
 
 use App\Core\Update\CoreDistribution;
 use App\Core\Update\CoreInspector;
+use App\Core\Update\CoreUpdater;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\Support\CoreUpdateFixture;
 use Tests\TestCase;
 
@@ -34,6 +36,9 @@ class CoreUpdateCommandTest extends TestCase
     #[Test]
     public function it_previews_without_creating_locks_or_staging(): void
     {
+        $this->fixture->installed('historical');
+        $backup = $this->fixture->path('application/.core-backup-' . str_repeat('a', 24));
+        rename($this->fixture->path('historical/core'), $backup);
         $this->artisan('core:update', ['--path' => $this->application, '--dry-run' => true])
             ->expectsOutputToContain('New.php')
             ->expectsOutputToContain('.htaccess')
@@ -46,6 +51,7 @@ class CoreUpdateCommandTest extends TestCase
         $this->assertFileDoesNotExist($this->fixture->path('application/core/stubs/error.html'));
         $this->assertFileDoesNotExist($this->fixture->path('application/.core-update.lock'));
         $this->assertSame([], glob($this->fixture->path('application/.core-stage-*')));
+        $this->assertDirectoryExists($backup);
     }
 
     #[Test]
@@ -108,5 +114,30 @@ class CoreUpdateCommandTest extends TestCase
             ->assertExitCode(2);
 
         $this->assertFileDoesNotExist($this->fixture->path('application/.core-update.lock'));
+    }
+
+    #[Test]
+    public function it_warns_without_rolling_back_when_old_backup_deletion_fails(): void
+    {
+        $this->fixture->installed('historical');
+        $path = $this->fixture->path('application/.core-backup-' . str_repeat('a', 24));
+        rename($this->fixture->path('historical/core'), $path);
+        $this->app->instance(CoreUpdater::class, new class() extends CoreUpdater
+        {
+            protected function removeTree(string $path): void
+            {
+                throw new RuntimeException('Simulated backup deletion failure.');
+            }
+        });
+
+        $this->artisan('core:update', ['--path' => $this->application, '--yes' => true])
+            ->expectsOutputToContain('Backup retained')
+            ->expectsOutputToContain('Simulated backup deletion failure')
+            ->assertExitCode(0);
+
+        $this->assertDirectoryExists($path);
+        $this->assertCount(2, glob($this->fixture->path('application/.core-backup-*')));
+        $this->assertSame($this->app->make(CoreDistribution::class)->manifest['id'], new CoreInspector()->installedManifest($this->fixture->path('application/core'))['id']);
+        $this->assertFileDoesNotExist($this->fixture->path('application/.core-update.json'));
     }
 }

@@ -97,6 +97,10 @@ class Update extends Command
             $this->line("Backup retained: {$backup}");
         }
 
+        foreach ($updater->cleanupWarnings() as $warning) {
+            $this->warn($warning);
+        }
+
         return self::SUCCESS;
     }
 }
