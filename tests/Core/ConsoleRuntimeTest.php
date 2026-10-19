@@ -43,6 +43,28 @@ class ConsoleRuntimeTest extends TestCase
         $this->assertSame(0, (new ConsoleRuntime())->run($root));
     }
 
+    #[Test]
+    public function it_reports_task_failures_on_standard_error(): void
+    {
+        $root = $this->application([
+            'broken' => 'static function (): void { throw new \RuntimeException("boom"); }',
+        ]);
+        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $script = $root . DIRECTORY_SEPARATOR . 'cron.php';
+
+        file_put_contents($script, "<?php\n\nrequire '{$autoload}';\n\nexit((new \\Arix\\Runtime\\ConsoleRuntime())->run('{$root}'));\n");
+
+        $process = proc_open([PHP_BINARY, $script], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $output = stream_get_contents($pipes[1]);
+        $errors = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        $this->assertSame(1, proc_close($process), $output . $errors);
+        $this->assertStringContainsString('failed: boom', $output);
+        $this->assertStringContainsString('failed: boom', $errors);
+    }
+
     /**
      * @param  array<string, string>  $events
      */
