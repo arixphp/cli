@@ -261,6 +261,7 @@ jobs:
             exit 1
           fi
           export GH_TOKEN="$HOMEBREW_TAP_TOKEN"
+          gh auth setup-git --hostname github.com
           rm -rf tap
           gh repo clone arixphp/homebrew-tap tap
           php .github/tap/run.php tap "$RELEASE_VERSION" dist
