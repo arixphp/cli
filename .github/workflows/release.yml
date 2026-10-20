@@ -108,6 +108,7 @@ jobs:
           composer install --working-dir="$copy" --no-dev --no-scripts --no-interaction --prefer-dist --no-progress
           (
             cd "$copy"
+            php arix core:package --check
             php arix app:build arix.phar --build-version="$RELEASE_VERSION" --no-interaction
             php arix core:package --check
           )
