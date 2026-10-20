@@ -38,7 +38,7 @@ class PackagedReleaseTest extends TestCase
 
         try {
             $lock = json_decode(file_get_contents(dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'composer.lock'), true, flags: JSON_THROW_ON_ERROR);
-            $extensions = ['mbstring'];
+            $extensions = ['mbstring', 'curl', 'zip'];
 
             foreach ($lock['packages'] as $package) {
                 foreach ($package['require'] ?? [] as $requirement => $constraint) {

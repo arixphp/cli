@@ -34,6 +34,39 @@ The official documentation is available at
 
 ## Documentation
 
+### Updating an application's core
+
+```sh
+# Default: use the installed CLI's embedded bundle, without internet:
+arix core:update --dry-run
+arix core:update
+
+# Explicitly download the latest stable core from arixphp/cli on GitHub:
+arix core:update --online --dry-run
+arix core:update --online
+```
+
+Both methods require a compatible, managed application and maintenance during
+replacement. Online errors never silently switch sources: omit `--online` for
+the offline fallback, or update the CLI through your usual installer and use its
+new embedded bundle. Neither command updates the CLI executable itself. See
+the command help for `--path`, `--dry-run` and noninteractive `--yes` options.
+
+Online mode trusts the official GitHub repository over HTTPS, pins the latest
+stable release to a commit, and validates the bundle's manifest and SHA-256
+inventory before replacement. It requires ext-curl, ext-zip, trusted CA
+certificates and writable temporary storage. It reads only `resources/core.bundle`
+from the source ZIP and does not execute downloaded repository code. Hashes detect
+corruption, not malicious changes by someone controlling the official repository.
+
+Stop and drain HTTP traffic before confirming either mode. The command rejects
+unmanaged or locally modified cores, retains a verified previous-core backup, and
+attempts rollback on installation failure. Keep any journal/stage/backup paths
+reported by a recovery error. Refresh application caches and OPcache and verify
+HTTP health before restoring traffic; the CLI verifies file integrity, not live
+application health. Maintainers must commit a fresh `resources/core.bundle`
+before tagging a release; CI checks its freshness before building.
+
 ### Installing the distributed CLI
 
 #### With a package manager (recommended)

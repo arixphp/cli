@@ -8,8 +8,10 @@ use App\Core\Update\ApplicationTarget;
 use App\Core\Update\CoreDistribution;
 use App\Core\Update\CoreInspector;
 use App\Core\Update\CoreUpdater;
+use App\Core\Update\GitHubCoreDistribution;
 use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 use function count;
 use function is_string;
@@ -18,6 +20,7 @@ class Update extends Command
 {
     protected $signature = 'core:update
         {--path= : Application root, relative to the invocation directory or absolute}
+        {--online : Download the core bundle from the latest stable arixphp/cli GitHub release}
         {--dry-run : Validate and preview changes without writing files}
         {--yes : Confirm an offline update without an interactive prompt}';
 
@@ -35,15 +38,29 @@ class Update extends Command
             $option = $this->option('path');
             $source = str_starts_with(base_path(), 'phar://') ? null : base_path('core');
             $application = ApplicationTarget::resolve(is_string($option) ? $option : null, $cwd, $source);
-            $distribution = $this->laravel->make(CoreDistribution::class);
+            $origin = 'embedded';
+
+            if ($this->option('online')) {
+                $remote = $this->laravel->make(GitHubCoreDistribution::class)->latest();
+                $distribution = $remote->distribution;
+                $origin = "GitHub arixphp/cli release {$remote->version} (commit {$remote->commit})";
+            } else {
+                $distribution = $this->laravel->make(CoreDistribution::class);
+            }
+
             $preview = $inspector->inspect($application, $distribution);
         } catch (RuntimeException $exception) {
-            $this->error($exception->getMessage());
+            $this->error(OutputFormatter::escape($exception->getMessage()));
+
+            if ($this->option('online')) {
+                $this->line('To use the embedded core instead, rerun core:update without --online. No automatic fallback was performed.');
+            }
 
             return self::INVALID;
         }
 
         $this->line("Application: {$application}");
+        $this->line("Source: {$origin}");
         $this->line("Distribution: {$distribution->manifest['id']}");
 
         foreach (['added', 'modified', 'removed'] as $kind) {
