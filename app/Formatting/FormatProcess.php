@@ -9,7 +9,7 @@ use Symfony\Component\Process\Process;
 class FormatProcess
 {
     /**
-     * @param callable(string, string): void $output
+     * @param  callable(string, string): void  $output
      */
     public function run(
         string $application,
