@@ -15,13 +15,13 @@ frontend build steps, and requires PHP 8.4.1+ with `ext-mbstring`.
 
 The deployable application skeleton ([arixphp/app](https://github.com/arixphp/app))
 and this CLI evolve together, but they are
-separate repositories with separate verification. Do not copy `cli/core/` into
+separate repositories with separate verification. Do not copy this repository's `core/` into
 an application's `core/` manually; a future `update` command will own that
 migration once its integration is implemented and verified.
 
 ## Local development
 
-Run `arix dev` from your application or `arix dev --path=../site`.
+Run `arix dev` from your application or `arix dev --path=/path/to/application`.
 The managed FrankenPHP server defaults to `http://127.0.0.1:8181`, with
 port fallback and optional browser live reload. See
 [development server](docs/development-server.md) and
@@ -177,7 +177,7 @@ The user rules file, `.arix-format.json`, is a hidden file (leading dot) and is
 denied by the existing server access rules in `.htaccess`, `Caddyfile` and
 `web.config` without needing server-level changes.
 
-Example `arix/.arix-format.json`:
+Example `.arix-format.json` at the application root:
 
 ```json
 {
@@ -206,12 +206,17 @@ arix tests
 arix tests --path=/path/to/application
 
 # From this source repository:
-php arix tests --path=../arix
+php arix tests --path=/path/to/application
 
 # CLI and standalone framework verification remains separate:
 ./vendor/bin/pest
 ./vendor/bin/pint --test
 ```
+
+Replace `/path/to/application` with the actual absolute application-root path.
+The application and CLI repositories can be located independently; no sibling
+directory layout or checkout name is required. Repository-local commands and
+paths in this README are relative to the CLI repository's root.
 
 Application `phpunit.xml` declares the suite and its `tests/autoload.php`
 bootstrap. Application tests use Pest syntax and cover `app/` only. Framework

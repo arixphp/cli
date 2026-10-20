@@ -4,23 +4,27 @@ Development and distribution tooling for Arix. This repository uses Laravel Zero
 and Composer during development, and builds a standalone framework core that can
 run on traditional PHP hosting without Composer or a frontend build.
 
-The workspace-level rules in `../AGENTS.md` also apply. This file is authoritative
-for work inside `cli/`.
+This file is authoritative for work inside this repository. Apply any enclosing
+workspace instructions when present; do not assume a particular checkout name or
+location. Paths below are relative to this repository's root unless stated otherwise.
 
 ## Product boundary
 
-`cli/` is the development tool for the deployable application in `../arix/`. Its
+This repository is the development tool for deployable Arix applications. Its
 responsibilities include creating and maintaining Arix applications, generating
 application code from stubs, testing framework components, importing approved
 upstream packages, and eventually updating an application's managed `core/`.
 
-The replacement core is still being integrated. Do not copy `cli/core/` into
-`arix/core/`, implement an ad hoc deployment, or claim update compatibility unless
+The replacement core is still being integrated. Do not copy this repository's
+`core/` into an application's `core/`, implement an ad hoc deployment, or claim update compatibility unless
 the task explicitly covers the complete migration and its verification. Use
-`../arix/` as an architectural reference only; do not modify it from a CLI task
-unless the user explicitly requests a cross-project change.
+the application skeleton ([arixphp/app](https://github.com/arixphp/app)) as an
+architectural reference only; do not modify an application from a CLI task unless
+the user explicitly requests a cross-project change. Locate any local application
+checkout explicitly rather than assuming it is a sibling directory.
 
-`../clix/` is out of scope. Do not read or modify it.
+The legacy `clix` project is out of scope, regardless of its location. Do not read
+or modify it.
 
 ## Project layout
 
@@ -38,7 +42,7 @@ unless the user explicitly requests a cross-project change.
   skeleton. The skeleton repository keeps the same base text plus its own
   repository-specific section; keep both copies in sync.
 - `vendor/` supplies CLI dependencies, including Pest as a runtime dependency;
-  it must never be copied into `../arix/` or standalone core.
+  it must never be copied into an application or standalone core.
 - `app/Testing/` launches isolated application tests, including the standalone
   worker entry and Pest adapter. Production uses a PHPacker
   executable with embedded PHP and an intermediate PHAR. Packaged workers extract
@@ -113,7 +117,7 @@ compatibility aliases or duplicate declarations.
 
 ## Commands
 
-Run every command from the `cli/` directory.
+Run every command from this repository's root.
 
 - Full test suite: `./vendor/bin/pest`
 - Core suite: `./vendor/bin/pest --testsuite=Core`
@@ -124,8 +128,11 @@ Run every command from the `cli/` directory.
 - Rebuild the optimized development autoloader after class or namespace moves:
   `composer dump-autoload --no-scripts`
 - Run the development CLI: `php arix` or `./arix`
-- Application tests: `php arix tests --path=../arix` from this directory, or
+- Application tests: `php arix tests --path=/path/to/application` from this repository's root, or
   installed `arix tests` from the application's root.
+
+Replace `/path/to/application` with the actual absolute application-root path;
+the application and CLI repositories need not share a parent directory.
 
 There are no project Composer scripts or PHPStan/Psalm configurations. GitHub
 Actions run the full suite on Linux, macOS and Windows, Pint, and pinned
@@ -189,7 +196,12 @@ in scope and validate the working tree first.
 - Use `DIRECTORY_SEPARATOR` for filesystem paths.
 - Add a blank line before each `return` statement.
 - Separate conditional structures with a blank line.
-- Explicitly import the special functions listed in `../AGENTS.md` when used.
+- Explicitly import these functions when used: `array_key_exists`, `array_slice`,
+  `boolval`, `call_user_func`, `call_user_func_array`, `chr`, `count`, `defined`,
+  `doubleval`, `floatval`, `func_get_args`, `func_num_args`, `get_called_class`,
+  `get_class`, `gettype`, `in_array`, `intval`, `is_array`, `is_bool`, `is_double`,
+  `is_float`, `is_int`, `is_integer`, `is_long`, `is_null`, `is_object`,
+  `is_resource`, `is_scalar`, `is_string`, `ord`, `sizeof`, `strlen`, `strval`.
 - Follow `pint.json` for handwritten PHP. It excludes imported HttpFoundation and
   FastRoute sources; do not expand formatting into managed upstream code.
 - Preserve public method signatures and documented behavior unless the requested
@@ -224,5 +236,5 @@ worktrees unless explicitly requested. Do not remove import locks, manifests,
 staging directories, or rollback backups without first establishing why they
 exist and whether recovery still depends on them.
 
-After implementation, review the scoped diff and confirm that neither `../arix/`
-nor `../clix/` was modified unless the task explicitly authorized it.
+After implementation, review the scoped diff and confirm that no application or
+other repository was modified unless the task explicitly authorized it.
