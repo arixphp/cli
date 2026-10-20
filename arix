@@ -5,6 +5,13 @@ declare(strict_types=1);
 
 if (($_SERVER['argv'][1] ?? null) === '--arix-tests-worker') {
     require __DIR__ . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Testing' . DIRECTORY_SEPARATOR . 'worker.php';
+
+    exit($status);
+}
+
+if (($_SERVER['argv'][1] ?? null) === '--arix-format-worker') {
+    require __DIR__ . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Formatting' . DIRECTORY_SEPARATOR . 'worker.php';
+
     exit($status);
 }
 

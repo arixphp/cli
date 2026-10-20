@@ -163,8 +163,15 @@ supports only `version` and `rules`; directory keys such as `paths` are
 rejected. The CLI decides which directories to format (`app` and `tests`,
 excluding `app/views`), not the configuration file.
 
-Pint is a development dependency of the CLI and is not part of a deployed Arix
-application. The command requires `vendor/bin/pint` to be available.
+Pint is a runtime dependency of the CLI, not of a deployed Arix application.
+Composer installations include it even with `--no-dev`. The published native
+executable bundles Pint and PHP; formatting does not require a separate PHP,
+Composer, or Pint installation on the target machine.
+
+Formatting runs in an isolated worker so Pint's framework does not conflict with
+the CLI's. Packaged workers extract only Pint's self-contained archive into a
+private temporary directory and remove it on shutdown. No application `vendor/`
+directory is created. The intermediate PHAR still requires PHP to launch it.
 
 The user rules file, `.arix-format.json`, is a hidden file (leading dot) and is
 denied by the existing server access rules in `.htaccess`, `Caddyfile` and

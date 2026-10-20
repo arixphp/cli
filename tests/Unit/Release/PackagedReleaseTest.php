@@ -88,4 +88,93 @@ PHP);
         Release::reportedVersion($process->getOutput(), $version);
         $this->addToAssertionCount(1);
     }
+
+    #[Test]
+    public function it_checks_and_fixes_packaged_application_code_without_system_php(): void
+    {
+        $fixture = new ApplicationTestingFixture();
+
+        try {
+            if (! $this->native) {
+                $pint = 'phar://' . $this->binary . '/vendor/laravel/pint/builds/pint';
+                $this->assertFileExists($pint);
+                $this->assertGreaterThan(0, filesize($pint));
+            }
+
+            $code = "<?php\ndeclare(strict_types=1);\nclass Controller{public function index(){return 1;}}\n";
+            $fixture->write('app/Controller.php', $code);
+            $this->runFormat($fixture, ['--test'], 1);
+            $this->assertSame($code, file_get_contents($fixture->path('app/Controller.php')));
+            $this->runFormat($fixture, [], 0);
+            $formatted = file_get_contents($fixture->path('app/Controller.php'));
+            $this->assertNotSame($code, $formatted);
+            $this->runFormat($fixture, ['--test'], 0);
+            $this->assertSame($formatted, file_get_contents($fixture->path('app/Controller.php')));
+            $this->assertDirectoryDoesNotExist($fixture->path('vendor'));
+            $this->assertSame([], glob($fixture->path('temporary files/arix-format-runtime-*')));
+            $this->assertSame([], glob($fixture->path('arix-format-*')));
+        } finally {
+            $fixture->cleanup();
+        }
+    }
+
+    #[Test]
+    public function it_respects_packaged_format_rules_and_exclusions(): void
+    {
+        $fixture = new ApplicationTestingFixture();
+
+        try {
+            $fixture->write('.arix-format.json', '{"rules":{"no_unused_imports":false}}');
+            $fixture->write('app/Controller.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace App;
+use RuntimeException;
+class Controller {}
+PHP);
+            $this->runFormat($fixture, [], 0);
+            $code = "<?php\ndeclare(strict_types=1);\necho( 'excluded' );\n";
+            $fixture->write('app/views/Layout.arix.php', $code);
+            $fixture->write('core/Excluded.php', $code);
+            $fixture->write('outside.php', $code);
+            $contents = file_get_contents($fixture->path('app/Controller.php'));
+            $this->assertStringContainsString('use RuntimeException;', $contents);
+            $this->runFormat($fixture, ['--test'], 0);
+            $fixture->write('custom rules.json', '{"rules":{"no_unused_imports":true}}');
+            $this->runFormat($fixture, ['--test', '--config=' . $fixture->path('custom rules.json')], 1);
+            $this->assertSame($contents, file_get_contents($fixture->path('app/Controller.php')));
+
+            foreach (['app/views/Layout.arix.php', 'core/Excluded.php', 'outside.php'] as $relative) {
+                $this->assertSame($code, file_get_contents($fixture->path($relative)));
+            }
+
+            $arguments = $this->native ? [$this->binary] : [PHP_BINARY, $this->binary];
+            $invalid = new Process([...$arguments, 'format', '--test', '--path=' . $fixture->path('missing')], env: ['PATH' => '', 'XDEBUG_MODE' => 'off']);
+            $invalid->run();
+            $this->assertSame(2, $invalid->getExitCode(), $invalid->getOutput() . $invalid->getErrorOutput());
+        } finally {
+            $fixture->cleanup();
+        }
+    }
+
+    private function runFormat(ApplicationTestingFixture $fixture, array $options, int $expected): void
+    {
+        $temporary = $fixture->path('temporary files');
+
+        if (! is_dir($temporary)) {
+            mkdir($temporary, 0700);
+        }
+
+        $arguments = $this->native ? [$this->binary] : [PHP_BINARY, $this->binary];
+        $process = new Process([...$arguments, 'format', '--path=' . $fixture->root, '--no-ansi', ...$options], dirname(__DIR__, 3), [
+            'PATH' => '',
+            'XDEBUG_MODE' => 'off',
+            'TMPDIR' => $temporary,
+            'TMP' => $temporary,
+            'TEMP' => $temporary,
+        ]);
+        $process->setTimeout(120);
+        $process->run();
+        $this->assertSame($expected, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+    }
 }
