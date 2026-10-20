@@ -31,7 +31,7 @@ class Format extends Command
 
             $path = $this->option('path');
             $config = $this->option('config');
-            $output = $this->output;
+            $output = $this->output->getOutput();
 
             if (! $output instanceof OutputInterface) {
                 throw new RuntimeException('Console output is unavailable.');

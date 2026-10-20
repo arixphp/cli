@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Commands\Format;
+use App\Formatting\FormatProcess;
 use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Finder\Finder;
+use Symfony\Component\Process\Process;
 use Tests\Support\ApplicationTestingFixture;
 use Tests\TestCase;
 
@@ -187,5 +191,47 @@ PHP);
         }
 
         return $contents;
+    }
+
+    #[Test]
+    public function it_fixes_real_php_code_and_then_passes_check_mode(): void
+    {
+        $code = "<?php\ndeclare(strict_types=1);\nclass Controller{public function index(){return 1;}}\n";
+        $this->fixture->write('app/Controller.php', $code);
+
+        $this->artisan('format', ['--path' => $this->fixture->root, '--test' => true])
+            ->assertExitCode(1);
+
+        $this->assertSame($code, file_get_contents($this->fixture->path('app/Controller.php')));
+
+        $this->artisan('format', ['--path' => $this->fixture->root])
+            ->assertExitCode(0);
+
+        $this->assertNotSame($code, file_get_contents($this->fixture->path('app/Controller.php')));
+
+        $this->artisan('format', ['--path' => $this->fixture->root, '--test' => true])
+            ->assertExitCode(0);
+    }
+
+    #[Test]
+    public function it_preserves_format_worker_output_channels(): void
+    {
+        $this->app->instance(FormatProcess::class, new class() extends FormatProcess
+        {
+            public function run(string $application, string $entry, string $config, bool $test, callable $output, bool $selfExecutable = false): int
+            {
+                $output(Process::OUT, 'format stdout');
+                $output(Process::ERR, 'format stderr');
+
+                return 7;
+            }
+        });
+        $command = $this->app->make(Format::class);
+        $command->setLaravel($this->app);
+        $tester = new CommandTester($command);
+        $status = $tester->execute(['--path' => $this->fixture->root], ['capture_stderr_separately' => true]);
+        $this->assertSame(7, $status);
+        $this->assertSame('format stdout', $tester->getDisplay());
+        $this->assertSame('format stderr', $tester->getErrorOutput());
     }
 }

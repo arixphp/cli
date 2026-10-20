@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Formatting;
 
 use App\Testing\ApplicationTarget;
+use Phar;
 use RuntimeException;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Process\ConsoleOutputInterface;
 use Symfony\Component\Process\Process;
 
 use function in_array;
@@ -19,6 +20,8 @@ use function is_readable;
 class Formatter
 {
     private const array ALLOWED_CONFIG_KEYS = ['version', 'rules'];
+
+    public function __construct(private readonly FormatProcess $runner) {}
 
     public function format(string|null $path, string|null $config, string $cwd, OutputInterface $output, bool $test = false): int
     {
@@ -38,26 +41,13 @@ class Formatter
         $tempConfig = $this->buildTempConfig($application, $rules);
 
         try {
-            $pint = base_path('vendor' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'pint');
-
-            if (! is_file($pint) || ! is_readable($pint)) {
-                throw new RuntimeException('Pint is not available in the CLI installation.');
-            }
-
+            $selfExecutable = PHP_SAPI === 'micro';
+            $entry = $selfExecutable ? micro_get_self_filename() : (Phar::running(false) ?: base_path('arix'));
             $stderr = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
 
-            $arguments = [PHP_BINARY, $pint, '--config=' . $tempConfig, '--no-ansi'];
-
-            if ($test) {
-                $arguments[] = '--test';
-            }
-
-            $process = new Process($arguments, $application);
-            $process->run(static function (string $type, string $buffer) use ($stderr): void {
-                $stderr->write($buffer, false);
-            });
-
-            return $process->getExitCode();
+            return $this->runner->run($application, $entry, $tempConfig, $test, static function (string $type, string $buffer) use ($output, $stderr): void {
+                ($type === Process::ERR ? $stderr : $output)->write($buffer, false);
+            }, $selfExecutable);
         } finally {
             if ($tempConfig !== null && is_file($tempConfig)) {
                 unlink($tempConfig);
