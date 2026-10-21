@@ -11,6 +11,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
+use Tests\Support\NativeLink;
 
 class RuntimePathsTest extends TestCase
 {
@@ -45,12 +46,12 @@ class RuntimePathsTest extends TestCase
 
     #[Test]
     #[DataProvider('internalLinks')]
-    public function it_rejects_internal_links_before_resolving_their_destinations(string $link, string $target, array $segments): void
+    public function it_rejects_internal_links_before_resolving_their_destinations(string $link, string $target, array $segments, bool $directory): void
     {
         $release = $this->directory . DIRECTORY_SEPARATOR . 'release';
         $link = $release . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $link);
         $target = $this->directory . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $target);
-        symlink($target, $link);
+        NativeLink::create($target, $link, $directory);
         $paths = RuntimePaths::fromApplicationRoot($release);
         $this->expectException(RuntimeException::class);
 
@@ -61,11 +62,11 @@ class RuntimePathsTest extends TestCase
     {
 
         return [
-            'same-root file' => ['app/Controllers/Linked.php', 'release/app/Controllers/Home.php', ['app', 'Controllers', 'Linked.php']],
-            'same-root directory' => ['app/Alias', 'release/app/Controllers', ['app', 'Alias', 'Home.php']],
-            'outside root directory' => ['app/Outside', '.', ['app', 'Outside', 'release', 'app', 'Controllers', 'Home.php']],
-            'broken optional file' => ['app/services.php', 'missing.php', ['app', 'services.php']],
-            'linked app directory' => ['linkedApp', 'release/app', ['linkedApp', 'Controllers', 'Home.php']],
+            'same-root file' => ['app/Controllers/Linked.php', 'release/app/Controllers/Home.php', ['app', 'Controllers', 'Linked.php'], false],
+            'same-root directory' => ['app/Alias', 'release/app/Controllers', ['app', 'Alias', 'Home.php'], true],
+            'outside root directory' => ['app/Outside', '.', ['app', 'Outside', 'release', 'app', 'Controllers', 'Home.php'], true],
+            'broken optional file' => ['app/services.php', 'missing.php', ['app', 'services.php'], false],
+            'linked app directory' => ['linkedApp', 'release/app', ['linkedApp', 'Controllers', 'Home.php'], true],
         ];
     }
 
@@ -139,12 +140,54 @@ class RuntimePathsTest extends TestCase
         $link = $this->directory . DIRECTORY_SEPARATOR . 'release' . DIRECTORY_SEPARATOR . 'redirect';
         $target = $this->directory . DIRECTORY_SEPARATOR . 'outside';
         mkdir($target);
+        $this->createJunction($link, $target);
+
+        try {
+            $paths = RuntimePaths::fromApplicationRoot($this->directory . DIRECTORY_SEPARATOR . 'release');
+            $this->expectException(RuntimeException::class);
+            $paths->resolve(['redirect']);
+        } finally {
+            $this->removeJunction($link);
+        }
+    }
+
+    #[Test]
+    public function it_rejects_a_native_windows_junction_as_a_strict_root_ancestor(): void
+    {
+
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('Requires native Windows junction semantics; not verified on this platform.');
+        }
+
+        $alias = $this->directory . DIRECTORY_SEPARATOR . 'alias';
+        $release = $this->directory . DIRECTORY_SEPARATOR . 'release';
+        $this->createJunction($alias, $release);
+
+        try {
+            $this->assertSame($release, RuntimePaths::fromApplicationRoot($alias)->root);
+            $this->expectException(RuntimeException::class);
+            RuntimePaths::fromStrictRoot($alias . DIRECTORY_SEPARATOR . 'app');
+        } finally {
+            $this->removeJunction($alias);
+        }
+    }
+
+    private function createJunction(string $link, string $target): void
+    {
         $process = new Process(['cmd.exe', '/c', 'mklink', '/J', $link, $target]);
         $process->run();
         $this->assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
-        $paths = RuntimePaths::fromApplicationRoot($this->directory . DIRECTORY_SEPARATOR . 'release');
-        $this->expectException(RuntimeException::class);
-        $paths->resolve(['redirect']);
+        clearstatcache(true, $link);
+        $this->assertTrue(is_dir($link));
+    }
+
+    private function removeJunction(string $link): void
+    {
+        clearstatcache(true, $link);
+
+        if (is_dir($link) && ! is_link($link)) {
+            @rmdir($link);
+        }
     }
 
     #[Test]

@@ -35,7 +35,7 @@ class MiddlewareTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'arix-middleware-' . bin2hex(random_bytes(8));
+        $this->directory = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-middleware-' . bin2hex(random_bytes(8));
         mkdir($this->directory, 0755, true);
     }
 

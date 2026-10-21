@@ -20,6 +20,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\NativeLink;
 
 use function strlen;
 
@@ -236,7 +237,7 @@ PHP;
     public function it_rejects_broken_optional_links(string $resource): void
     {
         $this->routes('/', $this->controller('public function show(): Response { return new Response("safe"); }'));
-        symlink($this->root . DIRECTORY_SEPARATOR . 'missing', $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $resource);
+        NativeLink::create($this->root . DIRECTORY_SEPARATOR . 'missing', $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $resource);
         $this->expectException(RuntimeException::class);
         $application = Application::create($this->root);
         $application->schedules(new Schedule());

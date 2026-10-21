@@ -13,6 +13,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Filesystem\Filesystem;
+use Tests\Support\NativeLink;
 
 class LocalizationPathTest extends TestCase
 {
@@ -40,7 +41,7 @@ class LocalizationPathTest extends TestCase
         file_put_contents($payload, '<?php declare(strict_types=1); file_put_contents(' . var_export($marker, true) . ', "yes"); return ["hello" => "unsafe"];');
         $target = $broken ? $this->root . DIRECTORY_SEPARATOR . 'missing' : ($directory ? dirname($payload) : $payload);
         $link = $this->root . DIRECTORY_SEPARATOR . ($directory ? 'linked' : 'lang' . DIRECTORY_SEPARATOR . 'es.php');
-        symlink($target, $link);
+        NativeLink::create($target, $link, $directory);
         $path = $directory ? $link : dirname($link);
         $path .= $trailing ? DIRECTORY_SEPARATOR : '';
 
@@ -73,7 +74,7 @@ class LocalizationPathTest extends TestCase
     public function it_rejects_broken_ancestors_of_optional_resource_directories(string $consumer): void
     {
         $link = $this->root . DIRECTORY_SEPARATOR . 'broken';
-        symlink($this->root . DIRECTORY_SEPARATOR . 'missing', $link);
+        NativeLink::create($this->root . DIRECTORY_SEPARATOR . 'missing', $link, true);
         $directory = $link . DIRECTORY_SEPARATOR . 'optional';
         $this->expectException(RuntimeException::class);
 

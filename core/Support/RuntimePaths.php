@@ -41,7 +41,7 @@ class RuntimePaths
         while (true) {
             clearstatcache(true, $ancestor);
 
-            if (is_link($ancestor)) {
+            if (Path::isLink($ancestor)) {
                 throw new RuntimeException('Runtime directory is linked.');
             }
 
@@ -76,7 +76,7 @@ class RuntimePaths
         while (true) {
             clearstatcache(true, $ancestor);
 
-            if (file_exists($ancestor) || is_link($ancestor)) {
+            if (file_exists($ancestor) || Path::isLink($ancestor)) {
                 break;
             }
 
@@ -125,7 +125,7 @@ class RuntimePaths
         self::validateSegments($segments);
         clearstatcache(true, $this->root);
 
-        if (is_link($this->root) || realpath($this->root) !== $this->root) {
+        if (Path::isLink($this->root) || realpath($this->root) !== $this->root) {
             throw new RuntimeException('Application runtime root changed.');
         }
 
@@ -177,7 +177,7 @@ class RuntimePaths
         $path = rtrim($parent, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $segment;
         clearstatcache(true, $path);
 
-        if (is_link($path)) {
+        if (Path::isLink($path)) {
             throw new RuntimeException('Runtime paths are linked.');
         }
 
