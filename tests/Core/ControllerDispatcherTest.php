@@ -21,6 +21,16 @@ use function strlen;
 class ControllerDispatcherTest extends RoutingTestCase
 {
     #[Test]
+    public function it_rejects_a_case_mismatched_controller_base_directory(): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("wrong directory"); }');
+        $directory = dirname($this->directory) . DIRECTORY_SEPARATOR . strtoupper(basename($this->directory));
+        $this->expectException(RuntimeException::class);
+
+        new ControllerDispatcher($directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container());
+    }
+
+    #[Test]
     public function it_loads_only_the_selected_controller_and_resolves_explicit_bindings(): void
     {
         $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("slug"), 201); } public function index(): Response { return new Response("index"); }');

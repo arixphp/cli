@@ -16,6 +16,7 @@ $scenario = $argv[1];
 $root = $argv[3];
 $options = json_decode($argv[4], true, flags: JSON_THROW_ON_ERROR);
 $cache = $root . DIRECTORY_SEPARATOR . 'cache';
+$storageCache = $root . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'cache';
 $views = $root . DIRECTORY_SEPARATOR . 'views';
 
 function check(bool $condition, string $message): void
@@ -48,10 +49,11 @@ switch ($scenario) {
     case 'services':
     case 'services-invalid':
         mkdir($root . DIRECTORY_SEPARATOR . 'lang');
+        mkdir($storageCache, 0700, true);
         file_put_contents($views . DIRECTORY_SEPARATOR . 'page.arix.php', 'Configured');
         $configuration = [
             'app' => ['locales' => ['en'], 'default_locale' => 'en'],
-            'cache' => ['path' => $cache, 'version' => 'custom-version'],
+            'cache' => ['version' => 'custom-version'],
             'views' => $views,
             'lang' => $root . DIRECTORY_SEPARATOR . 'lang',
         ];
@@ -77,7 +79,7 @@ switch ($scenario) {
             $configuration['cache']['templates'] = $options['policy'];
         }
 
-        $old = seedOldCompilations($cache, ($options['policy']['cleanup'] ?? true) ? 100 : 90000);
+        $old = seedOldCompilations($storageCache, ($options['policy']['cleanup'] ?? true) ? 100 : 90000);
         $container = new Container();
         ViewServices::register($container, $root, Request::create('/'), $configuration);
         check($container->get(TemplateEngine::class)->render('page') === 'Configured', 'Configured view failed.');
@@ -85,19 +87,15 @@ switch ($scenario) {
         break;
 
     case 'application':
-        foreach (['config', 'controllers', 'views', 'lang'] as $directory) {
+        foreach (['config', 'Controllers', 'views', 'lang'] as $directory) {
             mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $directory, 0700, true);
         }
 
         mkdir($root . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'app', 0700, true);
+        mkdir($storageCache, 0700, true);
         $app = $root . DIRECTORY_SEPARATOR . 'app';
         file_put_contents($app . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', '<?php declare(strict_types=1); return ["locales" => ["en"], "default_locale" => "en", "debug" => true];');
-        $configuredCache = match ($options['path_form'] ?? 'absolute') {
-            'relative' => 'cache',
-            'forward-slashes' => str_replace('\\', '/', $cache),
-            default => $cache,
-        };
-        $cacheConfig = ['path' => $configuredCache, 'version' => 'application-version', 'templates' => $options['policy']];
+        $cacheConfig = ['version' => 'application-version', 'templates' => $options['policy']];
         file_put_contents($app . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'cache.php', '<?php declare(strict_types=1); return ' . var_export($cacheConfig, true) . ';');
         file_put_contents($app . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'page.arix.php', 'Configured');
         file_put_contents($app . DIRECTORY_SEPARATOR . 'routes.php', <<<'PHP'
@@ -105,7 +103,7 @@ switch ($scenario) {
             declare(strict_types=1);
             Arix\Facades\Route::get('/', [App\Controllers\CacheController::class, 'index']);
             PHP);
-        file_put_contents($app . DIRECTORY_SEPARATOR . 'controllers' . DIRECTORY_SEPARATOR . 'CacheController.php', <<<'PHP'
+        file_put_contents($app . DIRECTORY_SEPARATOR . 'Controllers' . DIRECTORY_SEPARATOR . 'CacheController.php', <<<'PHP'
             <?php
             declare(strict_types=1);
             namespace App\Controllers;
@@ -117,7 +115,7 @@ switch ($scenario) {
                 }
             }
             PHP);
-        $old = seedOldCompilations($cache, ($options['policy']['cleanup'] ?? true) ? 100 : 90000);
+        $old = seedOldCompilations($storageCache, ($options['policy']['cleanup'] ?? true) ? 100 : 90000);
         $kernel = Application::create($root)->kernel();
         $response = $kernel->handle(Request::create('/'));
 
@@ -128,11 +126,34 @@ switch ($scenario) {
 
         check($response->getStatusCode() === 200 && $response->getContent() === 'Configured', 'Application render failed: ' . $response->getContent());
         check(remaining($old) === $options['remaining'], 'Application did not forward the requested collection policy.');
+        check(glob($storageCache . DIRECTORY_SEPARATOR . '*.php') !== [], 'Application did not compile templates into the framework-owned cache.');
+        check(glob($cache . DIRECTORY_SEPARATOR . '*.php') === [], 'Application compiled templates outside the framework-owned cache.');
 
         if ($options['remaining'] === 1) {
-            file_put_contents($cache . DIRECTORY_SEPARATOR . '.templates.lock', (string) (time() - 2));
+            file_put_contents($storageCache . DIRECTORY_SEPARATOR . '.templates.lock', (string) (time() - 2));
             $response = $kernel->handle(Request::create('/'));
             check($response->getStatusCode() === 200 && remaining($old) === 0, 'Application lost custom interval or request isolation.');
+        }
+
+        break;
+    case 'reserved-cache-path':
+        foreach (['config', 'Controllers', 'views', 'lang'] as $directory) {
+            mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $directory, 0700, true);
+        }
+
+        mkdir($root . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'app', 0700, true);
+        mkdir($storageCache, 0700, true);
+        $app = $root . DIRECTORY_SEPARATOR . 'app';
+        file_put_contents($app . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', '<?php declare(strict_types=1); return ["locales" => ["en"], "default_locale" => "en", "debug" => true];');
+        file_put_contents($app . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'cache.php', '<?php declare(strict_types=1); return ["path" => "/var/www/html", "version" => "1"];');
+        file_put_contents($app . DIRECTORY_SEPARATOR . 'routes.php', '<?php declare(strict_types=1);');
+        file_put_contents($app . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'page.arix.php', 'Configured');
+
+        try {
+            Application::create($root)->kernel();
+            throw new RuntimeException('Application accepted a reserved cache path.');
+        } catch (InvalidArgumentException $exception) {
+            check(str_contains($exception->getMessage(), "reserved configuration key 'cache.path'"), 'Unexpected failure: ' . $exception->getMessage());
         }
 
         break;

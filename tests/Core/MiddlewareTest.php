@@ -19,12 +19,23 @@ use TypeError;
 
 class MiddlewareTest extends TestCase
 {
+    #[Test]
+    public function it_rejects_a_case_mismatched_middleware_base_directory(): void
+    {
+        $id = 'CaseRoot' . bin2hex(random_bytes(6));
+        file_put_contents($this->directory . DIRECTORY_SEPARATOR . "{$id}.php", "<?php\ndeclare(strict_types=1);\nnamespace App\\Middleware;\nclass {$id} implements \\Arix\\Contracts\\Middleware { public function handle(\\Arix\\HttpFoundation\\Request \$request, \\Closure \$next): \\Arix\\HttpFoundation\\Response { return \$next(\$request); } }\n");
+        $directory = dirname($this->directory) . DIRECTORY_SEPARATOR . strtoupper(basename($this->directory));
+        $this->expectException(\RuntimeException::class);
+
+        (new MiddlewareResolver($directory))->resolve("App\\Middleware\\{$id}", new Container());
+    }
+
     private string $directory;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'arix-middleware-' . bin2hex(random_bytes(8));
+        $this->directory = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-middleware-' . bin2hex(random_bytes(8));
         mkdir($this->directory, 0755, true);
     }
 

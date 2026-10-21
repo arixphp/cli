@@ -6,6 +6,7 @@ namespace Arix\Http;
 
 use Arix\Container\Container;
 use Arix\Contracts\Middleware;
+use Arix\Support\Path;
 use ReflectionClass;
 use RuntimeException;
 
@@ -63,19 +64,27 @@ class MiddlewareResolver
             throw new RuntimeException('Invalid middleware class.');
         }
 
+        if (! is_dir($this->directory)) {
+            throw new RuntimeException('Middleware file is missing, linked, or has incorrect case.');
+        }
+
+        if (! Path::hasExactCase($this->directory)) {
+            throw new RuntimeException('Middleware directory must match its configured case exactly.');
+        }
+
         $path = $this->directory;
 
         foreach (explode('\\', $relative) as $index => $segment) {
             $name = $index === count(explode('\\', $relative)) - 1 ? "{$segment}.php" : $segment;
 
-            if (is_link($path) || ! in_array($name, scandir($path) ?: [], true)) {
+            if (Path::isLink($path) || ! in_array($name, scandir($path) ?: [], true)) {
                 throw new RuntimeException('Middleware file is missing, linked, or has incorrect case.');
             }
 
             $path .= DIRECTORY_SEPARATOR . $name;
         }
 
-        if (is_link($path) || ! is_file($path)) {
+        if (Path::isLink($path) || ! is_file($path)) {
             throw new RuntimeException('Middleware file is missing or linked.');
         }
 

@@ -23,7 +23,8 @@ class MiddlewareAndTestCommandTest extends TestCase
             $this->artisan('make:middleware', ['name' => 'Audit', '--path' => $fixture->root])->assertExitCode(0);
             $this->artisan('make:test', ['name' => 'Orders/Show', '--path' => $fixture->root])->assertExitCode(0);
             $this->artisan('make:test', ['name' => 'Orders/Show', '--unit' => true, '--path' => $fixture->root])->assertExitCode(0);
-            $this->assertStringContainsString('class AuditMiddleware implements Middleware', (string) file_get_contents($fixture->path('app/middleware/AuditMiddleware.php')));
+            $this->assertContains('Middleware', scandir($fixture->path('app')));
+            $this->assertStringContainsString('class AuditMiddleware implements Middleware', (string) file_get_contents($fixture->path('app/Middleware/AuditMiddleware.php')));
             $this->assertStringContainsString("it('ShowTest can be exercised through the application'", (string) file_get_contents($fixture->path('tests/Feature/Orders/ShowTest.php')));
             $unit = (string) file_get_contents($fixture->path('tests/Unit/Orders/ShowTest.php'));
             $this->assertStringContainsString("it('ShowTest can be exercised in isolation'", $unit);

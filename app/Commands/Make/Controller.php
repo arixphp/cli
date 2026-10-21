@@ -27,6 +27,6 @@ class Controller extends MakeCommand
             throw new RuntimeException('Controller stub is missing.');
         }
 
-        return new GenerationPolicy('app/controllers', 'App\\Controllers', 'Controller', '.php', $stub, GenerationPolicy::CLASS_NAME);
+        return new GenerationPolicy('app/Controllers', 'App\\Controllers', 'Controller', '.php', $stub, GenerationPolicy::CLASS_NAME);
     }
 }

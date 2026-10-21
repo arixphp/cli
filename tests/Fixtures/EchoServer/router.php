@@ -50,6 +50,19 @@ if ($path === '/redirect') {
     return;
 }
 
+if ($path === '/redirect-host') {
+    header('Location: http://localhost:' . (string) ($_SERVER['SERVER_PORT'] ?? '') . '/echo', true, 302);
+
+    return;
+}
+
+if ($path === '/redirect-target') {
+    parse_str((string) $query, $parameters);
+    header('Location: ' . $parameters['url'], true, 302);
+
+    return;
+}
+
 if ($path === '/slow') {
     sleep(3);
 

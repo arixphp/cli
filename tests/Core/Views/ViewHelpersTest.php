@@ -29,7 +29,7 @@ class ViewHelpersTest extends TestCase
         $this->directory = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-helpers-' . bin2hex(random_bytes(8));
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'views', 0755, true);
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'lang', 0755, true);
-        mkdir($this->directory . DIRECTORY_SEPARATOR . 'cache', 0755, true);
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'cache', 0755, true);
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config', 0755, true);
         file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', "<?php return ['name' => 'Test Site', 'locale' => 'en'];");
         file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'en.php', "<?php declare(strict_types=1); return ['home' => ['title' => 'Welcome']];");
@@ -182,7 +182,7 @@ class ViewHelpersTest extends TestCase
         $container->get(TemplateEngine::class)->render('probe');
         $source = realpath($this->directory . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'probe.arix.php');
         $code = file_get_contents($source);
-        $expected = $this->directory . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . hash('sha256', TemplateEngine::VERSION . "\0" . '1' . "\0" . $source . "\0" . $code) . '.php';
+        $expected = $this->directory . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . hash('sha256', TemplateEngine::VERSION . "\0" . '1' . "\0" . $source . "\0" . $code) . '.php';
 
         $this->assertFileExists($expected);
     }
@@ -195,8 +195,8 @@ class ViewHelpersTest extends TestCase
         foreach ([
             [],
             ['app' => [], 'cache' => [], 'views' => '', 'lang' => ''],
-            ['app' => ['locales' => ['en'], 'default_locale' => 'en', 'base_path' => ['/site']], 'cache' => ['path' => 'x', 'version' => '1'], 'views' => $this->directory . DIRECTORY_SEPARATOR . 'views', 'lang' => $this->directory . DIRECTORY_SEPARATOR . 'lang'],
-            ['app' => ['locales' => ['en'], 'default_locale' => 'en'], 'cache' => ['path' => 'x', 'version' => '1'], 'views' => $this->directory . DIRECTORY_SEPARATOR . 'missing', 'lang' => $this->directory . DIRECTORY_SEPARATOR . 'lang'],
+            ['app' => ['locales' => ['en'], 'default_locale' => 'en', 'base_path' => ['/site']], 'cache' => ['version' => '1'], 'views' => $this->directory . DIRECTORY_SEPARATOR . 'views', 'lang' => $this->directory . DIRECTORY_SEPARATOR . 'lang'],
+            ['app' => ['locales' => ['en'], 'default_locale' => 'en'], 'cache' => ['version' => '1'], 'views' => $this->directory . DIRECTORY_SEPARATOR . 'missing', 'lang' => $this->directory . DIRECTORY_SEPARATOR . 'lang'],
         ] as $configuration) {
             try {
                 ViewServices::register(new Container(), $this->directory, $request, $configuration);
@@ -225,7 +225,7 @@ class ViewHelpersTest extends TestCase
             Arix\Config\ConfigServices::register($container, $root.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'config');
             Arix\Views\ViewServices::register($container, $root, $request, [
                 'app' => ['name' => 'Test Site', 'base_path' => '/site', 'locales' => ['en'], 'default_locale' => 'en'],
-                'cache' => ['path' => $root . '/cache', 'version' => '1'],
+                'cache' => ['version' => '1'],
                 'views' => $root . '/views',
                 'lang' => $root . '/lang',
             ]);
@@ -261,7 +261,7 @@ class ViewHelpersTest extends TestCase
         ConfigServices::register($container, $this->directory . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config');
         ViewServices::register($container, $this->directory, $request, [
             'app' => ['name' => 'Test Site', 'base_path' => '/site', 'locales' => ['en', 'es'], 'default_locale' => 'en'],
-            'cache' => ['path' => $this->directory . DIRECTORY_SEPARATOR . 'cache', 'version' => '1'],
+            'cache' => ['version' => '1'],
             'views' => $this->directory . DIRECTORY_SEPARATOR . 'views',
             'lang' => $this->directory . DIRECTORY_SEPARATOR . 'lang',
         ]);

@@ -33,7 +33,7 @@ PHP);
         $this->fixture->write('app/config/cache.php', <<<'PHP'
 <?php
 declare(strict_types=1);
-return ['path' => 'storage/cache', 'version' => '1'];
+return ['version' => '1'];
 PHP);
         $this->fixture->write('app/routes.php', "<?php\ndeclare(strict_types=1);\n");
         $this->fixture->write('app/views/.keep', '');
@@ -209,8 +209,9 @@ PHP;
     public function it_falls_back_when_the_compilation_cache_is_unusable(): void
     {
         $this->fixture->write('app/views/errors/404.arix.php', 'Custom {{ $status }}');
-        $this->fixture->write('storage/not-a-directory', 'blocked');
-        $this->fixture->write('app/config/cache.php', "<?php declare(strict_types=1); return ['path' => 'storage/not-a-directory', 'version' => '1'];");
+        unlink($this->fixture->path('storage/cache/.keep'));
+        rmdir($this->fixture->path('storage/cache'));
+        $this->fixture->write('storage/cache', 'blocked');
         $response = Application::create($this->fixture->root)->kernel()->handle(Request::create('/missing'));
 
         $this->assertSame(404, $response->getStatusCode());

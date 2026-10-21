@@ -110,6 +110,26 @@ class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    #[DataProvider('invalidConstraints')]
+    public function it_rejects_unusable_route_parameter_constraints(string $pattern, string $expected): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($expected);
+        (new RouteRegistry())->get($pattern, ['App\\Controllers\\UnloadedController', 'show']);
+    }
+
+    public static function invalidConstraints(): array
+    {
+        return [
+            'pattern delimiter' => ['/items/{id:[0-9~]+}', 'cannot contain the pattern delimiter'],
+            'capturing group' => ['/items/{id:([0-9]+)}', 'cannot contain capturing groups'],
+            'named group' => ['/items/{id:(?<n>[0-9]+)}', 'cannot contain capturing groups'],
+            'empty constraint' => ['/items/{id:}', 'cannot be empty'],
+            'invalid pattern' => ['/items/{id:[0-9}', 'must be a valid pattern'],
+        ];
+    }
+
+    #[Test]
     #[DataProvider('conflictingPatterns')]
     public function it_rejects_duplicate_and_invalid_fastroute_patterns(string $pattern): void
     {

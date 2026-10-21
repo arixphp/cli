@@ -25,6 +25,16 @@ class ServerPolicyRenderer
         return "{$start}\n{$body}\n{$end}";
     }
 
+    /**
+     * The public resource directories of the policy.
+     *
+     * @return list<string>
+     */
+    public function directories(): array
+    {
+        return array_keys($this->policy->directories());
+    }
+
     public function matches(string $server, string $configuration): bool
     {
         [$start, $end] = $this->markers($server);
@@ -40,7 +50,90 @@ class ServerPolicyRenderer
 
         $normalize = static fn (string $value): array => array_map('trim', explode("\n", $value));
 
-        return $finish >= $offset && $normalize(substr($configuration, $offset, $finish - $offset + strlen($end))) === $normalize($this->render($server));
+        if ($finish < $offset || $normalize(substr($configuration, $offset, $finish - $offset + strlen($end))) !== $normalize($this->render($server))) {
+            return false;
+        }
+
+        return $this->satisfies($server, $configuration);
+    }
+
+    /**
+     * The rules a configuration must contain besides the managed block.
+     *
+     * The managed block only describes which resources are published. The
+     * rules around it decide whether a directory can be listed and whether
+     * the front controller is reached, so they are verified as well.
+     *
+     * @return list<string>
+     */
+    public function invariants(string $server): array
+    {
+        return match ($server) {
+            'apache' => [
+                '/^RewriteEngine On$/m',
+                '/^Options -Indexes\b/m',
+                '/^DirectoryIndex\b/m',
+                '/^RewriteRule \^ index\.php \[L\]$/m',
+            ],
+            'caddy' => [
+                '/^\s*rewrite \* \/index\.php$/m',
+                '/^\s*php(_server)?\b/m',
+            ],
+            'iis' => [
+                '/<directoryBrowse enabled="false" \/>/',
+                '/<allowDoubleEscaping>false<\/allowDoubleEscaping>/',
+                '/<add value="index\.php" \/>/',
+                '/name="Arix front controller"/',
+                '/name="Public resource Allow header"/',
+            ],
+            default => throw new InvalidArgumentException('Unsupported server policy format.'),
+        };
+    }
+
+    /**
+     * The patterns a configuration must not contain.
+     *
+     * @return list<string>
+     */
+    public function forbidden(string $server): array
+    {
+        return match ($server) {
+            'apache' => ['/^\s*Options[^\n]*\+Indexes/m'],
+            'caddy' => ['/^\s*browse\b/m'],
+            'iis' => ['/<directoryBrowse enabled="true" \/>/', '/<allowDoubleEscaping>true<\/allowDoubleEscaping>/'],
+            default => throw new InvalidArgumentException('Unsupported server policy format.'),
+        };
+    }
+
+    /** Whether a configuration contains every required rule and no forbidden one. */
+    public function satisfies(string $server, string $configuration): bool
+    {
+        return $this->violations($server, $configuration) === [];
+    }
+
+    /**
+     * The rules a configuration is missing.
+     *
+     * @return list<string>
+     */
+    public function violations(string $server, string $configuration): array
+    {
+        $normalized = str_replace("\r\n", "\n", $configuration);
+        $violations = [];
+
+        foreach ($this->invariants($server) as $invariant) {
+            if (preg_match($invariant, $normalized) !== 1) {
+                $violations[] = "missing: {$invariant}";
+            }
+        }
+
+        foreach ($this->forbidden($server) as $forbidden) {
+            if (preg_match($forbidden, $normalized) === 1) {
+                $violations[] = "forbidden: {$forbidden}";
+            }
+        }
+
+        return $violations;
     }
 
     private function markers(string $server): array
@@ -65,7 +158,7 @@ respond @private 403
 }
 header @resource_method Allow "GET, HEAD"
 respond @resource_method 405
-header X-Content-Type-Options nosniff
+header ?X-Content-Type-Options nosniff
 @public_files path_regexp arix_public `^/(?:{$public})$`
 file_server @public_files {
     pass_thru
@@ -86,6 +179,7 @@ CADDY;
         $directories = implode('|', array_keys($this->policy->directories()));
 
         return <<<APACHE
+# The virtual host must set "TraceEnable Off"; it cannot be set from .htaccess.
 RewriteEngine On
 RewriteRule ^(?:app|core|cli|tests|docs|storage|assets)(?:/|$) - [F,L,NC]
 RewriteRule (^|/)\\. - [F,L]
@@ -93,8 +187,7 @@ RewriteRule ^phpunit\\.xml(?:\\.dist)?$ - [F,L,NC]
 RewriteRule ^(?:{$directories})(?:/|$) - [E=ARIX_ASSET:1,NC]
 RewriteCond %{REQUEST_METHOD} !^(?:GET|HEAD)$
 RewriteRule ^(?:{$directories})(?:/|$) - [R=405,L,NC]
-Header onsuccess unset Allow env=ARIX_ASSET
-Header always set Allow "GET, HEAD" env=ARIX_ASSET
+Header always set Allow "GET, HEAD" env=ARIX_ASSET expr=%{REQUEST_METHOD} !~ ^(?:GET|HEAD)\$
 Header always set X-Content-Type-Options nosniff
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^(?:index\\.php|robots\\.txt|{$public})$ - [L]
@@ -149,7 +242,7 @@ XML;
         }
 
         return <<<APACHE
-Options -Indexes -MultiViews -ExecCGI -FollowSymLinks +SymLinksIfOwnerMatch
+Options -Indexes -MultiViews -ExecCGI -FollowSymLinks
 DirectoryIndex disabled
 SetHandler default-handler
 <FilesMatch "(?i)^(?![A-Za-z0-9_-]+\\.(?:{$pattern})$)">

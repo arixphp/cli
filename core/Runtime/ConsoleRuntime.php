@@ -14,6 +14,8 @@ use Arix\Scheduling\ScheduleLogger;
 use Arix\Scheduling\ScheduleReport;
 use Arix\Scheduling\ScheduleRunner;
 use Arix\Storage\Storage;
+use Arix\Support\ApplicationAutoloader;
+use Arix\Support\RuntimePaths;
 use DateTimeImmutable;
 use DateTimeZone;
 use Throwable;
@@ -22,8 +24,6 @@ use function fwrite;
 use function implode;
 use function is_string;
 use function sprintf;
-use function str_contains;
-use function str_starts_with;
 
 class ConsoleRuntime
 {
@@ -33,7 +33,9 @@ class ConsoleRuntime
 
         return ContainerContext::run($container, function () use ($applicationRoot, $container): int {
             try {
-                return $this->execute($applicationRoot, $container);
+                $applicationRoot = RuntimePaths::fromApplicationRoot($applicationRoot)->root;
+
+                return ApplicationAutoloader::run($applicationRoot, fn (): int => $this->execute($applicationRoot, $container));
             } catch (Throwable $exception) {
                 fwrite(STDERR, 'Arix scheduler failed: ' . $exception->getMessage() . PHP_EOL);
 
@@ -60,7 +62,7 @@ class ConsoleRuntime
 
         $this->write($report, $now);
         $this->reportFailures($report);
-        $this->log($report, $now, $applicationRoot, $config->get('schedule.log', 'storage/logs/cron.log'));
+        $this->log($report, $now, $applicationRoot);
 
         return $report->failed() ? 1 : 0;
     }
@@ -83,13 +85,12 @@ class ConsoleRuntime
         }
     }
 
-    private function log(ScheduleReport $report, DateTimeImmutable $now, string $applicationRoot, mixed $path): void
+    private function log(ScheduleReport $report, DateTimeImmutable $now, string $applicationRoot): void
     {
-        if (! is_string($path) || $path === '' || str_starts_with($path, '/') || str_contains($path, '..')) {
-            return;
-        }
-
-        $logger = new ScheduleLogger($applicationRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $path));
+        // The scheduler log is framework-owned: it must never be pointed at a
+        // published directory, where appending to it would corrupt content.
+        $paths = RuntimePaths::fromStrictRoot($applicationRoot);
+        $logger = new ScheduleLogger($paths->scheduleLogPath(), $paths->scheduleLogDirectory());
         $logger->write($report, $now);
     }
 }

@@ -50,4 +50,32 @@ class QueryPathValidatorTest extends TestCase
             $this->assertSame(HttpStatusCode::NOT_FOUND, $exception->status);
         }
     }
+
+    #[Test]
+    public function it_rejects_a_path_that_still_carries_an_escape(): void
+    {
+        $validator = new QueryPathValidator();
+        $request = new Request(server: ['REQUEST_URI' => '/a%252e%252e/b']);
+
+        try {
+            $validator->path($request);
+            $this->fail('A doubly encoded path must fail.');
+        } catch (HttpException $exception) {
+            $this->assertSame(HttpStatusCode::BAD_REQUEST, $exception->status);
+        }
+    }
+
+    #[Test]
+    public function it_rejects_an_excessive_path(): void
+    {
+        $validator = new QueryPathValidator();
+        $request = new Request(server: ['REQUEST_URI' => '/' . str_repeat('a', QueryPathValidator::MAX_PATH_BYTES)]);
+
+        try {
+            $validator->path($request);
+            $this->fail('An excessive path must fail.');
+        } catch (HttpException $exception) {
+            $this->assertSame(HttpStatusCode::BAD_REQUEST, $exception->status);
+        }
+    }
 }

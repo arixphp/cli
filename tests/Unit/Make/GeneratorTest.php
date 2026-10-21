@@ -40,20 +40,20 @@ class GeneratorTest extends TestCase
     public function it_generates_a_nested_confined_php_file(): void
     {
         $root = ApplicationTarget::resolve($this->root, $this->root);
-        $policy = new GenerationPolicy('app/controllers', 'App\\Controllers', 'Controller', '.php', "<?php\nnamespace {{ namespace }};\nclass {{ class }} {}\n", GenerationPolicy::CLASS_NAME);
+        $policy = new GenerationPolicy('app/Controllers', 'App\\Controllers', 'Controller', '.php', "<?php\nnamespace {{ namespace }};\nclass {{ class }} {}\n", GenerationPolicy::CLASS_NAME);
 
         $result = (new Generator())->generate($root, $policy, 'Admin/Post', false);
 
-        $this->assertSame('app/controllers/Admin/PostController.php', $result->path);
+        $this->assertSame('app/Controllers/Admin/PostController.php', $result->path);
         $this->assertTrue($result->written);
-        $this->assertSame("<?php\nnamespace App\\Controllers\\Admin;\nclass PostController {}\n", file_get_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'controllers' . DIRECTORY_SEPARATOR . 'Admin' . DIRECTORY_SEPARATOR . 'PostController.php'));
+        $this->assertSame("<?php\nnamespace App\\Controllers\\Admin;\nclass PostController {}\n", file_get_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Controllers' . DIRECTORY_SEPARATOR . 'Admin' . DIRECTORY_SEPARATOR . 'PostController.php'));
     }
 
     #[Test]
     public function it_rejects_unsafe_names_without_writing(): void
     {
         $root = ApplicationTarget::resolve($this->root, $this->root);
-        $policy = new GenerationPolicy('app/controllers', 'App\\Controllers', 'Controller', '.php', '', GenerationPolicy::CLASS_NAME);
+        $policy = new GenerationPolicy('app/Controllers', 'App\\Controllers', 'Controller', '.php', '', GenerationPolicy::CLASS_NAME);
 
         foreach (['../Escape', '/tmp/Escape', 'Admin//Post', 'Post.php'] as $name) {
             try {
@@ -72,12 +72,28 @@ class GeneratorTest extends TestCase
             $this->markTestSkipped('Symlinks are unavailable.');
         }
 
-        symlink(sys_get_temp_dir(), $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'controllers');
+        symlink(sys_get_temp_dir(), $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Controllers');
         $root = ApplicationTarget::resolve($this->root, $this->root);
-        $policy = new GenerationPolicy('app/controllers', 'App\\Controllers', 'Controller', '.php', '', GenerationPolicy::CLASS_NAME);
+        $policy = new GenerationPolicy('app/Controllers', 'App\\Controllers', 'Controller', '.php', '', GenerationPolicy::CLASS_NAME);
 
         $this->expectException(RuntimeException::class);
         (new Generator())->generate($root, $policy, 'Post', false);
+    }
+
+    #[Test]
+    public function it_rejects_an_existing_directory_with_different_case_without_writing(): void
+    {
+        mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'controllers');
+        $root = ApplicationTarget::resolve($this->root, $this->root);
+        $policy = new GenerationPolicy('app/Controllers', 'App\\Controllers', 'Controller', '.php', '<?php', GenerationPolicy::CLASS_NAME);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('case');
+
+        try {
+            (new Generator())->generate($root, $policy, 'Post', false);
+        } finally {
+            $this->assertFileDoesNotExist($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'controllers' . DIRECTORY_SEPARATOR . 'PostController.php');
+        }
     }
 
     private function remove(string $path): void

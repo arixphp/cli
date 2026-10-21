@@ -23,11 +23,12 @@ class MakeCommandTest extends TestCase
             $fixture->write('app/bootstrap.php', '<?php');
 
             $this->runCommand(['make:controller', 'Home'], $fixture->root);
-            $this->assertFileExists($fixture->path('app/controllers/HomeController.php'));
+            $this->assertContains('Controllers', scandir($fixture->path('app')));
+            $this->assertFileExists($fixture->path('app/Controllers/HomeController.php'));
 
             $relative = basename($fixture->root);
             $this->runCommand(['make:controller', 'Relative', "--path={$relative}"], $parent);
-            $this->assertFileExists($fixture->path('app/controllers/RelativeController.php'));
+            $this->assertFileExists($fixture->path('app/Controllers/RelativeController.php'));
         } finally {
             $fixture->cleanup();
         }
@@ -43,7 +44,7 @@ class MakeCommandTest extends TestCase
             $process->run();
 
             $this->assertSame(2, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
-            $this->assertFileDoesNotExist($fixture->path('app/controllers/PostController.php'));
+            $this->assertFileDoesNotExist($fixture->path('app/Controllers/PostController.php'));
         } finally {
             $fixture->cleanup();
         }

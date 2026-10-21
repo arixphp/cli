@@ -27,6 +27,6 @@ class Middleware extends MakeCommand
             throw new RuntimeException('Middleware stub is missing.');
         }
 
-        return new GenerationPolicy('app/middleware', 'App\\Middleware', 'Middleware', '.php', $stub, GenerationPolicy::CLASS_NAME);
+        return new GenerationPolicy('app/Middleware', 'App\\Middleware', 'Middleware', '.php', $stub, GenerationPolicy::CLASS_NAME);
     }
 }

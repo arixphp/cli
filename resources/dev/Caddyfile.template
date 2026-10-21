@@ -18,8 +18,7 @@
     root * ARIX_DEV_ROOT_PLACEHOLDER
     encode zstd br gzip
     header {
-        X-Content-Type-Options nosniff
-        Cache-Control no-store
+        ?Cache-Control no-store
     }
     request_body {
         max_size 1048576

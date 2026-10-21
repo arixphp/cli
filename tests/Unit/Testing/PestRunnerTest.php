@@ -6,6 +6,7 @@ namespace Tests\Unit\Testing;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Tests\Support\ApplicationTestingFixture;
 
 class PestRunnerTest extends TestCase
@@ -61,6 +62,25 @@ test('local ownership', function () {
 PHP);
         $process = $this->fixture->worker();
         $this->assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+    }
+
+    #[Test]
+    public function it_autoloads_application_classes_in_tests_without_a_second_app_loader(): void
+    {
+        (new Filesystem())->mirror(dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'core', $this->fixture->path('core'), options: ['override' => true]);
+        $this->fixture->write('app/Utils/Formatter.php', '<?php declare(strict_types=1); namespace App\Utils; class Formatter { public static function message(): string { return "application helper"; } }');
+        $this->fixture->write('tests/AutoloadTest.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+test('application namespaces use the core autoloader', function (): void {
+    expect(\App\Utils\Formatter::message())->toBe('application helper');
+    expect(class_exists(\App\Commands\InspireCommand::class))->toBeFalse();
+});
+PHP);
+        $process = $this->fixture->worker();
+
+        $this->assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+        $this->assertStringContainsString('application namespaces use the core autoloader', $process->getOutput());
     }
 
     #[Test]
