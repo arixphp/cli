@@ -10,12 +10,15 @@ use function dirname;
 use function file_exists;
 use function file_put_contents;
 use function implode;
+use function in_array;
 use function is_dir;
 use function is_file;
 use function is_link;
 use function mkdir;
 use function rename;
+use function scandir;
 use function str_replace;
+use function strcasecmp;
 use function tempnam;
 use function unlink;
 
@@ -91,7 +94,7 @@ class Generator
         $path = $root;
 
         foreach (array_merge(explode('/', $relative), $segments) as $segment) {
-            $path .= DIRECTORY_SEPARATOR . $segment;
+            $path = $this->exactCase($path, $segment);
 
             if (is_link($path)) {
                 throw new RuntimeException("Generated path is linked: {$path}");
@@ -99,6 +102,29 @@ class Generator
         }
 
         return $path;
+    }
+
+    private function exactCase(string $directory, string $segment): string
+    {
+        $candidate = $directory . DIRECTORY_SEPARATOR . $segment;
+
+        if (! is_dir($directory)) {
+            return $candidate;
+        }
+
+        $entries = scandir($directory) ?: [];
+
+        if (in_array($segment, $entries, true)) {
+            return $candidate;
+        }
+
+        foreach ($entries as $entry) {
+            if (strcasecmp($entry, $segment) === 0) {
+                throw new RuntimeException("Generated directory has incorrect case: {$candidate}");
+            }
+        }
+
+        return $candidate;
     }
 
     private function create(string $directory): void

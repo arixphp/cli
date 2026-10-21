@@ -58,7 +58,12 @@ install Pest in the application. XML and tests are trusted developer code, not a
 - Routes: `app/routes.php` calls `Arix\Facades\Route::get('/route', [Controller::class,
   'action'])`. The facade uses the active container's RouteCollector; registration never
   constructs controllers. The filename must match class/case exactly:
-  `App\Controllers\Blog\ArticleController` → `app/controllers/Blog/ArticleController.php`.
+  `App\Controllers\Blog\ArticleController` → `app/Controllers/Blog/ArticleController.php`.
+- Classes: the core autoloads `App\` classes, interfaces, traits and enums from `app/` on
+  demand, with exact case and no Composer: `App\Utils\Formatter` → `app/Utils/Formatter.php`.
+  Create directories when the site needs them; the skeleton ships no extra ones. The
+  lowercase resource directories `config`, `lang` and `views` are not namespaces, and the
+  `bootstrap`, `routes`, `services` and `schedules` entry names are not class names.
 - `app/services.php` is optional and returns a registration closure when present; explicit
   bindings only, no autowiring. Controllers without required constructor parameters resolve
   from their routes alone; explicit bindings always win. Actions are public instance methods

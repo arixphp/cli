@@ -34,6 +34,44 @@ The official documentation is available at
 
 ## Documentation
 
+### Application class autoloading
+
+The standalone core autoloads `App\` classes, interfaces, traits and enums from
+the application's `app/` directory without Composer or a generated class map.
+Create directories only when needed; no extra skeleton directories are required:
+
+```text
+App\Utils\Formatter       -> app/Utils/Formatter.php
+App\Services\MailService  -> app/Services/MailService.php
+App\Domain\Blog\Post      -> app/Domain/Blog/Post.php
+```
+
+Directory and filename case must match the namespace exactly, including on
+case-insensitive filesystems. This applies uniformly to `App\Controllers\`
+in `app/Controllers/` and `App\Middleware\` in `app/Middleware/` too; there
+are no lowercase-directory compatibility mappings. Applications using the old
+directory names must explicitly rename them before updating to this core;
+`core:update` replaces only the managed core and does not rename application files.
+
+The lowercase resource directories `config`, `lang` and `views`, and the
+`bootstrap`, `routes`, `services` and `schedules` entry names are excluded from
+class loading. Resources keep their existing explicit loading mechanisms.
+`App\Services\` remains a normal class namespace, distinct from `services.php`.
+The loader does not scan PHP files or follow symlinks. Application class files
+are trusted code and should contain declarations, not request-time side effects.
+
+`core/autoload.php` registers this loader before the application bootstrap and
+test setup. Application composition, HTTP requests and scheduler execution use
+the same loader with a temporary application-root scope, restored on failure.
+No autowiring is added: constructor dependencies still use explicit bindings.
+PHP declarations cannot be unloaded or redefined; independent sites with
+conflicting class names need separate processes. Fiber/coroutine execution and
+persistent worker class reloading remain unsupported.
+
+Existing application test bootstraps may still contain their older `App\`
+loader. It is redundant after updating the core; keep only the `Tests\` loader
+when maintaining that application-owned file. `core:update` does not rewrite it.
+
 ### Updating an application's core
 
 ```sh

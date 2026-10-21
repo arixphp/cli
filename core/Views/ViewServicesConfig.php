@@ -6,6 +6,7 @@ namespace Arix\Views;
 
 use Arix\HttpFoundation\Request;
 use Arix\Support\Path;
+use Arix\Support\RuntimePaths;
 use InvalidArgumentException;
 
 use function is_array;
@@ -88,7 +89,7 @@ class ViewServicesConfig
             throw new InvalidArgumentException($missing);
         }
 
-        return $real;
+        return RuntimePaths::fromStrictRoot($path)->root;
     }
 
     private static function cache(array $cache, string $base): array

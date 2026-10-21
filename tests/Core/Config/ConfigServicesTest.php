@@ -25,7 +25,7 @@ class ConfigServicesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'arix-config-' . bin2hex(random_bytes(8));
+        $this->directory = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-config-' . bin2hex(random_bytes(8));
         mkdir($this->directory);
     }
 

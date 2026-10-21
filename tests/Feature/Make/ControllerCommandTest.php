@@ -23,7 +23,8 @@ class ControllerCommandTest extends TestCase
             $this->artisan('make:controller', ['name' => 'Admin/Post', '--path' => $fixture->root])
                 ->assertExitCode(0);
 
-            $this->assertSame("<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Controllers\\Admin;\n\nclass PostController {}\n", file_get_contents($fixture->path('app/controllers/Admin/PostController.php')));
+            $this->assertContains('Controllers', scandir($fixture->path('app')));
+            $this->assertSame("<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Controllers\\Admin;\n\nclass PostController {}\n", file_get_contents($fixture->path('app/Controllers/Admin/PostController.php')));
         } finally {
             $fixture->cleanup();
         }
@@ -38,16 +39,16 @@ class ControllerCommandTest extends TestCase
             $fixture->write('.arix.json', '{"format":1,"core_contract":"arix-core-v1"}');
             $fixture->write('index.php', '<?php');
             $fixture->write('app/bootstrap.php', '<?php');
-            $fixture->write('app/controllers/PostController.php', 'sentinel');
+            $fixture->write('app/Controllers/PostController.php', 'sentinel');
 
             $this->artisan('make:controller', ['name' => 'Post', '--path' => $fixture->root])
-                ->expectsOutputToContain('Already exists app/controllers/PostController.php.')
+                ->expectsOutputToContain('Already exists app/Controllers/PostController.php.')
                 ->assertExitCode(0);
-            $this->assertSame('sentinel', file_get_contents($fixture->path('app/controllers/PostController.php')));
+            $this->assertSame('sentinel', file_get_contents($fixture->path('app/Controllers/PostController.php')));
 
             $this->artisan('make:controller', ['name' => 'Post', '--path' => $fixture->root, '--force' => true])
                 ->assertExitCode(0);
-            $this->assertStringContainsString('class PostController {}', (string) file_get_contents($fixture->path('app/controllers/PostController.php')));
+            $this->assertStringContainsString('class PostController {}', (string) file_get_contents($fixture->path('app/Controllers/PostController.php')));
         } finally {
             $fixture->cleanup();
         }
@@ -64,10 +65,10 @@ class ControllerCommandTest extends TestCase
             $fixture->write('app/bootstrap.php', '<?php');
 
             $this->artisan('make:controller', ['name' => 'Admin/PostController', '--path' => $fixture->root])->assertExitCode(0);
-            $this->assertFileExists($fixture->path('app/controllers/Admin/PostController.php'));
+            $this->assertFileExists($fixture->path('app/Controllers/Admin/PostController.php'));
 
             $this->artisan('make:controller', ['name' => 'Post.php', '--path' => $fixture->root])->assertExitCode(2);
-            $this->assertFileDoesNotExist($fixture->path('app/controllers/Post.phpController.php'));
+            $this->assertFileDoesNotExist($fixture->path('app/Controllers/Post.phpController.php'));
         } finally {
             $fixture->cleanup();
         }

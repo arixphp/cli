@@ -85,7 +85,7 @@ switch ($scenario) {
         break;
 
     case 'application':
-        foreach (['config', 'controllers', 'views', 'lang'] as $directory) {
+        foreach (['config', 'Controllers', 'views', 'lang'] as $directory) {
             mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $directory, 0700, true);
         }
 
@@ -105,7 +105,7 @@ switch ($scenario) {
             declare(strict_types=1);
             Arix\Facades\Route::get('/', [App\Controllers\CacheController::class, 'index']);
             PHP);
-        file_put_contents($app . DIRECTORY_SEPARATOR . 'controllers' . DIRECTORY_SEPARATOR . 'CacheController.php', <<<'PHP'
+        file_put_contents($app . DIRECTORY_SEPARATOR . 'Controllers' . DIRECTORY_SEPARATOR . 'CacheController.php', <<<'PHP'
             <?php
             declare(strict_types=1);
             namespace App\Controllers;

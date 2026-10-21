@@ -15,9 +15,44 @@ use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Process\Process;
 
 class NamedRouteTest extends TestCase
 {
+    #[Test]
+    public function it_autoloads_route_dependencies_through_a_root_alias_without_composer(): void
+    {
+        $root = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-route-scope-' . bin2hex(random_bytes(8));
+        mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config', 0755, true);
+        mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Domain');
+        file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Domain' . DIRECTORY_SEPARATOR . 'Paths.php', '<?php declare(strict_types=1); namespace App\\Domain; class Paths { public static function about(): string { return "/about"; } }');
+        file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', '<?php declare(strict_types=1); return ["base_path" => "/sub"];');
+        file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'routes.php', '<?php declare(strict_types=1); Arix\\Facades\\Route::get(App\\Domain\\Paths::about(), ["App\\\\Controllers\\\\AboutController", "show"])->name("about");');
+        $alias = $root . DIRECTORY_SEPARATOR . 'current';
+        symlink($root, $alias);
+        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $program = <<<'PHP'
+require $argv[1];
+$outer = new \Arix\Container\Container();
+echo \Arix\Container\ContainerContext::run($outer, static function () use ($argv, $outer): string {
+    $route = \Arix\Routing\RouteResolver::fromRoot($argv[2]);
+    if (\Arix\Container\ContainerContext::current() !== $outer) { exit(3); }
+    if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(4); }
+    return $route->to('about');
+});
+PHP;
+        $process = new Process([PHP_BINARY, '-r', $program, $autoload, $alias]);
+
+        try {
+            $process->run();
+            $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            $this->assertSame('/sub/about', $process->getOutput());
+        } finally {
+            (new Filesystem())->remove($root);
+        }
+    }
+
     #[Test]
     public function it_assigns_name_fluently(): void
     {
@@ -168,13 +203,17 @@ class NamedRouteTest extends TestCase
                 PHP
         );
 
+        $alias = $root . DIRECTORY_SEPARATOR . 'current';
+        symlink($root, $alias);
+
         try {
-            $generator = RouteResolver::fromRoot($root);
+            $generator = RouteResolver::fromRoot($alias);
 
             $this->assertSame('/sub/about', $generator->to('about'));
             $this->assertSame('/about', $generator->to('about', [], false));
             $this->assertSame('/sub/articles/7', $generator->to('article', ['id' => 7]));
         } finally {
+            unlink($alias);
             unlink($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'routes.php');
             unlink($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php');
             rmdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config');

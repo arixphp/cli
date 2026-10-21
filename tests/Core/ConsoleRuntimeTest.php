@@ -8,9 +8,57 @@ use Arix\Runtime\ConsoleRuntime;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Process\Process;
 
 class ConsoleRuntimeTest extends TestCase
 {
+    #[Test]
+    public function it_pins_lazy_schedule_code_and_logs_when_the_deployment_alias_changes(): void
+    {
+        $root = $this->application([]);
+        $alias = $root . DIRECTORY_SEPARATOR . 'current';
+        $other = $root . DIRECTORY_SEPARATOR . 'other';
+        mkdir($other);
+        symlink($root, $alias);
+        $id = 'Pinned' . bin2hex(random_bytes(6));
+        mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Services');
+        file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Services' . DIRECTORY_SEPARATOR . "{$id}.php", "<?php declare(strict_types=1); namespace App\\Services; class {$id} { public static function run(): void {} }");
+        file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'schedules.php', '<?php declare(strict_types=1); unlink(' . var_export($alias, true) . '); symlink(' . var_export($other, true) . ', ' . var_export($alias, true) . '); return static function ($schedule): void { $schedule->call("pinned", static fn () => \\App\\Services\\' . $id . '::run())->everyMinute(); };');
+        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $program = 'require $argv[1]; exit((new Arix\\Runtime\\ConsoleRuntime())->run($argv[2]));';
+        $process = new Process([PHP_BINARY, '-r', $program, $autoload, $alias]);
+
+        try {
+            $process->run();
+            $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            $this->assertFileExists($root . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATOR . 'cron.log');
+            $this->assertDirectoryDoesNotExist($other . DIRECTORY_SEPARATOR . 'storage');
+        } finally {
+            (new Filesystem())->remove($root);
+        }
+    }
+
+    #[Test]
+    public function it_autoloads_dependencies_when_a_scheduled_callback_executes(): void
+    {
+        $id = 'Task' . bin2hex(random_bytes(6));
+        $root = $this->application([
+            'autoload' => "static function (): void { \\App\\Services\\{$id}::run(); }",
+        ]);
+        mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Services');
+        file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Services' . DIRECTORY_SEPARATOR . "{$id}.php", "<?php\ndeclare(strict_types=1);\nnamespace App\\Services;\nclass {$id} { public static function run(): void { \$GLOBALS['arix_autoload_task'] = 'executed'; } }\n");
+        $GLOBALS['arix_autoload_task'] = null;
+
+        try {
+            $this->assertSame(0, (new ConsoleRuntime())->run($root));
+            $this->assertSame('executed', $GLOBALS['arix_autoload_task']);
+        } finally {
+            unset($GLOBALS['arix_autoload_task']);
+            (new Filesystem())->remove($root);
+        }
+    }
+
     #[Test]
     public function it_runs_the_application_schedule_and_reports_the_outcome(): void
     {
