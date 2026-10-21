@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Commands\Assets;
 
 use App\Assets\ServerPolicyRenderer;
+use Arix\Support\Path;
 use InvalidArgumentException;
 use LaravelZero\Framework\Commands\Command;
 
@@ -72,7 +73,7 @@ class RenderPolicy extends Command
             throw new InvalidArgumentException('Unknown public resource directory.');
         }
 
-        $path = str_starts_with($directory, DIRECTORY_SEPARATOR) ? $directory : getcwd() . DIRECTORY_SEPARATOR . $directory;
+        $path = Path::isAbsolute($directory) ? $directory : getcwd() . DIRECTORY_SEPARATOR . $directory;
         $name = basename($path);
 
         if (! in_array($name, $renderer->directories(), true)) {

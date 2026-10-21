@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Assets\ServerPolicyRenderer;
 use Arix\Assets\AssetPolicy;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Support\NewApplicationFixture;
 use Tests\TestCase;
@@ -46,23 +47,48 @@ class AssetsRenderPolicyCommandTest extends TestCase
     }
 
     #[Test]
-    public function it_verifies_the_policy_of_a_public_resource_directory(): void
+    #[DataProvider('directoryPaths')]
+    public function it_verifies_the_policy_of_a_public_resource_directory(string $pathFormat): void
     {
         $fixture = new NewApplicationFixture();
+        $workingDirectory = getcwd();
 
         try {
             $directory = $fixture->path('styles');
             mkdir($directory, 0755, true);
             file_put_contents($directory . DIRECTORY_SEPARATOR . '.htaccess', 'outdated');
 
-            $this->artisan('assets:policy', ['server' => 'apache', '--directory' => $directory])->assertExitCode(1);
+            chdir($fixture->root);
+
+            $argument = match ($pathFormat) {
+                'forward-slash' => str_replace(DIRECTORY_SEPARATOR, '/', $directory),
+                'relative' => 'styles',
+                default => $directory,
+            };
+
+            $this->artisan('assets:policy', ['server' => 'apache', '--directory' => $argument])
+                ->expectsOutput('The styles directory policy is out of date.')
+                ->assertExitCode(1);
 
             file_put_contents($directory . DIRECTORY_SEPARATOR . '.htaccess', (new ServerPolicyRenderer(new AssetPolicy()))->renderDirectory('styles'));
 
-            $this->artisan('assets:policy', ['server' => 'apache', '--directory' => $directory])->assertExitCode(0);
+            $this->artisan('assets:policy', ['server' => 'apache', '--directory' => $argument])
+                ->expectsOutput('The styles directory policy matches.')
+                ->assertExitCode(0);
         } finally {
+            chdir($workingDirectory);
             $fixture->cleanup();
         }
+    }
+
+    public static function directoryPaths(): array
+    {
+
+        return [
+            'native absolute path' => ['native'],
+            'absolute path with forward slashes' => ['forward-slash'],
+            'relative path' => ['relative'],
+        ];
     }
 
     private function configuration(string $server, string $surrounding = ''): string
