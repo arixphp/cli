@@ -63,7 +63,6 @@ class Loader
 
             try {
                 $configuration = (static function (string $file): mixed {
-
                     return require $file;
                 })($file);
             } catch (Throwable $exception) {
@@ -75,6 +74,8 @@ class Loader
             }
 
             Repository::validate($configuration, $file);
+            ReservedKeys::assert($key, $configuration, $file);
+
             $values[$key] = $configuration;
         }
 

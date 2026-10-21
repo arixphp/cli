@@ -15,6 +15,26 @@ use PHPUnit\Framework\TestCase;
 
 class RequestFactoryTest extends TestCase
 {
+    #[Test]
+    public function it_refuses_an_announced_body_that_exceeds_the_limit(): void
+    {
+        $previous = $_SERVER['CONTENT_LENGTH'] ?? null;
+        $_SERVER['CONTENT_LENGTH'] = '2048';
+
+        try {
+            (new RequestFactory(1024))->fromGlobals();
+            $this->fail('An oversized body must be refused.');
+        } catch (HttpException $exception) {
+            $this->assertSame(HttpStatusCode::CONTENT_TOO_LARGE, $exception->status);
+        } finally {
+            if ($previous === null) {
+                unset($_SERVER['CONTENT_LENGTH']);
+            } else {
+                $_SERVER['CONTENT_LENGTH'] = $previous;
+            }
+        }
+    }
+
     #[DataProvider('methods')]
     #[Test]
     public function it_capture_preserves_http_method_headers_query_and_repeatable_body(string $method): void

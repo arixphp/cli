@@ -35,6 +35,11 @@ class EchoServer
         return "http://127.0.0.1:{$this->port}{$path}";
     }
 
+    public function host(): string
+    {
+        return '127.0.0.1';
+    }
+
     public function stop(): void
     {
         if ($this->process->isRunning()) {

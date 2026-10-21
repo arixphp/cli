@@ -500,6 +500,173 @@ PHP;
     }
 
     #[Test]
+    public function it_restricts_the_accepted_host_headers(): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("ok"); }');
+        $this->routes('/page', $class);
+        $this->config(['trusted_hosts' => ['^example\.test$']]);
+        $kernel = Application::create($this->root)->kernel();
+
+        $refused = $kernel->handle(Request::create('/page', server: ['HTTP_HOST' => 'www.example.test']));
+
+        $this->assertSame(400, $refused->getStatusCode());
+        $this->assertFalse(class_exists($class, false));
+
+        $allowed = $kernel->handle(Request::create('/page', server: ['HTTP_HOST' => 'example.test']));
+
+        $this->assertSame(200, $allowed->getStatusCode());
+        $this->assertSame('ok', $allowed->getContent());
+    }
+
+    #[Test]
+    public function it_refuses_the_first_foreign_host_in_a_fresh_process(): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("ok"); }');
+        $this->routes('/page', $class);
+        $this->config(['trusted_hosts' => ['^example\.test$']]);
+        $program = <<<'PHP'
+            require $argv[1];
+            $kernel = \Arix\Application::create($argv[2])->kernel();
+            $response = $kernel->handle(\Arix\HttpFoundation\Request::create('/page', server: ['HTTP_HOST' => 'evil.test']));
+            echo json_encode(['status' => $response->getStatusCode(), 'loaded' => class_exists($argv[3], false)], JSON_THROW_ON_ERROR);
+            PHP;
+        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $process = new Process([PHP_BINARY, '-r', $program, $autoload, $this->root, $class], env: ['XDEBUG_MODE' => 'off']);
+        $process->run();
+
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $this->assertSame(['status' => 400, 'loaded' => false], json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
+    #[Test]
+    public function it_uses_the_current_host_policy_without_leaking_it_to_the_caller(): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("ok"); }');
+        $this->routes('/page', $class);
+        $this->config(['trusted_hosts' => ['^first\.test$']]);
+        $kernel = Application::create($this->root)->kernel();
+        Request::setTrustedHosts(['^caller\.(?:test|invalid)$']);
+        $previous = Request::getTrustedHosts();
+
+        try {
+            $this->assertSame(200, $kernel->handle(Request::create('http://first.test/page'))->getStatusCode());
+            $this->assertSame($previous, Request::getTrustedHosts());
+            $this->config(['trusted_hosts' => ['^second\.test$']]);
+            $this->assertSame(400, $kernel->handle(Request::create('http://first.test/page'))->getStatusCode());
+            $this->assertSame(200, $kernel->handle(Request::create('http://second.test/page'))->getStatusCode());
+            $this->assertSame($previous, Request::getTrustedHosts());
+            $this->assertSame('caller.test', Request::create('http://caller.test/')->getHost());
+        } finally {
+            Request::setTrustedHosts([]);
+        }
+    }
+
+    #[Test]
+    #[DataProvider('unrestrictedHostConfiguration')]
+    public function it_explicitly_clears_inherited_hosts_when_the_application_has_no_restriction(array $configuration): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("ok"); }');
+        $this->routes('/page', $class);
+        $this->config($configuration);
+        $kernel = Application::create($this->root)->kernel();
+        Request::setTrustedHosts(['^caller\.test$']);
+
+        try {
+            $this->assertSame(200, $kernel->handle(Request::create('http://other.test/page'))->getStatusCode());
+            $this->assertSame(['{^caller\.test$}i'], Request::getTrustedHosts());
+        } finally {
+            Request::setTrustedHosts([]);
+        }
+    }
+
+    public static function unrestrictedHostConfiguration(): array
+    {
+
+        return [[[]], [['trusted_hosts' => []]]];
+    }
+
+    #[Test]
+    #[DataProvider('invalidTrustedHosts')]
+    public function it_rejects_an_invalid_trusted_host_list(mixed $hosts): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("ok"); }');
+        $this->routes('/page', $class);
+        $this->config(['trusted_hosts' => $hosts, 'debug' => true]);
+        $kernel = Application::create($this->root)->kernel();
+        $response = $kernel->handle(Request::create('/page'));
+
+        $this->assertSame(500, $response->getStatusCode());
+        $this->assertStringContainsString('trusted_hosts', $response->getContent());
+    }
+
+    public static function invalidTrustedHosts(): array
+    {
+
+        return [[[42]], [null], ['example.test'], [['host' => '^example\.test$']], [['']], [['[']]];
+    }
+
+    #[Test]
+    #[DataProvider('consoleHostConfiguration')]
+    public function it_can_register_console_services_without_changing_the_callers_http_host_restriction(array $configuration): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("ok"); }');
+        $this->routes('/page', $class);
+        $this->config($configuration);
+        $container = new Container();
+        Request::setTrustedHosts(['^caller\.(?:test|invalid)$']);
+        $previous = Request::getTrustedHosts();
+
+        try {
+            Application::create($this->root)->registerConsole($container);
+            $this->assertTrue($container->has(Storage::class));
+            $this->assertSame($previous, Request::getTrustedHosts());
+
+            $this->config(['trusted_hosts' => [42]]);
+
+            try {
+                Application::create($this->root)->registerConsole(new Container());
+                $this->fail('Invalid console host configuration must fail.');
+            } catch (RuntimeException) {
+                $this->assertSame($previous, Request::getTrustedHosts());
+            }
+        } finally {
+            Request::setTrustedHosts([]);
+        }
+    }
+
+    public static function consoleHostConfiguration(): array
+    {
+
+        return [[[]], [['trusted_hosts' => []]], [['trusted_hosts' => ['^example\.test$']]]];
+    }
+
+    #[Test]
+    #[DataProvider('malformedRequestPaths')]
+    public function it_never_fails_a_request_with_an_internal_error(string $uri, int $expected): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("ok"); }');
+        $this->routes('/page', $class);
+        $this->config([]);
+        $kernel = Application::create($this->root)->kernel();
+        $response = $kernel->handle(Request::create($uri));
+
+        $this->assertSame($expected, $response->getStatusCode());
+        $this->assertStringNotContainsString('500 — ArixPHP', $response->getContent());
+    }
+
+    public static function malformedRequestPaths(): array
+    {
+        return [
+            'literal percent' => ['/%25', 400],
+            'double encoded traversal' => ['/%252e%252e/core/autoload.php', 400],
+            'encoded question mark' => ['/page%3Fx', 404],
+            'encoded colon' => ['/page%3Ax', 404],
+            'literal colon' => ['/page:x', 404],
+            'encoded hash' => ['/page%23x', 404],
+        ];
+    }
+
+    #[Test]
     public function it_builds_a_fresh_container_per_request(): void
     {
         $class = $this->controller('public static int $constructed = 0; public function __construct() { self::$constructed++; } public function show(): Response { return new Response("fresh"); }');
@@ -524,7 +691,7 @@ PHP;
         ], $overrides);
         $config = $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config';
         file_put_contents($config . DIRECTORY_SEPARATOR . 'app.php', "<?php\ndeclare(strict_types=1);\nreturn " . var_export($app, true) . ";\n");
-        file_put_contents($config . DIRECTORY_SEPARATOR . 'cache.php', "<?php\ndeclare(strict_types=1);\nreturn ['path' => 'storage/cache', 'version' => '1'];\n");
+        file_put_contents($config . DIRECTORY_SEPARATOR . 'cache.php', "<?php\ndeclare(strict_types=1);\nreturn ['version' => '1'];\n");
     }
 
     private function controller(string $body): string

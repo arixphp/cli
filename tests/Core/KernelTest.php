@@ -11,6 +11,7 @@ use Arix\Contracts\Middleware;
 use Arix\Contracts\RequestHandler;
 use Arix\Http\HttpException;
 use Arix\Http\Kernel;
+use Arix\HttpFoundation\Exception\SuspiciousOperationException;
 use Arix\HttpFoundation\Request;
 use Arix\HttpFoundation\Response;
 use Closure;
@@ -23,6 +24,151 @@ use stdClass;
 
 class KernelTest extends TestCase
 {
+    #[Test]
+    public function it_validates_the_configured_host_before_global_middleware_and_the_handler(): void
+    {
+        $calls = [];
+        $middleware = new class($calls) implements Middleware
+        {
+            public function __construct(private array &$calls) {}
+
+            public function handle(Request $request, Closure $next): Response
+            {
+                $this->calls[] = 'middleware';
+
+                return $next($request);
+            }
+        };
+        $kernel = new Kernel($this->handler(static function () use (&$calls): Response {
+            $calls[] = 'handler';
+
+            return new Response('ok');
+        }), configure: static function (Container $container) use ($middleware): void {
+            Request::setTrustedHosts(['^allowed\.test$']);
+            $container->instance('host.middleware', $middleware);
+        }, middleware: ['host.middleware']);
+
+        $this->assertSame(400, $kernel->handle(Request::create('http://evil.test/'))->getStatusCode());
+        $this->assertSame([], $calls);
+        $this->assertSame(200, $kernel->handle(Request::create('http://allowed.test/'))->getStatusCode());
+        $this->assertSame(['middleware', 'handler'], $calls);
+    }
+
+    #[Test]
+    public function it_never_accepts_a_reused_rejected_request_or_a_swallowed_host_error(): void
+    {
+        $kernel = new Kernel($this->handler(static fn (): Response => new Response('not reached')),
+            configure: static function (Container $container): void {
+                Request::setTrustedHosts(['^allowed\.test$']);
+
+                try {
+                    $container->get(Request::class)->getHost();
+                } catch (SuspiciousOperationException) {
+                    // The kernel must independently enforce the current policy.
+                }
+            });
+        $request = Request::create('http://evil.test/');
+
+        $this->assertSame(400, $kernel->handle($request)->getStatusCode());
+        $this->assertSame(400, $kernel->handle($request)->getStatusCode());
+    }
+
+    #[Test]
+    public function it_preserves_caller_host_patterns_for_a_direct_kernel(): void
+    {
+        Request::setTrustedHosts(['^caller\.(?:test|invalid)$']);
+        $previous = Request::getTrustedHosts();
+
+        try {
+            $kernel = new Kernel($this->handler(static fn (): Response => new Response('ok')));
+            $this->assertSame(200, $kernel->handle(Request::create('http://caller.test/'))->getStatusCode());
+            $this->assertSame(400, $kernel->handle(Request::create('http://evil.test/'))->getStatusCode());
+            $this->assertSame($previous, Request::getTrustedHosts());
+            $this->assertSame('caller.invalid', Request::create('http://caller.invalid/')->getHost());
+        } finally {
+            Request::setTrustedHosts([]);
+        }
+    }
+
+    #[Test]
+    public function it_refuses_a_request_with_a_stale_forwarded_host_before_the_handler(): void
+    {
+        $proxies = Request::getTrustedProxies();
+        $headers = Request::getTrustedHeaderSet();
+        $called = false;
+
+        try {
+            Request::setTrustedProxies(['127.0.0.1'], Request::HEADER_FORWARDED);
+            $request = Request::create('http://allowed.test/', server: ['HTTP_FORWARDED' => 'host=evil.test', 'REMOTE_ADDR' => '127.0.0.1']);
+            $this->assertSame('evil.test', $request->getHost());
+            $kernel = new Kernel($this->handler(static function () use (&$called): Response {
+                $called = true;
+
+                return new Response('not reached');
+            }), configure: static function (): void {
+                Request::setTrustedProxies(['127.0.0.1'], Request::HEADER_X_FORWARDED_HOST);
+                Request::setTrustedHosts(['^allowed\.test$']);
+            });
+
+            $this->assertSame(400, $kernel->handle($request)->getStatusCode());
+            $this->assertFalse($called);
+        } finally {
+            Request::setTrustedProxies($proxies, $headers);
+        }
+    }
+
+    #[Test]
+    public function it_restores_host_patterns_after_nested_requests_and_failures(): void
+    {
+        Request::setTrustedHosts(['^caller\.test$']);
+        $previous = Request::getTrustedHosts();
+        $inner = new Kernel($this->handler(static function (): Response {
+            throw new RuntimeException('inner failure');
+        }), configure: static function (): void {
+            Request::setTrustedHosts(['^inner\.test$']);
+        }, logger: static function (): void {});
+        $outer = new Kernel($this->handler(function () use ($inner): Response {
+            $this->assertSame(500, $inner->handle(Request::create('http://inner.test/'))->getStatusCode());
+            $this->assertSame('outer.test', Request::create('http://outer.test/')->getHost());
+
+            return new Response('ok');
+        }), configure: static function (): void {
+            Request::setTrustedHosts(['^outer\.test$']);
+        });
+
+        try {
+            $this->assertSame(200, $outer->handle(Request::create('http://outer.test/'))->getStatusCode());
+            $this->assertSame($previous, Request::getTrustedHosts());
+            $failing = new Kernel($this->handler(static fn (): Response => new Response('not reached')),
+                configure: static function (): void {
+                    Request::setTrustedHosts(['^changed\.test$']);
+                    throw new RuntimeException('configuration failure');
+                }, logger: static function (): void {});
+            $this->assertSame(500, $failing->handle(Request::create('http://caller.test/'))->getStatusCode());
+            $this->assertSame($previous, Request::getTrustedHosts());
+        } finally {
+            Request::setTrustedHosts([]);
+        }
+    }
+
+    #[Test]
+    public function it_never_routes_a_method_that_the_visitor_overrode(): void
+    {
+        $kernel = new Kernel($this->handler(static function (Request $request): Response {
+            return new Response($request->getMethod());
+        }), configure: static function (): void {
+            // The application configuration must not re-enable the override.
+            Request::setAllowedHttpMethodOverride(['POST']);
+        });
+
+        $response = $kernel->handle(Request::create('/', 'POST', [], [], [], [
+            'REQUEST_METHOD' => 'POST',
+            'HTTP_X_HTTP_METHOD_OVERRIDE' => 'DELETE',
+        ]));
+
+        $this->assertSame('POST', $response->getContent());
+    }
+
     #[Test]
     public function it_each_request_has_its_own_container_request_and_singletons(): void
     {

@@ -83,6 +83,18 @@ class ErrorResponderTest extends TestCase
     }
 
     #[Test]
+    public function it_debug_diagnostics_do_not_disclose_the_call_chain(): void
+    {
+        $response = new ErrorResponder(debug: true, logger: static function (): void {})->respond(new RuntimeException('debug secret'));
+        $body = (string) $response->getContent();
+
+        $this->assertStringContainsString('debug secret', $body);
+        $this->assertStringNotContainsString('Stack trace', $body);
+        $this->assertStringNotContainsString(dirname(__DIR__, 2), $body);
+        $this->assertStringNotContainsString('#0 ', $body);
+    }
+
+    #[Test]
     #[DataProvider('rendererFailures')]
     public function it_discards_incidental_output_from_custom_renderers(bool $fails): void
     {

@@ -136,8 +136,8 @@ class ConsoleRuntimeTest extends TestCase
         }
 
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', "<?php\n\ndeclare(strict_types=1);\n\nreturn ['debug' => false, 'base_path' => '', 'locales' => ['en'], 'default_locale' => 'en', 'name' => 'ArixPHP', 'max_body_bytes' => 1048576];\n");
-        file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'cache.php', "<?php\n\ndeclare(strict_types=1);\n\nreturn ['path' => 'storage/cache', 'version' => '1'];\n");
-        file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'schedule.php', "<?php\n\ndeclare(strict_types=1);\n\nreturn ['timezone' => 'UTC', 'grace' => 3600, 'log' => 'storage/logs/cron.log'];\n");
+        file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'cache.php', "<?php\n\ndeclare(strict_types=1);\n\nreturn ['version' => '1'];\n");
+        file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'schedule.php', "<?php\n\ndeclare(strict_types=1);\n\nreturn ['timezone' => 'UTC', 'grace' => 3600];\n");
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'routes.php', "<?php\n\ndeclare(strict_types=1);\n");
 
         if ($events !== []) {

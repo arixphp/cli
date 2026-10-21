@@ -130,11 +130,29 @@ class RoutingHandlerTest extends RoutingTestCase
             Route::get('/articles/{slug}', [$class, 'show']);
         }, basePath: '/site');
         $this->assertSame('café', $kernel->handle(Request::create('/site/articles/caf%C3%A9'))->getContent());
-        $this->assertSame('%2e%2e', $kernel->handle(Request::create('/site/articles/%252e%252e'))->getContent());
         $this->assertSame(400, $kernel->handle(Request::create('/site/articles/a%2Fb'))->getStatusCode());
         $this->assertSame(400, $kernel->handle(Request::create('/site/articles/%xx'))->getStatusCode());
         $this->assertSame(404, $kernel->handle(Request::create('/outside/articles/1'))->getStatusCode());
         $this->assertSame(404, $kernel->handle(Request::create('/site/articles/1/'))->getStatusCode());
+    }
+
+    #[Test]
+    public function it_decodes_a_request_path_exactly_once(): void
+    {
+        $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("slug")); }');
+        $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class): void {
+            $container->instance(RouteRegistry::class, new RouteRegistry());
+            $container->bind($class, static fn (): object => new $class());
+            Route::get('/articles/{slug}', [$class, 'show']);
+        });
+
+        // A decoded path that still carries an escape is malformed, not a route.
+        $this->assertSame(400, $kernel->handle(Request::create('/articles/%252e%252e'))->getStatusCode());
+        $this->assertSame(400, $kernel->handle(Request::create('/articles/100%25'))->getStatusCode());
+
+        // Characters that are legal in a path segment must not fail the request.
+        $this->assertSame('a:b', $kernel->handle(Request::create('/articles/a%3Ab'))->getContent());
+        $this->assertSame('a?b', $kernel->handle(Request::create('/articles/a%3Fb'))->getContent());
     }
 
     #[Test]
@@ -217,7 +235,7 @@ class RoutingHandlerTest extends RoutingTestCase
     {
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'views', 0755, true);
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'lang', 0755, true);
-        mkdir($this->directory . DIRECTORY_SEPARATOR . 'cache', 0755, true);
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'cache', 0755, true);
         file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'page.arix.php', '<h1>{{ $title }}</h1>');
         $root = $this->directory;
         $class = $this->controller('public function show(): \\Arix\\Views\\Contracts\\View { return new \\Arix\\Views\\View("page", ["title" => "Hi"]); }');
@@ -226,7 +244,7 @@ class RoutingHandlerTest extends RoutingTestCase
             $container->bind($class, static fn (): object => new $class());
             ViewServices::register($container, $root, $container->get(Request::class), [
                 'app' => ['name' => 'Site', 'base_path' => '', 'locales' => ['en'], 'default_locale' => 'en'],
-                'cache' => ['path' => $root . DIRECTORY_SEPARATOR . 'cache', 'version' => '1'],
+                'cache' => ['version' => '1'],
                 'views' => $root . DIRECTORY_SEPARATOR . 'views',
                 'lang' => $root . DIRECTORY_SEPARATOR . 'lang',
             ]);

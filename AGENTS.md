@@ -212,7 +212,20 @@ in scope and validate the working tree first.
 - Never derive class files, service identifiers, or filesystem paths directly
   from unvalidated visitor input.
 - Preserve exact path validation, one-time decoding, base-path handling, and
-  controller filename/class casing checks.
+  controller filename/class casing checks. The request path is decoded exactly
+  once and the decoded form must not carry another escape sequence.
+- A route parameter is exactly one path segment. Its constraint is compiled
+  into the route pattern, so it must be a valid pattern without capturing
+  groups and without the `~` delimiter.
+- The compiled template cache and the scheduler log are framework-owned and
+  live in `storage/` inside the application root. `cache.path` and
+  `schedule.log` are reserved configuration keys; a configuration file that
+  declares them is rejected.
+- The HTTP client refuses the addresses that belong to the deployment unless
+  the application allows the host explicitly, pins the resolved address, and
+  does not send the credentials of a host to a redirect of another host.
+- The server policy verifies the rules around the managed block: no directory
+  listing, a front controller, and no double escaping.
 - Controllers use explicit container bindings; do not add autowiring implicitly.
 - Keep a fresh container and mutable routing/view services per request.
 - Preserve bounded request-body capture and safe error responses. PHP and the web

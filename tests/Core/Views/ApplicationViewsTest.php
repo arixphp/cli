@@ -26,7 +26,7 @@ class ApplicationViewsTest extends TestCase
         $this->copy($reference . DIRECTORY_SEPARATOR . 'views', $this->directory . DIRECTORY_SEPARATOR . 'views');
         $this->copy($reference . DIRECTORY_SEPARATOR . 'lang', $this->directory . DIRECTORY_SEPARATOR . 'lang');
 
-        mkdir($this->directory . DIRECTORY_SEPARATOR . 'cache', 0755, true);
+        mkdir($this->directory . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'cache', 0755, true);
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'styles');
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'scripts');
         file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'styles' . DIRECTORY_SEPARATOR . 'app.css', 'abc');
@@ -56,7 +56,7 @@ class ApplicationViewsTest extends TestCase
                 Arix\Config\ConfigServices::register($container, $root.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'config');
                 Arix\Views\ViewServices::register($container, $root, $request, [
                     'app' => ['name' => 'ArixPHP', 'base_path' => '', 'locales' => ['es', 'en'], 'default_locale' => 'en'],
-                    'cache' => ['path' => $root . '/cache', 'version' => '1'],
+                    'cache' => ['version' => '1'],
                     'views' => $root . '/views',
                     'lang' => $root . '/lang',
                 ]);

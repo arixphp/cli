@@ -27,6 +27,7 @@ use Closure;
 use RuntimeException;
 
 use function array_key_exists;
+use function array_values;
 use function is_array;
 use function is_string;
 
@@ -119,10 +120,16 @@ class Application
     public function registerConsole(Container $container): void
     {
         ApplicationAutoloader::run($this->root, function () use ($container): void {
-            $container->instance(Request::class, new Request(server: ['REQUEST_METHOD' => HttpMethod::GET->value], content: ''));
+            $trustedHosts = array_map(static fn (string $pattern): string => substr($pattern, 1, -2), Request::getTrustedHosts());
 
-            $this->register($container);
-            $this->registerPresentation($container, routes: false);
+            try {
+                $container->instance(Request::class, new Request(server: ['REQUEST_METHOD' => HttpMethod::GET->value], content: ''));
+
+                $this->register($container);
+                $this->registerPresentation($container, routes: false);
+            } finally {
+                Request::setTrustedHosts($trustedHosts);
+            }
         });
     }
 
@@ -174,22 +181,51 @@ class Application
             throw new RuntimeException('Application configuration is missing.');
         }
 
+        self::trustHosts($app);
         $container->get(Request::class)->setDefaultLocale($app['default_locale']);
+    }
+
+    /**
+     * Restrict the accepted host headers.
+     *
+     * Without this the host of a request is controlled by the visitor, and
+     * application code that builds absolute URLs from it is exposed to host
+     * header poisoning.
+     *
+     * @param  array<string, mixed>  $app
+     */
+    private static function trustHosts(array $app): void
+    {
+        $hosts = array_key_exists('trusted_hosts', $app) ? $app['trusted_hosts'] : [];
+
+        if (! is_array($hosts) || ! array_is_list($hosts)) {
+            throw new RuntimeException('Application trusted_hosts must be a list of host patterns.');
+        }
+
+        foreach ($hosts as $host) {
+            if (! is_string($host) || $host === '' || ! self::validHostPattern($host)) {
+                throw new RuntimeException('Application trusted_hosts must be a list of host patterns.');
+            }
+        }
+
+        Request::setTrustedHosts(array_values($hosts));
+    }
+
+    private static function validHostPattern(string $pattern): bool
+    {
+        set_error_handler(static fn (): bool => true);
+
+        try {
+
+            return preg_match("{(?|(?:{$pattern}))}i", '') !== false;
+        } finally {
+            restore_error_handler();
+        }
     }
 
     private function registerPresentation(Container $container, bool $routes = true): void
     {
         $config = $container->get(Repository::class);
-        $cachePath = $config->get('cache.path', 'storage/cache');
-
-        if (! is_string($cachePath) || $cachePath === '') {
-            throw new RuntimeException('Application cache path is missing.');
-        }
-
-        if (! Path::isAbsolute($cachePath)) {
-            $cachePath = Path::join($this->root, $cachePath);
-        }
-
         $app = $config->get('app');
 
         if (! is_array($app)) {
@@ -202,7 +238,7 @@ class Application
         $request = $container->get(Request::class);
         $path = $request->attributes->get('_arix_path', '/');
         AssetServices::register($container, $this->root, new UrlGenerator((string) ($app['base_path'] ?? ''), is_string($path) ? $path : '/'));
-        $cache = ['path' => $cachePath, 'version' => $config->get('cache.version', '1')];
+        $cache = ['version' => $config->get('cache.version', '1')];
         $cacheConfiguration = $config->get('cache', []);
 
         if (is_array($cacheConfiguration) && array_key_exists('templates', $cacheConfiguration)) {
@@ -216,7 +252,8 @@ class Application
             'lang' => $this->languageDirectory,
         ]);
 
-        StorageServices::register($container, Path::join($this->root, 'storage', 'app'));
+        $storage = RuntimePaths::fromStrictRoot($this->root)->storageDirectory();
+        StorageServices::register($container, Path::join($storage, 'app'));
 
         if ($routes) {
             $routesFile = RuntimePaths::fromStrictRoot($this->root)->resolve(['app', 'routes.php'])

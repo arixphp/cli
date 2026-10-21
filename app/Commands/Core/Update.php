@@ -14,7 +14,11 @@ use RuntimeException;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 
 use function count;
+use function is_file;
+use function is_readable;
 use function is_string;
+use function preg_match;
+use function preg_quote;
 
 class Update extends Command
 {
@@ -110,6 +114,10 @@ class Update extends Command
 
         $this->info('Core integrity verified. HTTP application health has not been tested.');
 
+        foreach ($this->reservedConfigurationWarnings($application) as $warning) {
+            $this->warn($warning);
+        }
+
         if ($backup !== null) {
             $this->line("Backup retained: {$backup}");
         }
@@ -119,5 +127,36 @@ class Update extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The configuration keys the framework owns and the application must not declare.
+     *
+     * @return list<string>
+     */
+    private function reservedConfigurationWarnings(string $application): array
+    {
+        $warnings = [];
+
+        foreach ([['cache', 'path'], ['schedule', 'log']] as [$file, $key]) {
+            $path = $application . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . "{$file}.php";
+
+            if (! is_file($path) || ! is_readable($path)) {
+                continue;
+            }
+
+            $contents = file_get_contents($path);
+
+            if ($contents === false) {
+                continue;
+            }
+
+            // The file is inspected, never executed.
+            if (preg_match('/[\'"]' . preg_quote($key, '/') . '[\'"]\s*=>/', $contents) === 1) {
+                $warnings[] = "app/config/{$file}.php declares '{$key}', which the framework now owns. Remove it.";
+            }
+        }
+
+        return $warnings;
     }
 }

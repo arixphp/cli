@@ -126,12 +126,43 @@ class ClientTest extends TestCase
     public function it_reports_a_connection_failure(): void
     {
         try {
-            Http::create()->get('http://127.0.0.1:' . $this->closedPort() . '/');
+            Http::create()->withAllowedHosts(['127.0.0.1'])->get('http://127.0.0.1:' . $this->closedPort() . '/');
             $this->fail('A refused connection must be reported.');
         } catch (HttpClientException $exception) {
             $this->assertStringStartsWith('Network error: ', $exception->getMessage());
             $this->assertSame(CURLE_COULDNT_CONNECT, $exception->getCode());
         }
+    }
+
+    #[Test]
+    #[DataProvider('reservedHosts')]
+    public function it_refuses_to_reach_a_reserved_address(string $url, string $expected): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageIsOrContains($expected);
+        Http::create()->get($url);
+    }
+
+    public static function reservedHosts(): array
+    {
+        return [
+            'loopback' => ['http://127.0.0.1/', 'reserved address'],
+            'loopback name' => ['http://localhost/', 'reserved address'],
+            'private' => ['http://192.168.1.1/', 'reserved address'],
+            'private class a' => ['http://10.0.0.1/', 'reserved address'],
+            'link local' => ['http://169.254.169.254/latest/meta-data/', 'reserved address'],
+            'unspecified' => ['http://0.0.0.0/', 'reserved address'],
+            'multicast' => ['http://224.0.0.1/', 'reserved address'],
+            'ipv6 loopback' => ['http://[::1]/', 'reserved address'],
+        ];
+    }
+
+    #[Test]
+    public function it_refuses_a_host_outside_the_allowlist(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageIsOrContains('is not allowed');
+        Http::create()->withAllowedHosts(['api.example.test'])->get('http://other.example.test/');
     }
 
     #[Test]
