@@ -23,9 +23,6 @@ architectural reference only; do not modify an application from a CLI task unles
 the user explicitly requests a cross-project change. Locate any local application
 checkout explicitly rather than assuming it is a sibling directory.
 
-The legacy `clix` project is out of scope, regardless of its location. Do not read
-or modify it.
-
 ## Project layout
 
 - `arix` is the Laravel Zero entry point.
