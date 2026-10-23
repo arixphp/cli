@@ -13,6 +13,39 @@ use PHPUnit\Framework\TestCase;
 class ServerPolicyRendererTest extends TestCase
 {
     #[Test]
+    public function it_denies_environment_paths_before_public_file_serving_on_every_server(): void
+    {
+        $renderer = new ServerPolicyRenderer(new AssetPolicy());
+
+        foreach (['apache', 'caddy', 'iis'] as $server) {
+            $block = $renderer->render($server);
+            $expression = match ($server) {
+                'apache' => '~^RewriteRule (\S+) - \[F,L\]$~m',
+                'caddy' => '~@private path_regexp arix_private `([^`]+)`~',
+                'iis' => '~<rule name="Arix deny private files"[^>]*>\s*<match url="([^"]+)"~',
+            };
+            $this->assertSame(1, preg_match($expression, $block, $match));
+            $pattern = html_entity_decode($match[1], ENT_QUOTES | ENT_XML1);
+
+            foreach (['/.env', '/.env.local', '/.env.production', '/.env.bak', '/.env.example', '/nested/.env', '/%2eenv'] as $path) {
+                $decoded = rawurldecode($path);
+                $subject = $server === 'caddy' ? $decoded : ltrim($decoded, '/');
+                $this->assertSame(1, preg_match("~{$pattern}~", $subject), "{$server}: {$path}");
+            }
+
+            $privateOffset = strpos($block, $match[0]);
+            $publicOffset = strpos($block, match ($server) {
+                'apache' => 'RewriteCond %{REQUEST_FILENAME} -f',
+                'caddy' => 'file_server @public_files',
+                'iis' => '<rule name="Arix deny invalid public assets"',
+            });
+            $this->assertLessThan($publicOffset, $privateOffset);
+            $configuration = $this->configuration($server, $block);
+            $this->assertFalse($renderer->matches($server, str_replace($match[0], '', $configuration)));
+        }
+    }
+
+    #[Test]
     public function it_renders_typed_roots_and_method_restrictions(): void
     {
         $renderer = new ServerPolicyRenderer(new AssetPolicy());

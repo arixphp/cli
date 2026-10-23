@@ -259,7 +259,7 @@ PHP;
         $this->assertStringContainsString('<title>500 — ArixPHP</title>', $response->getContent());
 
         $missingRoot = $this->fixture->path('missing');
-        $response = new HttpRuntime(logger: static function (): void {})->handle(static fn () => Application::create($missingRoot), 'fpm-fcgi');
+        $response = new HttpRuntime($this->fixture->root, logger: static function (): void {})->handle(static fn () => Application::create($missingRoot), 'fpm-fcgi');
         $this->assertSame(500, $response->getStatusCode());
         $this->assertStringContainsString('<title>500 — ArixPHP</title>', $response->getContent());
     }

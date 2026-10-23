@@ -31,7 +31,8 @@ class PublicResourceHelpersTest extends TestCase
         try {
             $container = new Container();
 
-            AssetServices::register($container, $fixture->root, new UrlGenerator());
+            $generator = UrlGenerator::fromApplicationUrl('https://myapp.com');
+            AssetServices::register($container, $fixture->root, $generator, $generator);
 
             $this->expectException(InvalidArgumentException::class);
 
@@ -51,11 +52,12 @@ class PublicResourceHelpersTest extends TestCase
             $fixture->write('fonts/inter.woff2', 'abc');
             $first = new Container();
 
-            AssetServices::register($first, $fixture->root, new UrlGenerator());
+            $generator = UrlGenerator::fromApplicationUrl('https://myapp.com');
+            AssetServices::register($first, $fixture->root, $generator, $generator);
             $urls = ContainerContext::run($first, static fn (): array => [media('logo.webp', versioned: true), font('inter.woff2', versioned: true)]);
             $hash = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
 
-            $this->assertSame(["/media/logo.webp?v={$hash}", "/fonts/inter.woff2?v={$hash}"], $urls);
+            $this->assertSame(["https://myapp.com/media/logo.webp?v={$hash}", "https://myapp.com/fonts/inter.woff2?v={$hash}"], $urls);
 
             $mtime = filemtime($file);
 
@@ -64,7 +66,7 @@ class PublicResourceHelpersTest extends TestCase
 
             $second = new Container();
 
-            AssetServices::register($second, $fixture->root, new UrlGenerator());
+            AssetServices::register($second, $fixture->root, $generator, $generator);
 
             $url = ContainerContext::run($second, static fn (): string => media('logo.webp', versioned: true));
 
@@ -84,14 +86,15 @@ class PublicResourceHelpersTest extends TestCase
             $fixture->write('scripts/app.js', 'abc');
             $container = new Container();
 
-            AssetServices::register($container, $fixture->root, new UrlGenerator('/site'));
+            $generator = UrlGenerator::fromApplicationUrl('https://myapp.com/site');
+            AssetServices::register($container, $fixture->root, $generator, $generator);
 
             $urls = ContainerContext::run($container, static fn (): array => [style('app.css'), script('app.js')]);
 
             $hash = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
 
-            $this->assertSame("/site/styles/app.css?v={$hash}", $urls[0]);
-            $this->assertSame("/site/scripts/app.js?v={$hash}", $urls[1]);
+            $this->assertSame("https://myapp.com/site/styles/app.css?v={$hash}", $urls[0]);
+            $this->assertSame("https://myapp.com/site/scripts/app.js?v={$hash}", $urls[1]);
         } finally {
             $fixture->cleanup();
         }
@@ -104,11 +107,12 @@ class PublicResourceHelpersTest extends TestCase
 
         try {
             $container = new Container();
-            AssetServices::register($container, $fixture->root, new UrlGenerator('/site'));
+            $generator = UrlGenerator::fromApplicationUrl('https://myapp.com/site');
+            AssetServices::register($container, $fixture->root, $generator, $generator);
 
             $urls = ContainerContext::run($container, static fn (): array => [font('missing.woff2'), media('missing.webp')]);
 
-            $this->assertSame(['/site/fonts/missing.woff2', '/site/media/missing.webp'], $urls);
+            $this->assertSame(['https://myapp.com/site/fonts/missing.woff2', 'https://myapp.com/site/media/missing.webp'], $urls);
         } finally {
             $fixture->cleanup();
         }

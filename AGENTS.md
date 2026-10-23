@@ -201,8 +201,11 @@ in scope and validate the working tree first.
   `is_resource`, `is_scalar`, `is_string`, `ord`, `sizeof`, `strlen`, `strval`.
 - Follow `pint.json` for handwritten PHP. It excludes imported HttpFoundation and
   FastRoute sources; do not expand formatting into managed upstream code.
-- Preserve public method signatures and documented behavior unless the requested
-  change explicitly introduces a breaking migration.
+- Arix has no production applications; changes may be breaking. Implement and
+  document only the current contract. Do not preserve old signatures or behavior
+  for backward compatibility, add compatibility layers or aliases, or support
+  previous APIs or directory structures. Update affected callers and tests to the
+  current contract instead.
 
 ## Security and runtime invariants
 

@@ -12,7 +12,7 @@ class EnvHelperTest extends TestCase
 {
     #[Test]
     #[DataProvider('environmentValues')]
-    public function it_preserves_values_and_converts_only_boolean_strings(mixed $value, mixed $expected): void
+    public function it_preserves_typed_values_and_normalizes_unquoted_literals(mixed $value, mixed $expected): void
     {
         $program = '$_ENV["ARIX_TEST_ENV"] = ' . var_export($value, true) . '; ' . <<<'PHP'
             $calls = 0;
@@ -41,8 +41,8 @@ class EnvHelperTest extends TestCase
             [1.5, 1.5],
             [[], []],
             [null, null],
-            ['TRUE', 'TRUE'],
-            [' false ', ' false '],
+            ['TRUE', true],
+            [' false ', false],
         ];
     }
 

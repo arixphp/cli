@@ -39,6 +39,10 @@ class CaddyConfigurationTest extends TestCase
         $this->fixture->write('favicon.ico', 'ICON');
         $this->fixture->write('assets/Fonts/image.png', 'PRIVATE');
         $this->fixture->write('.frontend-backup-test/index.js', 'PRIVATE');
+
+        foreach (['.env', '.env.local', '.env.production', '.env.bak', '.env.example', 'nested/.env'] as $path) {
+            $this->fixture->write($path, 'PRIVATE');
+        }
     }
 
     protected function tearDown(): void
@@ -84,7 +88,7 @@ class CaddyConfigurationTest extends TestCase
             $this->assertSame('/index.php', $page['script']);
             $this->assertNotEmpty($page['reload']);
 
-            foreach (['/app/bootstrap.php', '/core/autoload.php', '/phpunit.xml', '/.git/config', '/styles/missing.css', '/styles/file.php', '/assets/Fonts/image.png', '/.frontend-backup-test/index.js'] as $path) {
+            foreach (['/app/bootstrap.php', '/core/autoload.php', '/phpunit.xml', '/.git/config', '/styles/missing.css', '/styles/file.php', '/assets/Fonts/image.png', '/.frontend-backup-test/index.js', '/.env', '/.env.local', '/.env.production', '/.env.bak', '/.env.example', '/nested/.env', '/%2eenv'] as $path) {
                 $this->assertSame(403, $this->request($port, $path)[0], $path);
                 $this->assertStringNotContainsString('PRIVATE', $this->request($port, $path)[1], $path);
             }

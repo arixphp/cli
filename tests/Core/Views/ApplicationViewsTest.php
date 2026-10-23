@@ -54,7 +54,9 @@ class ApplicationViewsTest extends TestCase
                 $request->attributes->set('_arix_path', $path);
                 $container = new Arix\Container\Container;
                 Arix\Config\ConfigServices::register($container, $root.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'config');
-                Arix\Views\ViewServices::register($container, $root, $request, [
+                $context = Arix\Http\RequestUrlContext::fromRequest($request);
+                Arix\Assets\AssetServices::register($container, $root, Arix\Routing\UrlGenerator::fromRequest($request, $context), Arix\Routing\UrlGenerator::fromRequest($request, $context, assets: true));
+                Arix\Views\ViewServices::register($container, $root, [
                     'app' => ['name' => 'ArixPHP', 'base_path' => '', 'locales' => ['es', 'en'], 'default_locale' => 'en'],
                     'cache' => ['version' => '1'],
                     'views' => $root . '/views',
@@ -87,7 +89,7 @@ class ApplicationViewsTest extends TestCase
         $this->assertStringContainsString('<nav aria-label="Main navigation">', $index);
         $this->assertStringContainsString('aria-current="page" >Home</a>', $index);
         $this->assertStringContainsString('Server-rendered HTML. JavaScript only when you need it.', $index);
-        $this->assertStringContainsString('<link rel="canonical" href="/">', $index);
+        $this->assertStringContainsString('<link rel="canonical" href="http://localhost/">', $index);
         $this->assertStringContainsString('/styles/app.css?v=ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', $index);
         $this->assertStringContainsString('/scripts/app.js?v=ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', $index);
 
@@ -95,7 +97,7 @@ class ApplicationViewsTest extends TestCase
         $this->assertStringContainsString('<h1>About ArixPHP</h1>', $about);
         $this->assertStringContainsString('A small framework for content-driven websites.', $about);
         $this->assertStringContainsString('aria-current="page" >About</a>', $about);
-        $this->assertStringContainsString('<link rel="canonical" href="/about">', $about);
+        $this->assertStringContainsString('<link rel="canonical" href="http://localhost/about">', $about);
     }
 
     private function copy(string $from, string $to): void

@@ -14,6 +14,22 @@ use Tests\TestCase;
 class AssetsRenderPolicyCommandTest extends TestCase
 {
     #[Test]
+    public function it_reports_drift_when_environment_file_protection_is_removed(): void
+    {
+        $fixture = new NewApplicationFixture();
+
+        try {
+            $configuration = $this->configuration('apache');
+            $configuration = str_replace('RewriteRule (^|/)\\. - [F,L]', '', $configuration);
+            $file = $fixture->write('.htaccess', $configuration);
+            $this->artisan('assets:policy', ['server' => 'apache', '--check' => $file])->assertExitCode(1);
+            $this->assertSame($configuration, file_get_contents($file));
+        } finally {
+            $fixture->cleanup();
+        }
+    }
+
+    #[Test]
     public function it_reports_drift_without_writing_files(): void
     {
         $fixture = new NewApplicationFixture();
