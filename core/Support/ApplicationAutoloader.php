@@ -4,90 +4,34 @@ declare(strict_types=1);
 
 namespace Arix\Support;
 
+use Arix\Autoload\AutoloadConfiguration;
+use Arix\Autoload\ClassLoader;
 use Closure;
-use RuntimeException;
 
-use function in_array;
-
+// TODO: Drop
 class ApplicationAutoloader
 {
-    private static Closure|null $loader = null;
-
-    private static string|null $root = null;
-
-    public static function register(string $root): void
+    public static function run(string $root, Closure $callback, bool|null $development = null): mixed
     {
-        self::$root = RuntimePaths::fromApplicationRoot($root)->root;
+        $previous = ClassLoader::current();
+        $canonical = RuntimePaths::fromApplicationRoot($root)->root;
+        $sameRoot = $previous?->configuration->root() === $canonical;
+        $development ??= $sameRoot && $previous?->development === true;
 
-        if (self::$loader === null) {
-            self::$loader = self::load(...);
-
-            spl_autoload_register(self::$loader, prepend: true);
+        if (! $sameRoot || $previous->development !== $development) {
+            $configuration = $sameRoot ? $previous->configuration : AutoloadConfiguration::read($canonical);
+            (new ClassLoader($configuration, $development))->register();
         }
-    }
-
-    public static function run(string $root, Closure $callback): mixed
-    {
-        $previous = self::$root;
-        $registered = self::$loader !== null;
-        self::register($root);
 
         try {
+
             return $callback();
         } finally {
-            self::$root = $previous;
 
-            if (! $registered) {
-                spl_autoload_unregister(self::$loader);
-                self::$loader = null;
+            if (ClassLoader::current() !== $previous) {
+                ClassLoader::current()?->unregister();
+                $previous?->register();
             }
         }
-    }
-
-    private static function load(string $class): void
-    {
-        if (self::$root === null || ! str_starts_with($class, 'App\\')) {
-            return;
-        }
-
-        $relative = substr($class, 4);
-
-        if (! preg_match('/^[A-Za-z_][A-Za-z0-9_]*(?:\\\\[A-Za-z_][A-Za-z0-9_]*)*$/D', $relative)) {
-            return;
-        }
-
-        $segments = explode('\\', $relative);
-
-        if (self::isResource($segments[0])) {
-            return;
-        }
-
-        $segments[array_key_last($segments)] .= '.php';
-        $path = self::classFile($segments);
-
-        if ($path !== null) {
-            require_once $path;
-        }
-    }
-
-    private static function isResource(string $segment): bool
-    {
-        return in_array($segment, ['config', 'lang', 'views', 'bootstrap', 'routes', 'services', 'schedules'], true);
-    }
-
-    /** @param list<string> $segments */
-    private static function classFile(array $segments): string|null
-    {
-        try {
-            $path = RuntimePaths::fromStrictRoot(self::$root)->resolve(['app', ...$segments]);
-        } catch (RuntimeException) {
-            return null;
-        }
-
-        if ($path === null || ! is_file($path) || ! is_readable($path)) {
-            return null;
-        }
-
-        return $path;
     }
 }

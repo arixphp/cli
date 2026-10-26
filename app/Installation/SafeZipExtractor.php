@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Installation;
 
-use JsonException;
+use Arix\Autoload\AutoloadConfiguration;
 use RuntimeException;
 use ZipArchive;
 
 use function array_slice;
 use function count;
-use function is_array;
 use function strlen;
 
 class SafeZipExtractor
@@ -223,28 +222,7 @@ class SafeZipExtractor
             throw new RuntimeException('Skeleton is missing the app directory.');
         }
 
-        $marker = $destination . DIRECTORY_SEPARATOR . '.arix.json';
-        $size = @filesize($marker);
-
-        if ($size === false || $size > 65536) {
-            throw new RuntimeException('Invalid skeleton contract marker size.');
-        }
-
-        $contents = @file_get_contents($marker);
-
-        if ($contents === false) {
-            throw new RuntimeException('Cannot read skeleton contract marker.');
-        }
-
-        try {
-            $contract = json_decode($contents, true, 16, JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new RuntimeException('Invalid skeleton contract JSON.', previous: $exception);
-        }
-
-        if (! is_array($contract) || ($contract['format'] ?? null) !== 1 || ($contract['core_contract'] ?? null) !== 'arix-core-v1') {
-            throw new RuntimeException('Unsupported skeleton contract. Update the CLI or use a compatible skeleton.');
-        }
+        AutoloadConfiguration::read($destination);
     }
 
     private function skeletonFiles(): array
@@ -252,6 +230,8 @@ class SafeZipExtractor
         return [
             'index.php',
             'core/autoload.php',
+            'core/Autoload/AutoloadConfiguration.php',
+            'core/Autoload/ClassLoader.php',
             '.arix.json',
             // The server policy is the only thing that keeps the private
             // directories and the application sources out of reach.

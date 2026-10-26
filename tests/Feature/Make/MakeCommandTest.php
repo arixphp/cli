@@ -18,7 +18,7 @@ class MakeCommandTest extends TestCase
         $parent = dirname($fixture->root);
 
         try {
-            $fixture->write('.arix.json', '{"format":1,"core_contract":"arix-core-v1"}');
+            $fixture->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"}}}');
             $fixture->write('index.php', '<?php');
             $fixture->write('app/bootstrap.php', '<?php');
 

@@ -27,7 +27,13 @@ class PackagedResourcesTest extends TestCase
             }
         }
 
-        foreach (['core/Assets/AssetPolicy.php', 'core/Assets/AssetType.php', 'core/Assets/public-policy.json'] as $required) {
+        foreach ([
+            'core/Assets/AssetPolicy.php',
+            'core/Assets/AssetType.php',
+            'core/Assets/public-policy.json',
+            'core/Autoload/AutoloadConfiguration.php',
+            'core/Autoload/ClassLoader.php',
+        ] as $required) {
             if (! in_array($required, $packaged, true)) {
                 $missing[] = $required;
             }

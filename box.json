@@ -11,6 +11,8 @@
         "core/Assets/AssetPolicy.php",
         "core/Assets/AssetType.php",
         "core/Assets/public-policy.json",
+        "core/Autoload/AutoloadConfiguration.php",
+        "core/Autoload/ClassLoader.php",
         "resources/core.bundle",
         "resources/stubs/AGENTS.md",
         "resources/stubs/controller.stub",

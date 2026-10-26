@@ -16,7 +16,7 @@ class ControllerCommandTest extends TestCase
         $fixture = new NewApplicationFixture();
 
         try {
-            $fixture->write('.arix.json', '{"format":1,"core_contract":"arix-core-v1"}');
+            $fixture->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"}}}');
             $fixture->write('index.php', '<?php');
             $fixture->write('app/bootstrap.php', '<?php');
 
@@ -36,7 +36,7 @@ class ControllerCommandTest extends TestCase
         $fixture = new NewApplicationFixture();
 
         try {
-            $fixture->write('.arix.json', '{"format":1,"core_contract":"arix-core-v1"}');
+            $fixture->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"}}}');
             $fixture->write('index.php', '<?php');
             $fixture->write('app/bootstrap.php', '<?php');
             $fixture->write('app/Controllers/PostController.php', 'sentinel');
@@ -60,7 +60,7 @@ class ControllerCommandTest extends TestCase
         $fixture = new NewApplicationFixture();
 
         try {
-            $fixture->write('.arix.json', '{"format":1,"core_contract":"arix-core-v1"}');
+            $fixture->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"}}}');
             $fixture->write('index.php', '<?php');
             $fixture->write('app/bootstrap.php', '<?php');
 

@@ -25,7 +25,7 @@ class GeneratorTest extends TestCase
         $this->root = $temporary . DIRECTORY_SEPARATOR . 'arix-make-' . bin2hex(random_bytes(8));
 
         mkdir($this->root . DIRECTORY_SEPARATOR . 'app', 0700, true);
-        file_put_contents($this->root . DIRECTORY_SEPARATOR . '.arix.json', '{"format":1,"core_contract":"arix-core-v1"}');
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"}}}');
         file_put_contents($this->root . DIRECTORY_SEPARATOR . 'index.php', '<?php');
         file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'bootstrap.php', '<?php');
     }

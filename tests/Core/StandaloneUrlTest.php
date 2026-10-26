@@ -7,6 +7,7 @@ namespace Tests\Core;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
+use Tests\Support\StandaloneCore;
 use Tests\Support\TempTree;
 
 class StandaloneUrlTest extends TestCase
@@ -15,6 +16,7 @@ class StandaloneUrlTest extends TestCase
     public function it_uses_the_target_application_url_in_console_and_route_resolution(): void
     {
         $tree = new TempTree();
+        $tree->applicationManifest();
         $tree->write('.env', 'APP_URL=https://myapp.com/subdirectory');
         $tree->write('app/config/app.php', '<?php declare(strict_types=1); return ["url" => env("APP_URL"), "locales" => ["en"], "default_locale" => "en"];');
         $tree->write('app/views/probe.php', '<?php echo url("/about");');
@@ -48,7 +50,7 @@ echo "\nURL_RESULT:" . json_encode([$status, $first, $console, $second, $third, 
 PHP;
 
         try {
-            $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+            $autoload = StandaloneCore::autoload($tree->root);
             $process = new Process([PHP_BINARY, '-r', $program, $autoload, $tree->root], env: ['XDEBUG_MODE' => 'off']);
             $process->mustRun();
             $result = json_decode(explode("\nURL_RESULT:", $process->getOutput(), 2)[1], true, flags: JSON_THROW_ON_ERROR);

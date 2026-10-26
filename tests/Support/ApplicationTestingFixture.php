@@ -15,12 +15,13 @@ class ApplicationTestingFixture
     {
         $this->root = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix tests ' . bin2hex(random_bytes(8));
         mkdir($this->root);
+        (new Filesystem())->mirror(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core', $this->path('core'));
+        $this->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/","Arix\\\\":"core/"},"files":["core/functions.php","core/FastRoute/functions.php"]},"autoload-dev":{"psr-4":{"Tests\\\\":"tests/"}}}');
         $this->write('index.php', '<?php');
         $this->write('app/bootstrap.php', '<?php');
-        $this->write('core/autoload.php', <<<'PHP'
+        $this->write('core/functions.php', <<<'PHP'
 <?php
 declare(strict_types=1);
-namespace Arix { class ApplicationMarker {} }
 namespace {
     function view(): string { return 'application-view'; }
     function trans(): string { return 'application-trans'; }
@@ -28,6 +29,7 @@ namespace {
     function env(): string { return 'application-env'; }
 }
 PHP);
+        $this->write('core/ApplicationMarker.php', '<?php declare(strict_types=1); namespace Arix; class ApplicationMarker {}');
         $this->write('tests/autoload.php', '<?php require_once dirname(__DIR__) . "/core/autoload.php";');
         $this->write('phpunit.xml', <<<'XML'
 <?xml version="1.0" encoding="UTF-8"?>

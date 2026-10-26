@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Testing;
 
+use Arix\Autoload\ClassLoader;
 use Pest\Kernel;
 use Pest\TestSuite;
 use RuntimeException;
@@ -32,6 +33,14 @@ class PestRunner
 
         // Arix must claim its global helpers before Composer includes Laravel's.
         require_once $root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $native = ClassLoader::current();
+
+        if ($native === null || $native->configuration->root() !== $root) {
+            throw new RuntimeException('Application bootstrap did not register its native autoloader.');
+        }
+
+        $configuration = $native->configuration;
+        (new ClassLoader($configuration, development: true))->register();
         $autoload = $distribution . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 
         if (! is_file($autoload)) {
@@ -43,8 +52,9 @@ class PestRunner
         // Pest plugins belong to the CLI's dependency installation, not the app.
         $GLOBALS['_composer_bin_dir'] = dirname($autoload) . DIRECTORY_SEPARATOR . 'bin';
         $loader->unregister();
-        spl_autoload_register(static function (string $class) use ($loader): void {
-            foreach (['App\\', 'Arix\\', 'Tests\\'] as $owned) {
+        $prefixes = array_unique(['App\\', 'Arix\\', 'Tests\\', ...array_keys($configuration->prefixes()), ...array_keys($configuration->devPrefixes())]);
+        spl_autoload_register(static function (string $class) use ($loader, $prefixes): void {
+            foreach ($prefixes as $owned) {
                 if (str_starts_with($class, $owned)) {
 
                     return;

@@ -21,11 +21,57 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Tests\Support\NativeLink;
+use Tests\Support\StandaloneCore;
 
 use function strlen;
 
 class ApplicationTest extends TestCase
 {
+    #[Test]
+    public function it_reuses_the_bootstrap_loader_through_the_http_request_lifecycle(): void
+    {
+        $autoload = StandaloneCore::autoload($this->root);
+        $manifest = json_decode(file_get_contents($this->root . DIRECTORY_SEPARATOR . '.arix.json'), true, flags: JSON_THROW_ON_ERROR);
+        $id = 'Domain' . bin2hex(random_bytes(6));
+        $manifest['autoload']['psr-4']["{$id}\\"] = 'domain/';
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . '.arix.json', json_encode($manifest, JSON_THROW_ON_ERROR));
+        mkdir($this->root . DIRECTORY_SEPARATOR . 'domain');
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'domain' . DIRECTORY_SEPARATOR . 'Message.php', "<?php namespace {$id}; class Message { public static function value(): string { return 'unified-http'; } }");
+        $controller = $this->controller('public function show(): Response { if (\\Arix\\Autoload\\ClassLoader::current() !== $GLOBALS["expected_loader"]) { throw new \\RuntimeException("Controller changed loader"); } return new Response(\\' . $id . '\\Message::value()); }');
+        $this->routes('/', $controller);
+        mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Middleware');
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Middleware' . DIRECTORY_SEPARATOR . 'Audit.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace App\Middleware;
+class Audit implements \Arix\Contracts\Middleware {
+    public function handle(\Arix\HttpFoundation\Request $request, \Closure $next): \Arix\HttpFoundation\Response {
+        if (\Arix\Autoload\ClassLoader::current() !== $GLOBALS['expected_loader']) { throw new \RuntimeException('Middleware changed loader'); }
+        $response = $next($request);
+        $response->headers->set('X-Autoload', 'unified');
+        return $response;
+    }
+}
+PHP);
+        $program = <<<'PHP'
+$loader = require $argv[1];
+$GLOBALS['expected_loader'] = $loader;
+unlink($argv[2] . DIRECTORY_SEPARATOR . '.arix.json');
+$_SERVER = ['REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/', 'SCRIPT_NAME' => '/index.php', 'SCRIPT_FILENAME' => $argv[2] . DIRECTORY_SEPARATOR . 'index.php', 'SERVER_NAME' => 'localhost', 'SERVER_PORT' => '80', 'HTTP_HOST' => 'localhost'];
+$response = (new \Arix\Runtime\HttpRuntime($argv[2]))->handle(static function () use ($argv, $loader) {
+    if (\Arix\Autoload\ClassLoader::current() !== $loader) { throw new RuntimeException('Runtime changed loader'); }
+    return \Arix\Application::create($argv[2])->kernel(['App\\Middleware\\Audit']);
+}, 'fpm-fcgi');
+if ($response->getStatusCode() !== 200 || $response->headers->get('X-Autoload') !== 'unified') { throw new RuntimeException($response->getContent()); }
+if (\Arix\Autoload\ClassLoader::current() !== $loader || count(spl_autoload_functions()) !== 1) { throw new RuntimeException('Loader was not preserved'); }
+echo $response->getContent();
+PHP;
+        $process = new Process([PHP_BINARY, '-r', $program, $autoload, $this->root]);
+        $process->run();
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $this->assertSame('unified-http', $process->getOutput());
+    }
+
     #[Test]
     #[DataProvider('nonBooleanDebugValues')]
     public function it_disables_non_boolean_debug_without_stopping_the_application(mixed $debug): void
@@ -162,7 +208,7 @@ PHP);
         $this->routes('/', $class);
         $alias = $this->root . DIRECTORY_SEPARATOR . 'current';
         symlink($this->root, $alias);
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = StandaloneCore::autoload($this->root);
         $program = <<<'PHP'
 require $argv[1];
 $kernel = \Arix\Application::create($argv[2])->kernel();
@@ -327,6 +373,7 @@ PHP;
         mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'views', 0755, true);
         mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'lang', 0755, true);
         mkdir($this->root . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'cache', 0755, true);
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"}}}');
         $this->config([]);
     }
 
@@ -553,7 +600,7 @@ PHP;
             $response = $kernel->handle(\Arix\HttpFoundation\Request::create('/page', server: ['HTTP_HOST' => 'evil.test']));
             echo json_encode(['status' => $response->getStatusCode(), 'loaded' => class_exists($argv[3], false)], JSON_THROW_ON_ERROR);
             PHP;
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = StandaloneCore::autoload($this->root);
         $process = new Process([PHP_BINARY, '-r', $program, $autoload, $this->root, $class], env: ['XDEBUG_MODE' => 'off']);
         $process->run();
 

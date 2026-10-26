@@ -139,7 +139,7 @@ class CoreDistribution
             }
         }
 
-        foreach (['autoload.php', 'functions.php', 'imports.json', 'Http/Kernel.php'] as $required) {
+        foreach (['autoload.php', 'Autoload/AutoloadConfiguration.php', 'Autoload/ClassLoader.php', 'functions.php', 'imports.json', 'Http/Kernel.php'] as $required) {
             if (! isset($manifest['files'][$required])) {
                 throw new RuntimeException("Incomplete core distribution: {$required}");
             }

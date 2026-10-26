@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
+use Tests\Support\StandaloneCore;
 
 class ConsoleRuntimeTest extends TestCase
 {
@@ -25,7 +26,7 @@ class ConsoleRuntimeTest extends TestCase
         mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Services');
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Services' . DIRECTORY_SEPARATOR . "{$id}.php", "<?php declare(strict_types=1); namespace App\\Services; class {$id} { public static function run(): void {} }");
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'schedules.php', '<?php declare(strict_types=1); unlink(' . var_export($alias, true) . '); symlink(' . var_export($other, true) . ', ' . var_export($alias, true) . '); return static function ($schedule): void { $schedule->call("pinned", static fn () => \\App\\Services\\' . $id . '::run())->everyMinute(); };');
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = StandaloneCore::autoload($root);
         $program = 'require $argv[1]; exit((new Arix\\Runtime\\ConsoleRuntime())->run($argv[2]));';
         $process = new Process([PHP_BINARY, '-r', $program, $autoload, $alias]);
 
@@ -97,7 +98,7 @@ class ConsoleRuntimeTest extends TestCase
         $root = $this->application([
             'broken' => 'static function (): void { throw new \RuntimeException("boom"); }',
         ]);
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = StandaloneCore::autoload($root);
         $script = $root . DIRECTORY_SEPARATOR . 'cron.php';
 
         file_put_contents($script, "<?php\n\nrequire '{$autoload}';\n\nexit((new \\Arix\\Runtime\\ConsoleRuntime())->run('{$root}'));\n");
@@ -135,6 +136,7 @@ class ConsoleRuntimeTest extends TestCase
             }
         }
 
+        file_put_contents($root . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"}}}');
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', "<?php\n\ndeclare(strict_types=1);\n\nreturn ['debug' => false, 'base_path' => '', 'locales' => ['en'], 'default_locale' => 'en', 'name' => 'ArixPHP', 'max_body_bytes' => 1048576];\n");
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'cache.php', "<?php\n\ndeclare(strict_types=1);\n\nreturn ['version' => '1'];\n");
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'schedule.php', "<?php\n\ndeclare(strict_types=1);\n\nreturn ['timezone' => 'UTC', 'grace' => 3600];\n");

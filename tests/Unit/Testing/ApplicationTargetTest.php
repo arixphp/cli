@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Symfony\Component\Process\Process;
 use Tests\Support\ApplicationTestingFixture;
 
 class ApplicationTargetTest extends TestCase
@@ -34,10 +35,21 @@ class ApplicationTargetTest extends TestCase
         $this->assertSame($root, ApplicationTarget::resolve($root, dirname(__DIR__)));
     }
 
+    #[Test]
+    public function it_inspects_metadata_without_executing_application_files_through_the_cli(): void
+    {
+        $this->fixture->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/","Arix\\\\":"core/"},"files":["trap.php"]}}');
+        $this->fixture->write('trap.php', '<?php throw new \\RuntimeException("Metadata inspection executed application PHP");');
+        $process = new Process([PHP_BINARY, dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'arix', 'make:controller', 'Inspection', '--path=' . $this->fixture->root, '--no-interaction']);
+        $process->run();
+        $this->assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+        $this->assertFileExists($this->fixture->path('app/Controllers/InspectionController.php'));
+    }
+
     public static function requiredFiles(): array
     {
 
-        return array_map(static fn (string $file): array => [$file], ['index.php', 'app/bootstrap.php', 'core/autoload.php', 'tests/autoload.php', 'phpunit.xml']);
+        return array_map(static fn (string $file): array => [$file], ['.arix.json', 'index.php', 'app/bootstrap.php', 'core/autoload.php', 'core/Autoload/AutoloadConfiguration.php', 'core/Autoload/ClassLoader.php', 'tests/autoload.php', 'phpunit.xml']);
     }
 
     #[Test]

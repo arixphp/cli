@@ -6,6 +6,7 @@ namespace Tests\Core\Views;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\StandaloneCore;
 
 class ApplicationViewsTest extends TestCase
 {
@@ -44,7 +45,7 @@ class ApplicationViewsTest extends TestCase
     #[Test]
     public function it_renders_the_reference_application_views_without_composer(): void
     {
-        $autoload = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = StandaloneCore::autoload();
         $program = 'require ' . var_export($autoload, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
             PHP;

@@ -62,7 +62,7 @@ class NewApplicationFixture
     {
 
         return [
-            'app-sha/.arix.json' => '{"format":1,"core_contract":"arix-core-v1"}',
+            'app-sha/.arix.json' => '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/","Arix\\\\":"core/"}}}',
             'app-sha/.htaccess' => 'RewriteEngine On',
             'app-sha/.gitignore' => '/storage/cache',
             'app-sha/AGENTS.md' => 'Skeleton instructions.',
@@ -70,6 +70,8 @@ class NewApplicationFixture
             'app-sha/Caddyfile' => 'rewrite * /index.php',
             'app-sha/web.config' => '<configuration />',
             'app-sha/core/autoload.php' => '<?php // downloaded core',
+            'app-sha/core/Autoload/AutoloadConfiguration.php' => '<?php // downloaded configuration',
+            'app-sha/core/Autoload/ClassLoader.php' => '<?php // downloaded loader',
             'app-sha/core/.htaccess' => 'Require all denied',
             'app-sha/app/.htaccess' => 'Require all denied',
             'app-sha/app/routes.php' => '<?php // routes',

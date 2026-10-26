@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
+use Tests\Support\StandaloneCore;
 
 class TemplateCacheCleanupTest extends TestCase
 {
@@ -21,7 +22,7 @@ class TemplateCacheCleanupTest extends TestCase
         $root = getenv('ARIX_REFERENCE_ROOT');
 
         if ($root === false || $root === '') {
-            $root = dirname(__DIR__, 3);
+            $root = dirname(StandaloneCore::autoload(), 2);
         }
 
         $resolved = realpath($root);
@@ -35,6 +36,7 @@ class TemplateCacheCleanupTest extends TestCase
         mkdir($this->directory, 0700);
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'cache', 0700);
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'views', 0700);
+        StandaloneCore::autoload($this->directory);
     }
 
     protected function tearDown(): void

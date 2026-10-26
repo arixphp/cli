@@ -24,6 +24,7 @@ class EnvironmentEntryPointsTest extends TestCase
     {
         parent::setUp();
         $this->tree = new TempTree();
+        $this->tree->applicationManifest();
         $this->env = $_ENV;
         $_ENV['APP_SITE_NAME'] = 'caller';
         $_ENV['APP_URL'] = 'https://caller.test';

@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
+use Tests\Support\StandaloneCore;
 
 class ApplicationAutoloaderTest extends TestCase
 {
@@ -23,6 +24,7 @@ class ApplicationAutoloaderTest extends TestCase
         $this->root = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-autoload-' . bin2hex(random_bytes(8));
         $this->id = 'Probe' . bin2hex(random_bytes(6));
         mkdir($this->root . DIRECTORY_SEPARATOR . 'app', 0755, true);
+        $this->manifest($this->root);
     }
 
     protected function tearDown(): void
@@ -64,11 +66,9 @@ class ApplicationAutoloaderTest extends TestCase
     }
 
     #[Test]
-    public function it_does_not_execute_resources_entry_files_or_wrong_case_paths(): void
+    public function it_does_not_execute_wrong_case_paths(): void
     {
         $paths = [
-            "views/{$this->id}", "config/{$this->id}", "lang/{$this->id}",
-            'bootstrap', 'routes', 'services', 'schedules',
             "utils/{$this->id}", "Utils/{$this->id}wrong", "controllers/{$this->id}", "middleware/{$this->id}",
         ];
 
@@ -77,7 +77,7 @@ class ApplicationAutoloaderTest extends TestCase
         }
 
         ApplicationAutoloader::run($this->root, function (): void {
-            foreach (["views\\{$this->id}", "config\\{$this->id}", "lang\\{$this->id}", 'bootstrap', 'routes', 'services', 'schedules', "Utils\\{$this->id}", "Utils\\{$this->id}Wrong", "Controllers\\{$this->id}", "Middleware\\{$this->id}", 'Middleware\\..\\bootstrap'] as $relative) {
+            foreach (["Utils\\{$this->id}", "Utils\\{$this->id}Wrong", "Controllers\\{$this->id}", "Middleware\\{$this->id}", 'Middleware\\..\\bootstrap'] as $relative) {
                 $this->assertFalse(class_exists("App\\{$relative}"));
             }
         });
@@ -102,6 +102,7 @@ class ApplicationAutoloaderTest extends TestCase
     {
         $second = $this->root . DIRECTORY_SEPARATOR . 'second';
         mkdir($second . DIRECTORY_SEPARATOR . 'app', 0755, true);
+        $this->manifest($second);
         $this->write("Utils/{$this->id}.php", "namespace App\\Utils; class {$this->id} {}");
         $before = spl_autoload_functions();
 
@@ -131,15 +132,17 @@ class ApplicationAutoloaderTest extends TestCase
         $this->write("Services/{$this->id}.php", "namespace App\\Services; class {$this->id} { public static function message(): string { return 'standalone'; } }");
         $other = $this->root . DIRECTORY_SEPARATOR . 'other';
         mkdir($other . DIRECTORY_SEPARATOR . 'app', 0755, true);
+        $this->manifest($other);
         $program = <<<'PHP'
 require $argv[1] . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+\Arix\Autoload\ClassLoader::current()->register();
 $class = $argv[3];
 $before = count(spl_autoload_functions());
 \Arix\Support\ApplicationAutoloader::run($argv[2], static function () use ($class): void {
     if (class_exists($class)) { throw new RuntimeException('Leaked outer application root.'); }
 });
 if (! class_exists($class)) { throw new RuntimeException('Outer root not restored.'); }
-\Arix\Support\ApplicationAutoloader::register($argv[1]);
+\Arix\Autoload\ClassLoader::current()->register();
 if (count(spl_autoload_functions()) !== $before) { throw new RuntimeException('Duplicate callback.'); }
 if (class_exists('Composer\Autoload\ClassLoader', false)) { throw new RuntimeException('Composer loaded.'); }
 echo $class::message();
@@ -189,5 +192,144 @@ PHP;
         }
 
         file_put_contents($path, "<?php\ndeclare(strict_types=1);\n{$body}\n");
+    }
+
+    private function manifest(string $root): void
+    {
+        file_put_contents($root . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/","Arix\\\\":"core/"}}}');
+    }
+
+    #[Test]
+    public function it_loads_former_resource_names_as_pure_psr4(): void
+    {
+        $this->write("views/{$this->id}.php", "namespace App\\views; class {$this->id} {}");
+
+        ApplicationAutoloader::run($this->root, function (): void {
+            $this->assertTrue(class_exists("App\\views\\{$this->id}"));
+        });
+    }
+
+    #[Test]
+    public function it_requires_a_manifest_before_activating_an_application(): void
+    {
+        unlink($this->root . DIRECTORY_SEPARATOR . '.arix.json');
+        $this->expectException(RuntimeException::class);
+        ApplicationAutoloader::run($this->root, static fn () => null);
+    }
+
+    #[Test]
+    public function it_preserves_explicit_development_loading_in_nested_application_scopes(): void
+    {
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"}},"autoload-dev":{"psr-4":{"Checks\\\\":"checks/"}}}');
+        mkdir($this->root . DIRECTORY_SEPARATOR . 'checks');
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'checks' . DIRECTORY_SEPARATOR . "{$this->id}.php", "<?php namespace Checks; class {$this->id} {}");
+        $class = "Checks\\{$this->id}";
+
+        ApplicationAutoloader::run($this->root, function () use ($class): void {
+            $this->assertFalse(class_exists($class));
+        });
+
+        ApplicationAutoloader::run($this->root, function () use ($class): void {
+            ApplicationAutoloader::run($this->root, function () use ($class): void {
+                $this->assertTrue(class_exists($class));
+            });
+        }, development: true);
+    }
+
+    #[Test]
+    public function it_restores_the_outer_loader_when_an_autoload_file_throws(): void
+    {
+        $other = $this->root . DIRECTORY_SEPARATOR . 'other';
+        mkdir($other);
+        file_put_contents($other . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"files":["throw.php"]}}');
+        file_put_contents($other . DIRECTORY_SEPARATOR . 'throw.php', '<?php throw new \\RuntimeException("file failed");');
+        $this->write("Utils/{$this->id}.php", "namespace App\\Utils; class {$this->id} {}");
+        $before = spl_autoload_functions();
+
+        ApplicationAutoloader::run($this->root, function () use ($other): void {
+
+            try {
+                ApplicationAutoloader::run($other, static fn () => null);
+                $this->fail('Autoload error ignored.');
+            } catch (RuntimeException $exception) {
+                $this->assertSame('file failed', $exception->getMessage());
+            }
+
+            $this->assertTrue(class_exists("App\\Utils\\{$this->id}"));
+        });
+
+        $this->assertSame($before, spl_autoload_functions());
+    }
+
+    #[Test]
+    public function it_does_not_leak_callbacks_when_an_autoload_file_opens_an_application_scope(): void
+    {
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"},"files":["helpers.php"]}}');
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'helpers.php', '<?php (new \\Arix\\Autoload\\ClassLoader(\\Arix\\Autoload\\AutoloadConfiguration::read(__DIR__)))->register();');
+        $before = spl_autoload_functions();
+        ApplicationAutoloader::run($this->root, static fn () => null);
+        $this->assertSame($before, spl_autoload_functions());
+    }
+
+    #[Test]
+    public function it_removes_a_reentrantly_registered_loader_when_an_eager_file_throws(): void
+    {
+        $other = $this->root . DIRECTORY_SEPARATOR . 'other';
+        mkdir($other . DIRECTORY_SEPARATOR . 'app', 0755, true);
+        $this->manifest($other);
+        file_put_contents($other . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . "{$this->id}.php", "<?php namespace App; class {$this->id} {}");
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"files":["helpers.php"]}}');
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'helpers.php', '<?php (new \\Arix\\Autoload\\ClassLoader(\\Arix\\Autoload\\AutoloadConfiguration::read(__DIR__ . DIRECTORY_SEPARATOR . "other")))->register(); throw new \\RuntimeException("reentrant failure");');
+        $before = spl_autoload_functions();
+        $failure = null;
+
+        try {
+            ApplicationAutoloader::run($this->root, static fn () => null);
+        } catch (RuntimeException $exception) {
+            $failure = $exception;
+        }
+
+        $this->assertInstanceOf(RuntimeException::class, $failure);
+        $this->assertSame($before, spl_autoload_functions());
+        $this->assertFalse(class_exists("App\\{$this->id}"));
+    }
+
+    #[Test]
+    public function it_enforces_framework_case_and_links_in_the_standalone_bootstrap(): void
+    {
+        (new Filesystem())->mirror(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core', $this->root . DIRECTORY_SEPARATOR . 'core');
+        $this->write('outside.php', 'throw new \\LogicException("Linked framework file executed");');
+        $outside = $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'outside.php';
+        symlink($outside, $this->root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'LinkedProbe.php');
+        $program = <<<'PHP'
+require $argv[1] . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+if (class_exists('Arix\\config\\Repository')) { throw new RuntimeException('Wrong case loaded.'); }
+if (class_exists('Arix\\LinkedProbe')) { throw new RuntimeException('Linked file loaded.'); }
+if (! class_exists('Arix\\Config\\Repository')) { throw new RuntimeException('Valid core class missing.'); }
+echo 'strict';
+PHP;
+        $process = new Process([PHP_BINARY, '-r', $program, $this->root]);
+        $process->run();
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $this->assertSame('strict', $process->getOutput());
+    }
+
+    #[Test]
+    public function it_reuses_the_bootstrap_loader_without_rereading_the_manifest(): void
+    {
+        StandaloneCore::autoload($this->root);
+        $program = <<<'PHP'
+$loader = require $argv[1] . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+unlink($argv[1] . DIRECTORY_SEPARATOR . '.arix.json');
+\Arix\Support\ApplicationAutoloader::run($argv[1], static function () use ($loader): void {
+    if (\Arix\Autoload\ClassLoader::current() !== $loader || count(spl_autoload_functions()) !== 1) { throw new RuntimeException('Bootstrap loader replaced.'); }
+});
+if (\Arix\Autoload\ClassLoader::current() !== $loader) { throw new RuntimeException('Loader not restored.'); }
+echo 'reused';
+PHP;
+        $process = new Process([PHP_BINARY, '-r', $program, $this->root]);
+        $process->run();
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $this->assertSame('reused', $process->getOutput());
     }
 }

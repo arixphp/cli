@@ -40,6 +40,8 @@ class CoreUpdateFixture
     {
         $files = array_replace([
             'autoload.php' => "<?php\ndeclare(strict_types=1);\n",
+            'Autoload/AutoloadConfiguration.php' => "<?php\ndeclare(strict_types=1);\n// configuration\n",
+            'Autoload/ClassLoader.php' => "<?php\ndeclare(strict_types=1);\n// loader\n",
             'functions.php' => "<?php\ndeclare(strict_types=1);\n// helpers\n",
             'Http/Kernel.php' => "<?php\ndeclare(strict_types=1);\n// kernel\n",
             'imports.json' => '{"format":1,"packages":[],"files":[]}',
@@ -62,7 +64,7 @@ class CoreUpdateFixture
 
     public function application(string $relative = 'application'): string
     {
-        $this->write("{$relative}/.arix.json", '{"format":1,"core_contract":"arix-core-v1"}');
+        $this->write("{$relative}/.arix.json", '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/","Arix\\\\":"core/"}}}');
         $this->write("{$relative}/index.php", '<?php // application entry point');
         $this->write("{$relative}/app/bootstrap.php", '<?php // application bootstrap');
 
@@ -77,7 +79,7 @@ class CoreUpdateFixture
         $hashes = [];
         $resources = $includeResources ? ['.htaccess', 'stubs/error.html', 'Assets/public-policy.json'] : [];
 
-        foreach (['autoload.php', 'functions.php', 'Http/Kernel.php', 'imports.json', ...$resources, ...array_keys($files)] as $name) {
+        foreach (['autoload.php', 'Autoload/AutoloadConfiguration.php', 'Autoload/ClassLoader.php', 'functions.php', 'Http/Kernel.php', 'imports.json', ...$resources, ...array_keys($files)] as $name) {
             $hashes[$name] = hash_file('sha256', $core . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $name));
         }
 

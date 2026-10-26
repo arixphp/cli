@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
+use Tests\Support\StandaloneCore;
 
 class ClientRedirectTest extends TestCase
 {
@@ -88,7 +89,7 @@ class ClientRedirectTest extends TestCase
     {
         $root = dirname(__DIR__, 3);
         $fixture = $root . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'Fixtures' . DIRECTORY_SEPARATOR . 'HttpClient' . DIRECTORY_SEPARATOR . 'redirects.php';
-        $autoload = $root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = StandaloneCore::autoload();
         $process = new Process([PHP_BINARY, $fixture, $autoload, json_encode($scenario, JSON_THROW_ON_ERROR)], env: ['XDEBUG_MODE' => 'off']);
         $process->run();
 

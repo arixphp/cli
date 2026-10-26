@@ -50,10 +50,10 @@ PHP);
 <?php
 test('local ownership', function () {
     expect(class_exists(App\Commands\InspireCommand::class))->toBeFalse();
-    expect(class_exists(Arix\Application::class))->toBeFalse();
+    expect((new ReflectionClass(Arix\Application::class))->getFileName())->toBe(realpath(getcwd() . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Application.php'));
     expect(class_exists(Tests\TestCase::class))->toBeFalse();
     expect(function_exists('something'))->toBeFalse();
-    expect((new ReflectionClass(Arix\ApplicationMarker::class))->getFileName())->toBe(realpath(getcwd() . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php'));
+    expect((new ReflectionClass(Arix\ApplicationMarker::class))->getFileName())->toBe(realpath(getcwd() . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'ApplicationMarker.php'));
     expect(view())->toBe('application-view');
     expect(trans())->toBe('application-trans');
     expect(config())->toBe('application-config');
@@ -81,6 +81,53 @@ PHP);
 
         $this->assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
         $this->assertStringContainsString('application namespaces use the core autoloader', $process->getOutput());
+    }
+
+    #[Test]
+    public function it_loads_custom_production_files_and_explicit_development_namespaces(): void
+    {
+        $this->fixture->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"Domain\\\\":"domain/","Arix\\\\":"core/"},"files":["core/functions.php","checks/helpers.php"]},"autoload-dev":{"psr-4":{"Checks\\\\":"checks/"}}}');
+        $this->fixture->write('domain/Value.php', '<?php namespace Domain; class Value {}');
+        $this->fixture->write('checks/Probe.php', '<?php namespace Checks; class Probe {}');
+        $this->fixture->write('checks/helpers.php', '<?php function arix_probe(): string { return "development"; }');
+        $this->fixture->write('tests/AutoloadTest.php', <<<'PHP'
+<?php
+test('declarative namespaces', function () {
+    expect(new Domain\Value())->toBeInstanceOf(Domain\Value::class);
+    expect(new Checks\Probe())->toBeInstanceOf(Checks\Probe::class);
+    expect(arix_probe())->toBe('development');
+});
+PHP);
+        $process = $this->fixture->worker();
+        $this->assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+    }
+
+    #[Test]
+    public function it_loads_application_helpers_before_competing_composer_helpers(): void
+    {
+        $this->fixture->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"Arix\\\\":"core/"},"files":["helpers.php"]}}');
+        $this->fixture->write('helpers.php', '<?php function collect(): string { return "application collection"; }');
+        $this->fixture->write('tests/HelpersTest.php', '<?php test("application helpers win", fn () => expect(collect())->toBe("application collection"));');
+        $process = $this->fixture->worker();
+        $this->assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+    }
+
+    #[Test]
+    public function it_uses_local_native_declarations_and_one_development_loader(): void
+    {
+        $this->fixture->write('tests/NativeTest.php', <<<'PHP'
+<?php
+test('native ownership', function () {
+    $root = getcwd() . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Autoload' . DIRECTORY_SEPARATOR;
+    expect((new ReflectionClass(\Arix\Autoload\ClassLoader::class))->getFileName())->toBe(realpath($root . 'ClassLoader.php'));
+    expect((new ReflectionClass(\Arix\Autoload\AutoloadConfiguration::class))->getFileName())->toBe(realpath($root . 'AutoloadConfiguration.php'));
+    expect(\Arix\Autoload\ClassLoader::current()->development)->toBeTrue();
+    $native = array_filter(spl_autoload_functions(), static fn ($callback) => $callback instanceof Closure && (new ReflectionFunction($callback))->getClosureThis() instanceof \Arix\Autoload\ClassLoader);
+    expect(count($native))->toBe(1);
+});
+PHP);
+        $process = $this->fixture->worker();
+        $this->assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
     }
 
     #[Test]

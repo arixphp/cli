@@ -12,6 +12,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
+use Tests\Support\StandaloneCore;
 
 class ClientTest extends TestCase
 {
@@ -239,7 +240,7 @@ class ClientTest extends TestCase
             ], JSON_THROW_ON_ERROR);
             PHP;
         $process = new Process(
-            [PHP_BINARY, '-d', 'display_errors=stderr', '-r', $program, $root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php'],
+            [PHP_BINARY, '-d', 'display_errors=stderr', '-r', $program, StandaloneCore::autoload()],
             $root,
             ['XDEBUG_MODE' => 'off'],
         );

@@ -13,6 +13,7 @@ use Arix\HttpFoundation\Response;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
+use Tests\Support\StandaloneCore;
 use Tests\Support\TempTree;
 
 use function array_slice;
@@ -23,6 +24,7 @@ class RequestUrlIntegrationTest extends TestCase
     public function it_uses_one_validated_context_for_views_routes_and_assets(): void
     {
         $tree = new TempTree();
+        $tree->applicationManifest();
         $tree->write('app/config/app.php', '<?php declare(strict_types=1); return ["debug" => true, "locales" => ["en"], "default_locale" => "en", "base_path" => "/wrong", "url" => "https://configured.test/wrong", "trusted_hosts" => ["^myapp\\.com$", "^other\\.test$"]];');
         $tree->write('app/lang/en.php', '<?php declare(strict_types=1); return [];');
         $tree->write('app/routes.php', '<?php declare(strict_types=1); Arix\Facades\Route::get("/about", [App\Controllers\UrlContextController::class, "show"])->name("about");');
@@ -56,7 +58,7 @@ $rejected = new \Arix\HttpFoundation\Request(server: ['REQUEST_URI' => '/about',
 $results[] = [$kernel->handle($rejected)->getStatusCode(), $kernel->handle($rejected)->getStatusCode()];
 echo json_encode($results, JSON_THROW_ON_ERROR);
 PHP;
-            $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+            $autoload = StandaloneCore::autoload($tree->root);
             $process = new Process([PHP_BINARY, '-r', $program, $autoload, $tree->root], env: ['XDEBUG_MODE' => 'off']);
             $process->mustRun();
             $results = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
