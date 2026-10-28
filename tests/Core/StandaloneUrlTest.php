@@ -7,8 +7,8 @@ namespace Tests\Core;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
-use Tests\Support\StandaloneCore;
 use Tests\Support\TempTree;
+use Tests\Support\TestApplication;
 
 class StandaloneUrlTest extends TestCase
 {
@@ -50,7 +50,7 @@ echo "\nURL_RESULT:" . json_encode([$status, $first, $console, $second, $third, 
 PHP;
 
         try {
-            $autoload = StandaloneCore::autoload($tree->root);
+            $autoload = TestApplication::prepareCore($tree->root);
             $process = new Process([PHP_BINARY, '-r', $program, $autoload, $tree->root], env: ['XDEBUG_MODE' => 'off']);
             $process->mustRun();
             $result = json_decode(explode("\nURL_RESULT:", $process->getOutput(), 2)[1], true, flags: JSON_THROW_ON_ERROR);

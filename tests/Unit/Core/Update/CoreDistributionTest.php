@@ -42,6 +42,16 @@ class CoreDistributionTest extends TestCase
     }
 
     #[Test]
+    public function it_distributes_native_autoload_declarations_without_removed_runtime_coordinators(): void
+    {
+        $files = CoreDistribution::bundled(dirname(__DIR__, 4))->manifest['files'];
+
+        $this->assertArrayHasKey('Autoload/AutoloadConfiguration.php', $files);
+        $this->assertArrayHasKey('Autoload/ClassLoader.php', $files);
+        $this->assertArrayNotHasKey('Support/ApplicationAutoloader.php', $files);
+    }
+
+    #[Test]
     public function it_rejects_runnable_distributions_missing_native_autoload_declarations(): void
     {
         foreach (['Autoload/AutoloadConfiguration.php', 'Autoload/ClassLoader.php'] as $missing) {

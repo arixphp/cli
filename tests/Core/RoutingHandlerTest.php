@@ -15,7 +15,7 @@ use Arix\Routing\RoutingHandler;
 use Arix\Views\ViewServices;
 use PHPUnit\Framework\Attributes\Test;
 use stdClass;
-use Tests\Support\StandaloneCore;
+use Tests\Support\TestApplication;
 
 class RoutingHandlerTest extends RoutingTestCase
 {
@@ -205,7 +205,7 @@ class RoutingHandlerTest extends RoutingTestCase
     public function it_runs_the_kernel_router_and_controller_without_composer(): void
     {
         $class = $this->controller('public function show(Request $request): Response { return new Response($request->attributes->get("id") . ":" . $request->attributes->get("middleware")); }');
-        $autoload = StandaloneCore::autoload();
+        $autoload = TestApplication::shared()->path('core/autoload.php');
         $program = 'require ' . var_export($autoload, true) . '; $class = ' . var_export($class, true) . '; $directory = ' . var_export($this->directory, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
             $kernel = new Arix\Http\Kernel(new Arix\Routing\RoutingHandler($directory), configure: function ($container) use ($class) {

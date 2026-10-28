@@ -14,7 +14,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 use Tests\Support\CoreUpdateFixture;
-use Tests\Support\StandaloneCore;
+use Tests\Support\TestApplication;
 
 class ErrorViewsTest extends TestCase
 {
@@ -118,7 +118,7 @@ if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
 $response = \Arix\Application::create($argv[2])->kernel()->handle(\Arix\HttpFoundation\Request::create('/missing'));
 echo $response->getContent();
 PHP;
-        $process = new Process([PHP_BINARY, '-r', $program, StandaloneCore::autoload($this->fixture->root), $this->fixture->root], $this->fixture->root, ['XDEBUG_MODE' => 'off']);
+        $process = new Process([PHP_BINARY, '-r', $program, TestApplication::prepareCore($this->fixture->root), $this->fixture->root], $this->fixture->root, ['XDEBUG_MODE' => 'off']);
         $process->run();
 
         $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());

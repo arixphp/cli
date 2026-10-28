@@ -34,12 +34,12 @@ class UnifiedBootstrapTest extends TestCase
         $this->tree->write('domain/Value.php', '<?php namespace Domain; class Value {}');
         $this->tree->write('helpers.php', '<?php $GLOBALS["unified"] = new \\Domain\\Value();');
         $this->runProgram(<<<'PHP'
-require $argv[1] . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+$loader = require $argv[1] . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
 if (count(spl_autoload_functions()) !== 1) { throw new RuntimeException('Expected one loader.'); }
 if (! class_exists('App\\Item')) { throw new RuntimeException('Application mapping was not loaded.'); }
 if (! class_exists('Arix\\Config\\Repository')) { throw new RuntimeException('Framework mapping was not loaded.'); }
 if (! $GLOBALS['unified'] instanceof \Domain\Value) { throw new RuntimeException('Files ran before mappings.'); }
-\Arix\Autoload\ClassLoader::current()->register();
+$loader->register();
 if (count(spl_autoload_functions()) !== 1) { throw new RuntimeException('Repeated registration added a loader.'); }
 if (class_exists('Composer\\Autoload\\ClassLoader', false)) { throw new RuntimeException('Composer was loaded.'); }
 if (class_exists('ClassLoader', false) || class_exists('AutoloadConfiguration', false)) { throw new RuntimeException('Global autoload aliases remain.'); }
@@ -72,6 +72,19 @@ if (class_exists('Arix\\Config\\Repository')) { throw new RuntimeException('Impl
 if (count(spl_autoload_functions()) !== 1) { throw new RuntimeException('Expected one loader.'); }
 echo 'declarative';
 PHP, 'declarative');
+    }
+
+    #[Test]
+    public function it_does_not_enable_development_mappings_from_debug_mode(): void
+    {
+        $this->tree->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"Arix\\\\":"core/"}},"autoload-dev":{"psr-4":{"Checks\\\\":"checks/"}}}');
+        $this->tree->write('checks/Probe.php', '<?php declare(strict_types=1); namespace Checks; class Probe {}');
+        $this->runProgram(<<<'PHP'
+$_ENV['APP_DEBUG'] = 'true';
+$loader = require $argv[1] . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+if ($loader->development || class_exists('Checks\\Probe')) { throw new RuntimeException('Debug enabled development'); }
+echo 'production';
+PHP, 'production');
     }
 
     private function runProgram(string $program, string $expected): void

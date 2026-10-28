@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Testing;
 
+use Arix\Autoload\AutoloadConfiguration;
 use Arix\Autoload\ClassLoader;
 use Pest\Kernel;
 use Pest\TestSuite;
@@ -31,16 +32,16 @@ class PestRunner
             }
         }
 
-        // Arix must claim its global helpers before Composer includes Laravel's.
-        require_once $root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
-        $native = ClassLoader::current();
-
-        if ($native === null || $native->configuration->root() !== $root) {
-            throw new RuntimeException('Application bootstrap did not register its native autoloader.');
+        if (PHP_VERSION_ID < 80401 || ! extension_loaded('mbstring')) {
+            throw new RuntimeException('Arix core requires PHP >= 8.4.1 and ext-mbstring.');
         }
 
-        $configuration = $native->configuration;
-        (new ClassLoader($configuration, development: true))->register();
+        // Register development before eager files, and local helpers before Composer.
+        require_once $root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Autoload' . DIRECTORY_SEPARATOR . 'AutoloadConfiguration.php';
+        require_once $root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Autoload' . DIRECTORY_SEPARATOR . 'ClassLoader.php';
+        $configuration = AutoloadConfiguration::read($root);
+        $native = new ClassLoader($configuration, development: true);
+        $native->register();
         $autoload = $distribution . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 
         if (! is_file($autoload)) {

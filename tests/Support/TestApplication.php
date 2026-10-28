@@ -5,23 +5,41 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use Symfony\Component\Filesystem\Filesystem;
+use Throwable;
 
-class StandaloneCore
+class TestApplication extends TempTree
 {
-    private static TempTree|null $application = null;
+    private static self|null $shared = null;
 
-    public static function autoload(string|null $root = null): string
+    public function __construct()
     {
-        if ($root === null) {
+        parent::__construct();
+        $project = dirname(__DIR__, 2);
+        $filesystem = new Filesystem();
 
-            if (self::$application === null) {
-                self::$application = new TempTree();
-                register_shutdown_function(static fn () => self::$application->cleanup());
-            }
+        try {
+            $filesystem->mirror($project . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'app', $this->root);
+            self::prepareCore($this->root);
+            $filesystem->mkdir($this->path('storage/cache'), 0700);
+        } catch (Throwable $exception) {
+            $this->cleanup();
 
-            $root = self::$application->root;
+            throw $exception;
+        }
+    }
+
+    public static function shared(): self
+    {
+        if (self::$shared === null) {
+            self::$shared = new self();
+            register_shutdown_function(static fn () => self::$shared->cleanup());
         }
 
+        return self::$shared;
+    }
+
+    public static function prepareCore(string $root): string
+    {
         $core = $root . DIRECTORY_SEPARATOR . 'core';
 
         if (! is_file($core . DIRECTORY_SEPARATOR . 'autoload.php')) {

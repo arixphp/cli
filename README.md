@@ -82,8 +82,8 @@ are trusted code and should contain declarations, not request-time side effects.
 
 `core/autoload.php` registers the single native loader for the manifest at the
 application root and returns it. Application composition, HTTP runtime bootstrap
-and scheduler execution reuse that loader in a temporary application-root scope,
-restored on failure.
+and scheduler execution use that process loader; they never register or replace
+it. Boot once per process, as `index.php` does.
 No autowiring is added: constructor dependencies still use explicit bindings.
 PHP declarations cannot be unloaded or redefined; independent sites with
 conflicting class names need separate processes. Fiber/coroutine execution and
@@ -313,6 +313,13 @@ paths in this README are relative to the CLI repository's root.
 Application `phpunit.xml` declares the suite and its `tests/autoload.php`
 bootstrap. Application tests use Pest syntax and cover `app/` only. Framework
 tests remain in this repository's `tests/Core/`.
+
+CLI core tests share the functional fixture application in
+`tests/fixtures/app/`. `Tests\Support\TestApplication` copies it and the current
+`core/` into a private temporary root, without symlinks or mutations of the
+source. Preparation is per fixture instance; each request still receives a fresh
+container. Conflicting applications run in separate processes, never through
+autoloader scopes.
 
 The command validates the application and starts a fresh PHP worker, streams
 Pest output, and preserves its exit status. Relative `--path` values resolve from

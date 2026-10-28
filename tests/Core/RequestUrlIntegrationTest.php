@@ -13,8 +13,8 @@ use Arix\HttpFoundation\Response;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
-use Tests\Support\StandaloneCore;
 use Tests\Support\TempTree;
+use Tests\Support\TestApplication;
 
 use function array_slice;
 
@@ -58,7 +58,7 @@ $rejected = new \Arix\HttpFoundation\Request(server: ['REQUEST_URI' => '/about',
 $results[] = [$kernel->handle($rejected)->getStatusCode(), $kernel->handle($rejected)->getStatusCode()];
 echo json_encode($results, JSON_THROW_ON_ERROR);
 PHP;
-            $autoload = StandaloneCore::autoload($tree->root);
+            $autoload = TestApplication::prepareCore($tree->root);
             $process = new Process([PHP_BINARY, '-r', $program, $autoload, $tree->root], env: ['XDEBUG_MODE' => 'off']);
             $process->mustRun();
             $results = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);

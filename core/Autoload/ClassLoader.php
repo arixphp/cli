@@ -13,8 +13,6 @@ use function strlen;
 
 class ClassLoader
 {
-    private static self|null $active = null; // TODO: Drop
-
     /** @var array<string, string> */
     private readonly array $prefixes;
 
@@ -41,29 +39,20 @@ class ClassLoader
         $this->prefixes = $prefixes;
     }
 
-    public static function current(): self|null
-    {
-        return self::$active;
-    }
-
     public function register(): void
     {
-        if (self::$active === $this) {
+        if ($this->callback !== null) {
             return;
         }
 
-        $previous = self::$active;
-        $previous?->unregister();
-        $this->callback ??= $this->loadClass(...);
+        $this->callback = $this->loadClass(...);
 
         spl_autoload_register($this->callback, prepend: true);
-        self::$active = $this;
 
         try {
             $this->loadFiles();
         } catch (Throwable $exception) {
-            self::$active?->unregister();
-            $previous?->register();
+            $this->unregister();
 
             throw $exception;
         }
@@ -73,11 +62,7 @@ class ClassLoader
     {
         if ($this->callback !== null) {
             spl_autoload_unregister($this->callback);
-
-        }
-
-        if (self::$active === $this) {
-            self::$active = null;
+            $this->callback = null;
         }
     }
 

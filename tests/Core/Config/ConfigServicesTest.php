@@ -17,7 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-use Tests\Support\StandaloneCore;
+use Tests\Support\TestApplication;
 
 class ConfigServicesTest extends TestCase
 {
@@ -161,7 +161,7 @@ class ConfigServicesTest extends TestCase
         file_put_contents($configuration . DIRECTORY_SEPARATOR . 'app.php', "<?php return ['name' => 'Published'];");
         $source = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'core';
         copy($source . DIRECTORY_SEPARATOR . 'Config' . DIRECTORY_SEPARATOR . 'Loader.php', $core . DIRECTORY_SEPARATOR . 'Loader.php');
-        $program = 'require ' . var_export(StandaloneCore::autoload(), true) . '; require ' . var_export($core . DIRECTORY_SEPARATOR . 'Loader.php', true) . '; echo (new Arix\\Config\\Loader())->load()->get("app.name");';
+        $program = 'require ' . var_export(TestApplication::shared()->path('core/autoload.php'), true) . '; require ' . var_export($core . DIRECTORY_SEPARATOR . 'Loader.php', true) . '; echo (new Arix\\Config\\Loader())->load()->get("app.name");';
         $process = proc_open([PHP_BINARY, '-r', $program], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, dirname(__DIR__, 3));
         $output = stream_get_contents($pipes[1]);
         $errors = stream_get_contents($pipes[2]);
@@ -181,7 +181,7 @@ class ConfigServicesTest extends TestCase
         mkdir($app . DIRECTORY_SEPARATOR . 'config');
         mkdir($bootstrap);
         file_put_contents($app . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', "<?php return ['name' => 'Standalone'];");
-        $autoload = StandaloneCore::autoload();
+        $autoload = TestApplication::shared()->path('core/autoload.php');
         file_put_contents($bootstrap . DIRECTORY_SEPARATOR . 'app.php', '<?php require ' . var_export($autoload, true) . '; ' . <<<'PHP'
             $container = new Arix\Container\Container();
             Arix\Config\ConfigServices::register($container, __DIR__.DIRECTORY_SEPARATOR.'..'.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'config');

@@ -19,6 +19,9 @@ class ClassLoaderTest extends TestCase
 
     private string $prefix;
 
+    /** @var list<ClassLoader> */
+    private array $loaders = [];
+
     protected function setUp(): void
     {
         $this->root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'arix-loader-' . bin2hex(random_bytes(8));
@@ -28,7 +31,10 @@ class ClassLoaderTest extends TestCase
 
     protected function tearDown(): void
     {
-        ClassLoader::current()?->unregister();
+        foreach ($this->loaders as $loader) {
+            $loader->unregister();
+        }
+
         (new Filesystem())->remove($this->root);
     }
 
@@ -125,7 +131,10 @@ class ClassLoaderTest extends TestCase
     {
         $this->write('.arix.json', json_encode(['version' => '1.0.0', 'autoload' => ['psr-4' => $prefixes, 'files' => $files]], JSON_THROW_ON_ERROR));
 
-        return new ClassLoader(AutoloadConfiguration::read($this->root));
+        $loader = new ClassLoader(AutoloadConfiguration::read($this->root));
+        $this->loaders[] = $loader;
+
+        return $loader;
     }
 
     private function write(string $relative, string $contents): void
@@ -140,32 +149,40 @@ class ClassLoaderTest extends TestCase
     }
 
     #[Test]
-    public function it_replaces_the_active_loader_without_accumulating_callbacks(): void
+    public function it_registers_and_unregisters_only_its_callback(): void
     {
         $before = spl_autoload_functions();
         $first = $this->loader([$this->prefix => 'first/']);
         $second = $this->loader([$this->prefix => 'second/']);
         $first->register();
         $second->register();
-        $second->register();
-        $this->assertSame($second, ClassLoader::current());
-        $this->assertCount(count($before) + 1, spl_autoload_functions());
+        $this->assertCount(count($before) + 2, spl_autoload_functions());
         $first->unregister();
-        $this->assertSame($second, ClassLoader::current());
+        $this->assertCount(count($before) + 1, spl_autoload_functions());
         $second->unregister();
-        $this->assertNull(ClassLoader::current());
         $this->assertSame($before, spl_autoload_functions());
     }
 
     #[Test]
-    public function it_restores_the_previous_loader_after_a_reentrant_registration_fails(): void
+    public function it_does_not_duplicate_its_registration(): void
+    {
+        $before = spl_autoload_functions();
+        $loader = $this->loader([$this->prefix => 'base/']);
+        $loader->register();
+        $registered = spl_autoload_functions();
+        $loader->register();
+        $this->assertSame($registered, spl_autoload_functions());
+        $this->assertCount(count($before) + 1, $registered);
+        $loader->unregister();
+        $this->assertSame($before, spl_autoload_functions());
+    }
+
+    #[Test]
+    public function it_removes_its_callback_when_eager_loading_fails(): void
     {
         $previous = $this->loader([$this->prefix => 'base/']);
         $previous->register();
-        $other = $this->root . DIRECTORY_SEPARATOR . 'other';
-        mkdir($other);
-        file_put_contents($other . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{}}');
-        $this->write('throw.php', '<?php (new \\Arix\\Autoload\\ClassLoader(\\Arix\\Autoload\\AutoloadConfiguration::read(__DIR__ . DIRECTORY_SEPARATOR . "other")))->register(); throw new \\RuntimeException("reentrant");');
+        $this->write('throw.php', '<?php throw new \\RuntimeException("eager failure");');
         $failing = $this->loader([$this->prefix => 'base/'], ['throw.php']);
         $callbacks = spl_autoload_functions();
         $failure = null;
@@ -177,8 +194,7 @@ class ClassLoaderTest extends TestCase
         }
 
         $this->assertInstanceOf(RuntimeException::class, $failure);
-        $this->assertSame('reentrant', $failure->getMessage());
-        $this->assertSame($previous, ClassLoader::current());
+        $this->assertSame('eager failure', $failure->getMessage());
         $this->assertSame($callbacks, spl_autoload_functions());
     }
 }

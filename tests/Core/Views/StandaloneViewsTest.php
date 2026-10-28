@@ -6,14 +6,14 @@ namespace Tests\Core\Views;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\StandaloneCore;
+use Tests\Support\TestApplication;
 
 class StandaloneViewsTest extends TestCase
 {
     #[Test]
     public function it_resolves_relocated_views_and_integration_without_composer(): void
     {
-        $autoload = StandaloneCore::autoload();
+        $autoload = TestApplication::shared()->path('core/autoload.php');
         $root = dirname($autoload, 2);
         $program = 'require ' . var_export($autoload, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }

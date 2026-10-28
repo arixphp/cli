@@ -15,7 +15,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Tests\Support\CoreUpdateFixture;
-use Tests\Support\StandaloneCore;
+use Tests\Support\TestApplication;
 
 class ErrorResponderTest extends TestCase
 {
@@ -174,7 +174,7 @@ echo json_encode([
     'nosniff' => $response->headers->get('X-Content-Type-Options'),
 ], JSON_THROW_ON_ERROR);
 PHP;
-            $process = new Process([PHP_BINARY, '-d', 'display_errors=stderr', '-r', $program, StandaloneCore::autoload($fixture->root), $viewFails ? 'fail' : 'none'], $fixture->root, ['XDEBUG_MODE' => 'off']);
+            $process = new Process([PHP_BINARY, '-d', 'display_errors=stderr', '-r', $program, TestApplication::prepareCore($fixture->root), $viewFails ? 'fail' : 'none'], $fixture->root, ['XDEBUG_MODE' => 'off']);
             $process->run();
 
             $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());

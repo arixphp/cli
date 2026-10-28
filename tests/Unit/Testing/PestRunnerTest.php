@@ -89,12 +89,13 @@ PHP);
         $this->fixture->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"Domain\\\\":"domain/","Arix\\\\":"core/"},"files":["core/functions.php","checks/helpers.php"]},"autoload-dev":{"psr-4":{"Checks\\\\":"checks/"}}}');
         $this->fixture->write('domain/Value.php', '<?php namespace Domain; class Value {}');
         $this->fixture->write('checks/Probe.php', '<?php namespace Checks; class Probe {}');
-        $this->fixture->write('checks/helpers.php', '<?php function arix_probe(): string { return "development"; }');
+        $this->fixture->write('checks/helpers.php', '<?php $GLOBALS["eager_probe"] = new \\Checks\\Probe(); function arix_probe(): string { return "development"; }');
         $this->fixture->write('tests/AutoloadTest.php', <<<'PHP'
 <?php
 test('declarative namespaces', function () {
     expect(new Domain\Value())->toBeInstanceOf(Domain\Value::class);
     expect(new Checks\Probe())->toBeInstanceOf(Checks\Probe::class);
+    expect($GLOBALS['eager_probe'])->toBeInstanceOf(Checks\Probe::class);
     expect(arix_probe())->toBe('development');
 });
 PHP);
@@ -121,9 +122,9 @@ test('native ownership', function () {
     $root = getcwd() . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Autoload' . DIRECTORY_SEPARATOR;
     expect((new ReflectionClass(\Arix\Autoload\ClassLoader::class))->getFileName())->toBe(realpath($root . 'ClassLoader.php'));
     expect((new ReflectionClass(\Arix\Autoload\AutoloadConfiguration::class))->getFileName())->toBe(realpath($root . 'AutoloadConfiguration.php'));
-    expect(\Arix\Autoload\ClassLoader::current()->development)->toBeTrue();
     $native = array_filter(spl_autoload_functions(), static fn ($callback) => $callback instanceof Closure && (new ReflectionFunction($callback))->getClosureThis() instanceof \Arix\Autoload\ClassLoader);
     expect(count($native))->toBe(1);
+    expect((new ReflectionFunction(reset($native)))->getClosureThis()->development)->toBeTrue();
 });
 PHP);
         $process = $this->fixture->worker();

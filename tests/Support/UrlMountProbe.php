@@ -8,7 +8,7 @@ class UrlMountProbe
 {
     public static function install(NewApplicationFixture $fixture): void
     {
-        $autoload = StandaloneCore::autoload($fixture->path('sub'));
+        $autoload = TestApplication::prepareCore($fixture->path('sub'));
         $program = '<?php declare(strict_types=1); require ' . var_export($autoload, true) . ';' . <<<'PHP'
 $handler = new class() implements \Arix\Contracts\RequestHandler {
     public function handle(\Arix\HttpFoundation\Request $request, \Arix\Container\Container $container): \Arix\HttpFoundation\Response {

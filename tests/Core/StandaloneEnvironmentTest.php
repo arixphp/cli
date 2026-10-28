@@ -7,8 +7,8 @@ namespace Tests\Core;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
-use Tests\Support\StandaloneCore;
 use Tests\Support\TempTree;
+use Tests\Support\TestApplication;
 
 class StandaloneEnvironmentTest extends TestCase
 {
@@ -18,7 +18,7 @@ class StandaloneEnvironmentTest extends TestCase
         $tree = new TempTree();
         $tree->applicationManifest();
         $tree->write('.env', "APP_DEBUG=true\nAPP_TOKEN=\"private-token-sentinel\"invalid");
-        $autoload = StandaloneCore::autoload($tree->root);
+        $autoload = TestApplication::prepareCore($tree->root);
         $program = <<<'PHP'
 require $argv[1];
 $logs = [];
@@ -45,7 +45,7 @@ PHP;
         $tree = new TempTree();
         $tree->applicationManifest();
         $tree->write('.env', "APP_STANDALONE_TEST=file\nAPP_DEBUG=\"false\"");
-        $autoload = StandaloneCore::autoload($tree->root);
+        $autoload = TestApplication::prepareCore($tree->root);
         $program = <<<'PHP'
 require $argv[1];
 $_ENV['APP_STANDALONE_TEST'] = 'caller';
@@ -91,7 +91,7 @@ class SiteController {
 }
 PHP);
         $tree->write('app/bootstrap.php', '<?php declare(strict_types=1); return \Arix\Application::configure(dirname(__DIR__))->create();');
-        $autoload = StandaloneCore::autoload($tree->root);
+        $autoload = TestApplication::prepareCore($tree->root);
         $program = <<<'PHP'
 require $argv[1];
 $_SERVER = ['REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/', 'HTTP_HOST' => 'localhost'];
@@ -118,7 +118,7 @@ PHP;
         $tree = new TempTree();
         $tree->applicationManifest();
         $tree->write('.env', 'invalid secret');
-        $autoload = StandaloneCore::autoload($tree->root);
+        $autoload = TestApplication::prepareCore($tree->root);
         $script = $tree->write('index.php', '<?php declare(strict_types=1); require $argv[1]; exit((new \Arix\Runtime\HttpRuntime(applicationRoot: __DIR__))->run(static function () { echo "BOOTSTRAP"; }));');
 
         try {

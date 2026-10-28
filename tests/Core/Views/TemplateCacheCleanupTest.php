@@ -8,7 +8,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
-use Tests\Support\StandaloneCore;
+use Tests\Support\TestApplication;
 
 class TemplateCacheCleanupTest extends TestCase
 {
@@ -22,7 +22,7 @@ class TemplateCacheCleanupTest extends TestCase
         $root = getenv('ARIX_REFERENCE_ROOT');
 
         if ($root === false || $root === '') {
-            $root = dirname(StandaloneCore::autoload(), 2);
+            $root = TestApplication::shared()->root;
         }
 
         $resolved = realpath($root);
@@ -36,7 +36,7 @@ class TemplateCacheCleanupTest extends TestCase
         mkdir($this->directory, 0700);
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'cache', 0700);
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'views', 0700);
-        StandaloneCore::autoload($this->directory);
+        TestApplication::prepareCore($this->directory);
     }
 
     protected function tearDown(): void
@@ -345,7 +345,7 @@ class TemplateCacheCleanupTest extends TestCase
 
     private function worker(string $name, array $options = []): Process
     {
-        $worker = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'Fixtures' . DIRECTORY_SEPARATOR . 'TemplateCacheCleanup' . DIRECTORY_SEPARATOR . 'worker.php';
+        $worker = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'TemplateCacheCleanup' . DIRECTORY_SEPARATOR . 'worker.php';
         $process = new Process([PHP_BINARY, $worker, $name, $this->application, $this->directory, json_encode($options, JSON_THROW_ON_ERROR)]);
         $process->setTimeout(20);
 

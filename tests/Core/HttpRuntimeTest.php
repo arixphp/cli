@@ -15,20 +15,19 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-use Tests\Support\StandaloneCore;
 use Tests\Support\TempTree;
+use Tests\Support\TestApplication;
 
 class HttpRuntimeTest extends TestCase
 {
     #[Test]
-    public function it_rejects_a_missing_manifest_before_executing_the_bootstrap(): void
+    public function it_does_not_register_or_replace_autoloaders_during_dispatch(): void
     {
-        unlink($this->tree->path('.arix.json'));
-        $called = false;
-        $response = (new HttpRuntime($this->tree->root, logger: static function (): void {}))->handle(static function () use (&$called): void {
-            $called = true;
+        $before = spl_autoload_functions();
+        $response = (new HttpRuntime($this->tree->root, logger: static function (): void {}))->handle(static function (): never {
+            throw new RuntimeException('bootstrap failure');
         }, 'fpm-fcgi');
-        $this->assertFalse($called);
+        $this->assertSame($before, spl_autoload_functions());
         $this->assertSame(500, $response->getStatusCode());
     }
 
@@ -227,7 +226,7 @@ class HttpRuntimeTest extends TestCase
     #[Test]
     public function it_cli_run_writes_only_stderr_and_does_not_execute_bootstrap(): void
     {
-        $autoload = StandaloneCore::autoload();
+        $autoload = TestApplication::shared()->path('core/autoload.php');
         $program = 'require ' . var_export($autoload, true) . '; exit((new Arix\\Runtime\\HttpRuntime("invalid://root"))->run(static function () { echo "BOOTSTRAP"; }));';
         $process = proc_open([PHP_BINARY, '-r', $program], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         $stdout = stream_get_contents($pipes[1]);

@@ -21,7 +21,7 @@ use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\StandaloneCore;
+use Tests\Support\TestApplication;
 
 class ViewHelpersTest extends TestCase
 {
@@ -218,7 +218,7 @@ class ViewHelpersTest extends TestCase
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'styles');
         file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'styles' . DIRECTORY_SEPARATOR . 'app.css', 'body{}');
         file_put_contents($this->views() . 'helper.arix.php', "{{ trans('home.title') }}|{{ config('app.name') }}|{{ url('/about') }}|{{ style('app.css') }}|{{ url()->current() }}|{{ url()->currentPath() }}");
-        $autoload = StandaloneCore::autoload();
+        $autoload = TestApplication::shared()->path('core/autoload.php');
         $program = 'require ' . var_export($autoload, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
             PHP;
