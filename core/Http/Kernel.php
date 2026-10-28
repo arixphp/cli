@@ -60,8 +60,8 @@ class Kernel
                 $this->requests->capture($request);
 
                 $context = RequestUrlContext::fromRequest($request);
-                $request->attributes->set('_arix_url_context', $context);
-                $request->attributes->set('_arix_path', $context->path);
+                $request->attributes->set(RequestAttributes::URL_CONTEXT, $context);
+                $request->attributes->set(RequestAttributes::PATH, $context->path);
                 $container->instance(Request::class, $request);
 
                 if ($this->configure !== null) {

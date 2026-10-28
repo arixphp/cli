@@ -11,6 +11,7 @@ use Arix\Container\Container;
 use Arix\Contracts\RequestHandler;
 use Arix\Http\Kernel;
 use Arix\Http\MiddlewareResolver;
+use Arix\Http\RequestAttributes;
 use Arix\Http\RequestUrlContext;
 use Arix\HttpFoundation\Request;
 use Arix\HttpFoundation\Response;
@@ -141,8 +142,8 @@ class Application
             $app = $this->defaults->get('app', []);
             $request = ApplicationUrl::fromConfiguration($app)->request();
             $context = RequestUrlContext::fromRequest($request);
-            $request->attributes->set('_arix_url_context', $context);
-            $request->attributes->set('_arix_path', $context->path);
+            $request->attributes->set(RequestAttributes::URL_CONTEXT, $context);
+            $request->attributes->set(RequestAttributes::PATH, $context->path);
             $container->instance(Request::class, $request);
 
             $this->register($container);
@@ -276,7 +277,7 @@ class Application
         $container->instance(Repository::class, new Repository(array_replace($config->get(), ['app' => $app])));
 
         $request = $container->get(Request::class);
-        $context = $request->attributes->get('_arix_url_context');
+        $context = $request->attributes->get(RequestAttributes::URL_CONTEXT);
 
         if (! $context instanceof RequestUrlContext) {
             throw new RuntimeException('Validated request URL context is missing.');
