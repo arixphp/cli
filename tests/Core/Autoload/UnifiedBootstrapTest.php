@@ -75,6 +75,21 @@ PHP, 'declarative');
     }
 
     #[Test]
+    public function it_loads_asset_versioner_from_the_assets_namespace_without_composer(): void
+    {
+        $this->tree->write('styles/app.css', 'abc');
+        $this->runProgram(<<<'PHP'
+require $argv[1] . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+$locator = new \Arix\Assets\AssetLocator($argv[1], new \Arix\Assets\AssetPolicy());
+$versioner = new \Arix\Assets\AssetVersioner($locator);
+if ($versioner->hash('styles/app.css') !== hash('sha256', 'abc')) { throw new RuntimeException('Asset hash mismatch.'); }
+if (class_exists('Arix\\Support\\AssetVersioner')) { throw new RuntimeException('Legacy class remains.'); }
+if (class_exists('Composer\\Autoload\\ClassLoader', false)) { throw new RuntimeException('Composer was loaded.'); }
+echo 'assets';
+PHP, 'assets');
+    }
+
+    #[Test]
     public function it_does_not_enable_development_mappings_from_debug_mode(): void
     {
         $this->tree->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"Arix\\\\":"core/"}},"autoload-dev":{"psr-4":{"Checks\\\\":"checks/"}}}');
