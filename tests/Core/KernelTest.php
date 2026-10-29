@@ -170,6 +170,22 @@ class KernelTest extends TestCase
     }
 
     #[Test]
+    public function it_leaves_method_override_disabled_after_a_request(): void
+    {
+        $previous = Request::getAllowedHttpMethodOverride();
+
+        try {
+            Request::setAllowedHttpMethodOverride(['POST']);
+            $kernel = new Kernel($this->handler(static fn (): Response => new Response('ok')));
+
+            $this->assertSame(200, $kernel->handle(Request::create('/'))->getStatusCode());
+            $this->assertSame([], Request::getAllowedHttpMethodOverride());
+        } finally {
+            Request::setAllowedHttpMethodOverride($previous);
+        }
+    }
+
+    #[Test]
     public function it_each_request_has_its_own_container_request_and_singletons(): void
     {
         $scopes = [];
