@@ -6,6 +6,7 @@ namespace Tests\Unit\Core\Update;
 
 use App\Core\Update\ApplicationTarget;
 use App\Core\Update\CoreDistribution;
+use App\Core\Update\CoreFiles;
 use App\Core\Update\CoreInspector;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -84,6 +85,26 @@ class CoreInspectorTest extends TestCase
         $this->assertFileExists($this->fixture->path('application/core/Old.php'));
         $this->assertFileDoesNotExist($this->fixture->path('application/core/New.php'));
         $this->assertFileDoesNotExist($this->fixture->path('application/.core-update.lock'));
+    }
+
+    #[Test]
+    public function it_inspects_an_older_managed_core_without_new_autoload_files(): void
+    {
+        $application = $this->fixture->installed();
+        $core = $this->fixture->path('application/core');
+        unlink($this->fixture->path('application/core/Autoload/AutoloadConfiguration.php'));
+        unlink($this->fixture->path('application/core/Autoload/ClassLoader.php'));
+        rmdir($this->fixture->path('application/core/Autoload'));
+        $manifest = CoreDistribution::manifest(CoreFiles::inventory($core, strictDirectories: true));
+        $this->fixture->write('application/core/distribution.json', json_encode($manifest, JSON_THROW_ON_ERROR));
+
+        $inspector = new CoreInspector();
+        $this->assertSame($manifest, $inspector->installedManifest($core));
+
+        $this->fixture->write('application/core/functions.php', 'modified');
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains('local changes');
+        $inspector->installedManifest($core);
     }
 
     #[Test]

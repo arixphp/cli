@@ -97,6 +97,18 @@ class CoreDistribution
     /** @return array<string, mixed> */
     public static function validateManifest(array $manifest): array
     {
+        return self::validate($manifest, requireNativeAutoload: true);
+    }
+
+    /** @return array<string, mixed> */
+    public static function validateInstalledManifest(array $manifest): array
+    {
+        return self::validate($manifest, requireNativeAutoload: false);
+    }
+
+    /** @return array<string, mixed> */
+    private static function validate(array $manifest, bool $requireNativeAutoload): array
+    {
         if (($manifest['format'] ?? null) !== 1 || ($manifest['contract'] ?? null) !== 'arix-core-v1'
             || ($manifest['php'] ?? null) !== '>=8.4.1' || ($manifest['extensions'] ?? null) !== ['mbstring']
             || ! is_array($manifest['files'] ?? null) || ! is_string($manifest['id'] ?? null)) {
@@ -139,7 +151,14 @@ class CoreDistribution
             }
         }
 
-        foreach (['autoload.php', 'Autoload/AutoloadConfiguration.php', 'Autoload/ClassLoader.php', 'functions.php', 'imports.json', 'Http/Kernel.php'] as $required) {
+        $requiredFiles = ['autoload.php', 'functions.php', 'imports.json', 'Http/Kernel.php'];
+
+        if ($requireNativeAutoload) {
+            $requiredFiles[] = 'Autoload/AutoloadConfiguration.php';
+            $requiredFiles[] = 'Autoload/ClassLoader.php';
+        }
+
+        foreach ($requiredFiles as $required) {
             if (! isset($manifest['files'][$required])) {
                 throw new RuntimeException("Incomplete core distribution: {$required}");
             }

@@ -58,7 +58,7 @@ class CoreInspector
             throw new RuntimeException('Installed core manifest is missing; refusing unmanaged core.');
         }
 
-        $manifest = CoreDistribution::validateManifest(CoreDistribution::decode(CoreFiles::read($path)));
+        $manifest = CoreDistribution::validateInstalledManifest(CoreDistribution::decode(CoreFiles::read($path)));
 
         if (CoreFiles::inventory($core, strictDirectories: true) !== $manifest['files']) {
             throw new RuntimeException('Installed core has local changes; refusing to overwrite.');
