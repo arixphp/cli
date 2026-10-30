@@ -10,6 +10,7 @@ use LaravelZero\Framework\Commands\Command;
 use Phar;
 use RuntimeException;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 
 use function is_string;
@@ -51,6 +52,8 @@ class Tests extends Command
             $this->error("Cannot launch application tests: {$exception->getMessage()}");
 
             return self::FAILURE;
+        } finally {
+            (new Filesystem())->remove($application . DIRECTORY_SEPARATOR . '--record-test-run-history');
         }
     }
 }

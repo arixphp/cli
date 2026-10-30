@@ -52,6 +52,22 @@ class TestsCommandTest extends TestCase
     }
 
     #[Test]
+    public function it_removes_the_stray_phpunit_cache_directory_from_the_application(): void
+    {
+        $this->fixture->write('--record-test-run-history/test-run-history', 'stale');
+
+        $process = new Process(
+            [PHP_BINARY, dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'arix', 'tests', '--path=' . $this->fixture->root, '--no-ansi'],
+            dirname(__DIR__, 2),
+            ['XDEBUG_MODE' => 'off'],
+        );
+        $process->run();
+
+        $this->assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+        $this->assertDirectoryDoesNotExist($this->fixture->path('--record-test-run-history'));
+    }
+
+    #[Test]
     public function it_rejects_missing_configuration(): void
     {
         unlink($this->fixture->path('phpunit.xml'));
