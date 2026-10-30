@@ -39,4 +39,9 @@ class TempTree
     {
         (new Filesystem())->remove($this->root);
     }
+
+    public function applicationManifest(): void
+    {
+        $this->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/","Arix\\\\":"core/"}}}');
+    }
 }

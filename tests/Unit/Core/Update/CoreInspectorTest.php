@@ -6,6 +6,7 @@ namespace Tests\Unit\Core\Update;
 
 use App\Core\Update\ApplicationTarget;
 use App\Core\Update\CoreDistribution;
+use App\Core\Update\CoreFiles;
 use App\Core\Update\CoreInspector;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -87,6 +88,26 @@ class CoreInspectorTest extends TestCase
     }
 
     #[Test]
+    public function it_inspects_an_older_managed_core_without_new_autoload_files(): void
+    {
+        $application = $this->fixture->installed();
+        $core = $this->fixture->path('application/core');
+        unlink($this->fixture->path('application/core/Autoload/AutoloadConfiguration.php'));
+        unlink($this->fixture->path('application/core/Autoload/ClassLoader.php'));
+        rmdir($this->fixture->path('application/core/Autoload'));
+        $manifest = CoreDistribution::manifest(CoreFiles::inventory($core, strictDirectories: true));
+        $this->fixture->write('application/core/distribution.json', json_encode($manifest, JSON_THROW_ON_ERROR));
+
+        $inspector = new CoreInspector();
+        $this->assertSame($manifest, $inspector->installedManifest($core));
+
+        $this->fixture->write('application/core/functions.php', 'modified');
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains('local changes');
+        $inspector->installedManifest($core);
+    }
+
+    #[Test]
     public function it_rejects_local_edits_missing_files_and_unmanaged_additions(): void
     {
         $source = $this->fixture->core('source');
@@ -150,7 +171,7 @@ class CoreInspectorTest extends TestCase
     public function it_rejects_application_metadata_declaring_a_retired_core_contract(): void
     {
         $application = $this->fixture->installed();
-        $this->fixture->write('application/.arix.json', '{"format":1,"core_contract":"standalone-http-v1"}');
+        $this->fixture->write('application/.arix.json', '{"version":"unsupported","autoload":{"psr-4":{}}}');
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessageIsOrContains('compatibility');

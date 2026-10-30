@@ -7,6 +7,7 @@ namespace Tests\Core;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestApplication;
 
 class EnvHelperTest extends TestCase
 {
@@ -98,7 +99,7 @@ class EnvHelperTest extends TestCase
 
     private function runStandalone(string $program): mixed
     {
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::shared()->path('core/autoload.php');
         $program = 'require ' . var_export($autoload, true) . '; if (class_exists("Composer\\Autoload\\ClassLoader", false)) { exit(2); } ' . $program;
         $process = proc_open([PHP_BINARY, '-r', $program], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         $output = stream_get_contents($pipes[1]);

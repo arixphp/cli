@@ -10,9 +10,22 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
+use Tests\Support\TestApplication;
 
 class ConsoleRuntimeTest extends TestCase
 {
+    /** @var list<TestApplication> */
+    private array $applications = [];
+
+    protected function tearDown(): void
+    {
+        foreach ($this->applications as $application) {
+            $application->cleanup();
+        }
+
+        parent::tearDown();
+    }
+
     #[Test]
     public function it_pins_lazy_schedule_code_and_logs_when_the_deployment_alias_changes(): void
     {
@@ -25,7 +38,7 @@ class ConsoleRuntimeTest extends TestCase
         mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Services');
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Services' . DIRECTORY_SEPARATOR . "{$id}.php", "<?php declare(strict_types=1); namespace App\\Services; class {$id} { public static function run(): void {} }");
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'schedules.php', '<?php declare(strict_types=1); unlink(' . var_export($alias, true) . '); symlink(' . var_export($other, true) . ', ' . var_export($alias, true) . '); return static function ($schedule): void { $schedule->call("pinned", static fn () => \\App\\Services\\' . $id . '::run())->everyMinute(); };');
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::prepareCore($root);
         $program = 'require $argv[1]; exit((new Arix\\Runtime\\ConsoleRuntime())->run($argv[2]));';
         $process = new Process([PHP_BINARY, '-r', $program, $autoload, $alias]);
 
@@ -48,13 +61,15 @@ class ConsoleRuntimeTest extends TestCase
         ]);
         mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Services');
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Services' . DIRECTORY_SEPARATOR . "{$id}.php", "<?php\ndeclare(strict_types=1);\nnamespace App\\Services;\nclass {$id} { public static function run(): void { \$GLOBALS['arix_autoload_task'] = 'executed'; } }\n");
-        $GLOBALS['arix_autoload_task'] = null;
+        $autoload = TestApplication::prepareCore($root);
+        $program = 'require $argv[1]; $code = (new Arix\\Runtime\\ConsoleRuntime())->run($argv[2]); echo $GLOBALS["arix_autoload_task"] ?? "missing"; exit($code);';
+        $process = new Process([PHP_BINARY, '-r', $program, $autoload, $root]);
 
         try {
-            $this->assertSame(0, (new ConsoleRuntime())->run($root));
-            $this->assertSame('executed', $GLOBALS['arix_autoload_task']);
+            $process->run();
+            $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            $this->assertStringEndsWith('executed', $process->getOutput());
         } finally {
-            unset($GLOBALS['arix_autoload_task']);
             (new Filesystem())->remove($root);
         }
     }
@@ -97,7 +112,7 @@ class ConsoleRuntimeTest extends TestCase
         $root = $this->application([
             'broken' => 'static function (): void { throw new \RuntimeException("boom"); }',
         ]);
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::prepareCore($root);
         $script = $root . DIRECTORY_SEPARATOR . 'cron.php';
 
         file_put_contents($script, "<?php\n\nrequire '{$autoload}';\n\nexit((new \\Arix\\Runtime\\ConsoleRuntime())->run('{$root}'));\n");
@@ -118,7 +133,9 @@ class ConsoleRuntimeTest extends TestCase
      */
     private function application(array $events): string
     {
-        $root = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-console-' . bin2hex(random_bytes(8));
+        $application = new TestApplication();
+        $this->applications[] = $application;
+        $root = $application->root;
 
         $directories = [
             'app' . DIRECTORY_SEPARATOR . 'config',
@@ -130,11 +147,12 @@ class ConsoleRuntimeTest extends TestCase
         ];
 
         foreach ($directories as $directory) {
-            if (! mkdir($root . DIRECTORY_SEPARATOR . $directory, 0755, true)) {
+            if (! is_dir($root . DIRECTORY_SEPARATOR . $directory) && ! mkdir($root . DIRECTORY_SEPARATOR . $directory, 0755, true)) {
                 throw new RuntimeException('Cannot create the test application.');
             }
         }
 
+        file_put_contents($root . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"}}}');
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', "<?php\n\ndeclare(strict_types=1);\n\nreturn ['debug' => false, 'base_path' => '', 'locales' => ['en'], 'default_locale' => 'en', 'name' => 'ArixPHP', 'max_body_bytes' => 1048576];\n");
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'cache.php', "<?php\n\ndeclare(strict_types=1);\n\nreturn ['version' => '1'];\n");
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'schedule.php', "<?php\n\ndeclare(strict_types=1);\n\nreturn ['timezone' => 'UTC', 'grace' => 3600];\n");

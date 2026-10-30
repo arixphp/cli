@@ -30,12 +30,50 @@ class CoreDistributionTest extends TestCase
         $files = [
             'Http/Kernel.php' => hash('sha256', 'kernel'),
             'autoload.php' => hash('sha256', 'autoload'),
+            'Autoload/AutoloadConfiguration.php' => hash('sha256', 'configuration'),
+            'Autoload/ClassLoader.php' => hash('sha256', 'loader'),
             'functions.php' => hash('sha256', 'functions'),
             'imports.json' => hash('sha256', 'imports'),
         ];
         $manifest = CoreDistribution::manifest($files);
 
+        ksort($files);
         $this->assertSame($files, CoreDistribution::validateManifest($manifest)['files']);
+    }
+
+    #[Test]
+    public function it_distributes_native_autoload_declarations_without_removed_runtime_coordinators(): void
+    {
+        $files = CoreDistribution::bundled(dirname(__DIR__, 4))->manifest['files'];
+
+        $this->assertArrayHasKey('Autoload/AutoloadConfiguration.php', $files);
+        $this->assertArrayHasKey('Autoload/ClassLoader.php', $files);
+        $this->assertArrayNotHasKey('Support/ApplicationAutoloader.php', $files);
+    }
+
+    #[Test]
+    public function it_rejects_runnable_distributions_missing_native_autoload_declarations(): void
+    {
+        foreach (['Autoload/AutoloadConfiguration.php', 'Autoload/ClassLoader.php'] as $missing) {
+            $files = [
+                'Http/Kernel.php' => hash('sha256', 'kernel'),
+                'autoload.php' => hash('sha256', 'autoload'),
+                'Autoload/AutoloadConfiguration.php' => hash('sha256', 'configuration'),
+                'Autoload/ClassLoader.php' => hash('sha256', 'loader'),
+                'functions.php' => hash('sha256', 'functions'),
+                'imports.json' => hash('sha256', 'imports'),
+            ];
+            unset($files[$missing]);
+            $manifest = CoreDistribution::manifest($files);
+
+            try {
+                CoreDistribution::validateManifest($manifest);
+                $this->fail("Distribution without {$missing} was accepted.");
+            } catch (RuntimeException $exception) {
+                $this->assertStringContainsString('Incomplete core distribution', $exception->getMessage());
+                $this->assertStringContainsString($missing, $exception->getMessage());
+            }
+        }
     }
 
     #[Test]
@@ -50,7 +88,7 @@ class CoreDistributionTest extends TestCase
         CoreDistribution::build($source, $bundle);
         $distribution = CoreDistribution::load($bundle);
 
-        $this->assertSame(['.htaccess', 'Assets/public-policy.json', 'Http/Kernel.php', 'autoload.php', 'functions.php', 'imports.json', 'stubs/error.html'], array_keys($distribution->manifest['files']));
+        $this->assertSame(['.htaccess', 'Assets/public-policy.json', 'Autoload/AutoloadConfiguration.php', 'Autoload/ClassLoader.php', 'Http/Kernel.php', 'autoload.php', 'functions.php', 'imports.json', 'stubs/error.html'], array_keys($distribution->manifest['files']));
         $this->assertSame("<?php\ndeclare(strict_types=1);\n// kernel\n", $distribution->contents('Http/Kernel.php'));
         $this->assertSame(hash('sha256', $distribution->contents('Http/Kernel.php')), $distribution->manifest['files']['Http/Kernel.php']);
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $distribution->manifest['id']);
@@ -186,6 +224,8 @@ class CoreDistributionTest extends TestCase
         $files = [
             'Http/Kernel.php' => hash('sha256', 'kernel'),
             'autoload.php' => hash('sha256', 'autoload'),
+            'Autoload/AutoloadConfiguration.php' => hash('sha256', 'configuration'),
+            'Autoload/ClassLoader.php' => hash('sha256', 'loader'),
             'functions.php' => hash('sha256', 'functions'),
             'imports.json' => hash('sha256', 'imports'),
         ];

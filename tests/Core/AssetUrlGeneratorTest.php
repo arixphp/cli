@@ -10,6 +10,7 @@ use Arix\Assets\AssetPolicy;
 use Arix\Assets\AssetServices;
 use Arix\Assets\AssetType;
 use Arix\Assets\AssetUrlGenerator;
+use Arix\Assets\AssetVersioner;
 use Arix\Container\Container;
 use Arix\Routing\ApplicationUrl;
 use Arix\Routing\UrlGenerator;
@@ -66,6 +67,7 @@ class AssetUrlGeneratorTest extends TestCase
             AssetServices::register($container, $fixture->root,
                 new UrlGenerator(ApplicationUrl::fromString('https://myapp.com/sub/index.php'), '/about'),
                 new UrlGenerator(ApplicationUrl::fromString('https://myapp.com/sub'), '/about'));
+            $this->assertInstanceOf(AssetVersioner::class, $container->get(AssetVersioner::class));
             $this->assertSame('https://myapp.com/sub/index.php/about', $container->get(UrlGenerator::class)->to('/about'));
             $this->assertSame('https://myapp.com/sub/styles/app.css', $container->get(AssetUrlGenerator::class)->to(AssetType::Style, 'app.css', false));
             $this->assertStringStartsWith('https://myapp.com/sub/styles/app.css?v=', $container->get(AssetUrlGenerator::class)->to(AssetType::Style, 'app.css', true));

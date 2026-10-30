@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Core;
 
 use Arix\Application;
+use Arix\Autoload\AutoloadConfiguration;
+use Arix\Autoload\ClassLoader;
 use Arix\Config\Repository;
 use Arix\Container\Container;
 use Arix\Container\ContainerContext;
@@ -14,18 +16,78 @@ use Arix\HttpFoundation\Request;
 use Arix\Localization\Translator;
 use Arix\Routing\RouteRegistry;
 use Arix\Scheduling\Schedule;
+use Arix\Scheduling\ScheduleReport;
+use Arix\Scheduling\TaskStatus;
 use Arix\Storage\Storage;
+use DateTimeImmutable;
+use DateTimeZone;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Tests\Support\NativeLink;
+use Tests\Support\TestApplication;
 
 use function strlen;
 
+#[RunTestsInSeparateProcesses]
+#[PreserveGlobalState(false)]
 class ApplicationTest extends TestCase
 {
+    private TestApplication $fixture;
+
+    private ClassLoader $loader;
+
+    private string|false $errorLog;
+
+    #[Test]
+    public function it_reuses_the_bootstrap_loader_through_the_http_request_lifecycle(): void
+    {
+        $autoload = TestApplication::prepareCore($this->root);
+        $manifest = json_decode(file_get_contents($this->root . DIRECTORY_SEPARATOR . '.arix.json'), true, flags: JSON_THROW_ON_ERROR);
+        $id = 'Domain' . bin2hex(random_bytes(6));
+        $manifest['autoload']['psr-4']["{$id}\\"] = 'domain/';
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . '.arix.json', json_encode($manifest, JSON_THROW_ON_ERROR));
+        mkdir($this->root . DIRECTORY_SEPARATOR . 'domain');
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'domain' . DIRECTORY_SEPARATOR . 'Message.php', "<?php namespace {$id}; class Message { public static function value(): string { return 'unified-http'; } }");
+        $controller = $this->controller('public function show(): Response { if (spl_autoload_functions() !== $GLOBALS["expected_callbacks"]) { throw new \\RuntimeException("Controller changed loader"); } return new Response(\\' . $id . '\\Message::value()); }');
+        $this->routes('/', $controller);
+        mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Middleware');
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Middleware' . DIRECTORY_SEPARATOR . 'Audit.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+namespace App\Middleware;
+class Audit implements \Arix\Contracts\Middleware {
+    public function handle(\Arix\HttpFoundation\Request $request, \Closure $next): \Arix\HttpFoundation\Response {
+        if (spl_autoload_functions() !== $GLOBALS['expected_callbacks']) { throw new \RuntimeException('Middleware changed loader'); }
+        $response = $next($request);
+        $response->headers->set('X-Autoload', 'unified');
+        return $response;
+    }
+}
+PHP);
+        $program = <<<'PHP'
+$loader = require $argv[1];
+$GLOBALS['expected_callbacks'] = spl_autoload_functions();
+unlink($argv[2] . DIRECTORY_SEPARATOR . '.arix.json');
+$_SERVER = ['REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/', 'SCRIPT_NAME' => '/index.php', 'SCRIPT_FILENAME' => $argv[2] . DIRECTORY_SEPARATOR . 'index.php', 'SERVER_NAME' => 'localhost', 'SERVER_PORT' => '80', 'HTTP_HOST' => 'localhost'];
+$response = (new \Arix\Runtime\HttpRuntime($argv[2]))->handle(static function () use ($argv, $loader) {
+    if (spl_autoload_functions() !== $GLOBALS['expected_callbacks']) { throw new RuntimeException('Runtime changed loader'); }
+    return \Arix\Application::create($argv[2])->kernel(['App\\Middleware\\Audit']);
+}, 'fpm-fcgi');
+if ($response->getStatusCode() !== 200 || $response->headers->get('X-Autoload') !== 'unified') { throw new RuntimeException($response->getContent()); }
+if (spl_autoload_functions() !== $GLOBALS['expected_callbacks'] || count(spl_autoload_functions()) !== 1) { throw new RuntimeException('Loader was not preserved'); }
+echo $response->getContent();
+PHP;
+        $process = new Process([PHP_BINARY, '-r', $program, $autoload, $this->root]);
+        $process->run();
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $this->assertSame('unified-http', $process->getOutput());
+    }
+
     #[Test]
     #[DataProvider('nonBooleanDebugValues')]
     public function it_disables_non_boolean_debug_without_stopping_the_application(mixed $debug): void
@@ -162,7 +224,7 @@ PHP);
         $this->routes('/', $class);
         $alias = $this->root . DIRECTORY_SEPARATOR . 'current';
         symlink($this->root, $alias);
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::prepareCore($this->root);
         $program = <<<'PHP'
 require $argv[1];
 $kernel = \Arix\Application::create($argv[2])->kernel();
@@ -320,19 +382,25 @@ PHP;
     {
         parent::setUp();
         $id = 'Site' . bin2hex(random_bytes(6));
-        $this->root = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-application-' . bin2hex(random_bytes(8));
+        $this->fixture = new TestApplication();
+        $this->root = $this->fixture->root;
+        $this->errorLog = ini_set('error_log', $this->fixture->path('storage/test-errors.log'));
         $this->controllers = "App\\Controllers\\{$id}";
-        mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config', 0755, true);
         mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Controllers' . DIRECTORY_SEPARATOR . $id, 0755, true);
-        mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'views', 0755, true);
-        mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'lang', 0755, true);
-        mkdir($this->root . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'cache', 0755, true);
+        unlink($this->fixture->path('app/routes.php'));
+        unlink($this->fixture->path('app/services.php'));
+        $this->remove($this->fixture->path('app/Middleware'));
+        $this->remove($this->fixture->path('app/views/home.php'));
         $this->config([]);
+        $this->loader = new ClassLoader(AutoloadConfiguration::read($this->root));
+        $this->loader->register();
     }
 
     protected function tearDown(): void
     {
-        $this->remove($this->root);
+        $this->loader->unregister();
+        ini_set('error_log', $this->errorLog === false ? '' : $this->errorLog);
+        $this->fixture->cleanup();
         parent::tearDown();
     }
 
@@ -356,6 +424,12 @@ PHP;
     {
         $this->expectException(RuntimeException::class);
         Application::create($this->root);
+    }
+
+    #[Test]
+    public function it_builds_a_scheduling_application_without_routes(): void
+    {
+        $this->assertInstanceOf(Application::class, Application::createForScheduling($this->root));
     }
 
     #[Test]
@@ -393,6 +467,41 @@ PHP;
         Application::create($this->root)->schedules($schedule);
 
         $this->assertTrue($schedule->has('report:daily'));
+    }
+
+    #[Test]
+    public function it_builds_a_schedule_kernel_without_routes_controllers_or_middleware(): void
+    {
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'schedules.php', "<?php\ndeclare(strict_types=1);\nreturn static function (\\Arix\\Scheduling\\Schedule \$schedule): void { \$schedule->call('report:daily', static function (): void { \$GLOBALS['arix_schedule_kernel_ran'] = true; })->everyMinute(); };\n");
+        $container = new Container();
+        $now = new DateTimeImmutable('2026-10-19 03:05:00', new DateTimeZone('UTC'));
+
+        $report = ContainerContext::run($container, function () use ($container, $now): ScheduleReport {
+            $kernel = Application::createForScheduling($this->root)->scheduleKernel($container);
+
+            return $kernel->handle($now);
+        });
+
+        $this->assertTrue($GLOBALS['arix_schedule_kernel_ran'] ?? false);
+        $this->assertSame(TaskStatus::Completed, $report->results()[0]->status);
+        $this->assertFileExists($this->root . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATOR . 'cron.log');
+    }
+
+    #[Test]
+    public function it_reads_the_schedule_configuration_when_building_the_schedule_kernel(): void
+    {
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'schedule.php', "<?php\ndeclare(strict_types=1);\nreturn ['timezone' => 'UTC', 'grace' => 0];\n");
+        file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'schedules.php', "<?php\ndeclare(strict_types=1);\nreturn static function (\\Arix\\Scheduling\\Schedule \$schedule): void { \$schedule->call('daily', static fn (): null => null)->daily()->at('00:00'); };\n");
+        $container = new Container();
+        $now = new DateTimeImmutable('2026-10-19 03:05:00', new DateTimeZone('UTC'));
+
+        $report = ContainerContext::run($container, function () use ($container, $now): ScheduleReport {
+            $kernel = Application::createForScheduling($this->root)->scheduleKernel($container);
+
+            return $kernel->handle($now);
+        });
+
+        $this->assertSame(TaskStatus::NotDue, $report->results()[0]->status);
     }
 
     #[Test]
@@ -553,7 +662,7 @@ PHP;
             $response = $kernel->handle(\Arix\HttpFoundation\Request::create('/page', server: ['HTTP_HOST' => 'evil.test']));
             echo json_encode(['status' => $response->getStatusCode(), 'loaded' => class_exists($argv[3], false)], JSON_THROW_ON_ERROR);
             PHP;
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::prepareCore($this->root);
         $process = new Process([PHP_BINARY, '-r', $program, $autoload, $this->root, $class], env: ['XDEBUG_MODE' => 'off']);
         $process->run();
 

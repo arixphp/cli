@@ -176,6 +176,26 @@ class SafeZipExtractorTest extends TestCase
     }
 
     #[Test]
+    #[DataProvider('nativeAutoloadFiles')]
+    public function it_rejects_skeletons_without_native_autoload_declarations(string $path): void
+    {
+        $entries = NewApplicationFixture::skeleton();
+
+        unset($entries["app-sha/{$path}"]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains('missing required file');
+
+        new SafeZipExtractor()->extract($this->fixture->archive($entries), $this->fixture->path('output'));
+    }
+
+    public static function nativeAutoloadFiles(): array
+    {
+
+        return array_map(static fn (string $path): array => [$path], ['core/Autoload/AutoloadConfiguration.php', 'core/Autoload/ClassLoader.php']);
+    }
+
+    #[Test]
     public function it_rejects_missing_required_files(): void
     {
         $entries = NewApplicationFixture::skeleton();

@@ -87,6 +87,7 @@ switch ($scenario) {
         break;
 
     case 'application':
+        file_put_contents($root . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/","Arix\\\\":"core/"}}}');
         foreach (['config', 'Controllers', 'views', 'lang'] as $directory) {
             mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $directory, 0700, true);
         }
@@ -137,6 +138,7 @@ switch ($scenario) {
 
         break;
     case 'reserved-cache-path':
+        file_put_contents($root . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/","Arix\\\\":"core/"}}}');
         foreach (['config', 'Controllers', 'views', 'lang'] as $directory) {
             mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $directory, 0700, true);
         }

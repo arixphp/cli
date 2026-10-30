@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core\Update;
 
+use Arix\Autoload\AutoloadConfiguration;
 use RuntimeException;
 
 class ApplicationTarget
@@ -36,11 +37,7 @@ class ApplicationTarget
             throw new RuntimeException('Application compatibility metadata is missing; migrate the application first.');
         }
 
-        $contract = CoreDistribution::decode(CoreFiles::read($metadata));
-
-        if (($contract['format'] ?? null) !== 1 || ($contract['core_contract'] ?? null) !== 'arix-core-v1') {
-            throw new RuntimeException('Unsupported application compatibility contract; migrate the application first.');
-        }
+        AutoloadConfiguration::read($application);
 
         foreach (['index.php', 'app/bootstrap.php'] as $required) {
             $file = CoreFiles::local($application, $required);

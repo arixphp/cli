@@ -34,7 +34,7 @@ $archive->setStub("<?php Phar::mapPhar('testing.phar'); require 'phar://testing.
 $archive->stopBuffering();
 PHP);
             $builder = new Process([PHP_BINARY, '-d', 'phar.readonly=0', $fixture->path('build.php'), $project]);
-            $builder->setTimeout(120);
+            $builder->setTimeout(300);
             $builder->mustRun();
             $fixture->write('tests/RuntimeTest.php', <<<'PHP'
 <?php

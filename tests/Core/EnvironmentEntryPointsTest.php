@@ -24,6 +24,7 @@ class EnvironmentEntryPointsTest extends TestCase
     {
         parent::setUp();
         $this->tree = new TempTree();
+        $this->tree->applicationManifest();
         $this->env = $_ENV;
         $_ENV['APP_SITE_NAME'] = 'caller';
         $_ENV['APP_URL'] = 'https://caller.test';
@@ -97,6 +98,19 @@ PHP);
             $this->tree->write('.env', 'malformed');
             $this->assertSame('https://myapp.com/local/about', RouteResolver::fromRoot($this->tree->root)->to('about'));
         });
+    }
+
+    #[Test]
+    public function it_resolves_named_routes_without_executing_application_services(): void
+    {
+        $this->tree->write('app/services.php', <<<'PHP'
+<?php
+declare(strict_types=1);
+throw new \RuntimeException('services were loaded');
+PHP);
+
+        $this->assertSame('https://myapp.com/local/about', RouteResolver::fromRoot($this->tree->root)->to('about'));
+        $this->assertSame('caller', $_ENV['APP_SITE_NAME']);
     }
 
     #[Test]

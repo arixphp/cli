@@ -49,7 +49,7 @@ class EchoServer
 
     private static function router(): string
     {
-        return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'Fixtures'
+        return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures'
             . DIRECTORY_SEPARATOR . 'EchoServer' . DIRECTORY_SEPARATOR . 'router.php';
     }
 

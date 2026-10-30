@@ -21,7 +21,7 @@ class ReloadClientTest extends TestCase
         }
 
         $base = dirname(__DIR__, 3);
-        $process = new Process([$node, $base . DIRECTORY_SEPARATOR . 'tests/Fixtures/Development/reload-client.mjs', $base . DIRECTORY_SEPARATOR . 'resources/js/dev-reload.js']);
+        $process = new Process([$node, $base . DIRECTORY_SEPARATOR . 'tests/fixtures/Development/reload-client.mjs', $base . DIRECTORY_SEPARATOR . 'resources/js/dev-reload.js']);
         $process->run();
 
         $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());

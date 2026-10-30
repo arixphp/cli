@@ -36,9 +36,32 @@ The official documentation is available at
 
 ### Application class autoloading
 
-The standalone core autoloads `App\` classes, interfaces, traits and enums from
-the application's `app/` directory without Composer or a generated class map.
-Create directories only when needed; no extra skeleton directories are required:
+Every application must declare its compatibility contract and namespaces in a
+root `.arix.json`. There are no implicit application mappings, Composer runtime
+dependencies, generated class maps, or deployment commands:
+
+```json
+{
+    "version": "1.0.0",
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Arix\\": "core/"
+        },
+        "files": ["core/functions.php", "core/FastRoute/functions.php"]
+    },
+    "autoload-dev": {
+        "psr-4": {"Tests\\": "tests/"}
+    }
+}
+```
+
+`version` identifies the supported application/core compatibility contract, not
+the site's version or an equality check against an installed release. The former
+`format` and `core_contract` fields are not accepted. See
+[autoloading](docs/autoloading.md) for validation and activation APIs.
+
+With this manifest, classes, interfaces, traits and enums resolve on demand:
 
 ```text
 App\Utils\Formatter       -> app/Utils/Formatter.php
@@ -49,28 +72,26 @@ App\Domain\Blog\Post      -> app/Domain/Blog/Post.php
 Directory and filename case must match the namespace exactly, including on
 case-insensitive filesystems. This applies uniformly to `App\Controllers\`
 in `app/Controllers/` and `App\Middleware\` in `app/Middleware/` too; there
-are no lowercase-directory compatibility mappings. Applications using the old
-directory names must explicitly rename them before updating to this core;
-`core:update` replaces only the managed core and does not rename application files.
+are no lowercase-directory compatibility mappings.
 
-The lowercase resource directories `config`, `lang` and `views`, and the
-`bootstrap`, `routes`, `services` and `schedules` entry names are excluded from
-class loading. Resources keep their existing explicit loading mechanisms.
-`App\Services\` remains a normal class namespace, distinct from `services.php`.
+PSR-4 is applied uniformly: there are no resource-directory or entry-name
+exclusions. Resources still have their explicit loading mechanisms; their PHP
+files must not be requested as classes unless they actually declare those classes.
 The loader does not scan PHP files or follow symlinks. Application class files
 are trusted code and should contain declarations, not request-time side effects.
 
-`core/autoload.php` registers this loader before the application bootstrap and
-test setup. Application composition, HTTP requests and scheduler execution use
-the same loader with a temporary application-root scope, restored on failure.
+`core/autoload.php` registers the single native loader for the manifest at the
+application root and returns it. Application composition, HTTP runtime bootstrap
+and scheduler execution use that process loader; they never register or replace
+it. Boot once per process, as `index.php` does.
 No autowiring is added: constructor dependencies still use explicit bindings.
 PHP declarations cannot be unloaded or redefined; independent sites with
 conflicting class names need separate processes. Fiber/coroutine execution and
 persistent worker class reloading remain unsupported.
 
-Existing application test bootstraps may still contain their older `App\`
-loader. It is redundant after updating the core; keep only the `Tests\` loader
-when maintaining that application-owned file. `core:update` does not rewrite it.
+`arix tests` reuses the validated manifest and registers a development loader
+before the test bootstrap. Application tests need no separate `App\` or `Tests\`
+loader. Debug mode never enables development autoloading.
 
 ### Updating an application's core
 
@@ -292,6 +313,13 @@ paths in this README are relative to the CLI repository's root.
 Application `phpunit.xml` declares the suite and its `tests/autoload.php`
 bootstrap. Application tests use Pest syntax and cover `app/` only. Framework
 tests remain in this repository's `tests/Core/`.
+
+CLI core tests share the functional fixture application in
+`tests/fixtures/app/`. `Tests\Support\TestApplication` copies it and the current
+`core/` into a private temporary root, without symlinks or mutations of the
+source. Preparation is per fixture instance; each request still receives a fresh
+container. Conflicting applications run in separate processes, never through
+autoloader scopes.
 
 The command validates the application and starts a fresh PHP worker, streams
 Pest output, and preserves its exit status. Relative `--path` values resolve from

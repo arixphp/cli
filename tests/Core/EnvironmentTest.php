@@ -96,6 +96,27 @@ class EnvironmentTest extends TestCase
     }
 
     #[Test]
+    public function it_keeps_the_outer_environment_after_a_nested_failure(): void
+    {
+        $_ENV['APP_SCOPE_NEW'] = 'caller';
+        $this->tree->write('.env', 'APP_SCOPE_NEW=local');
+
+        Environment::run($this->tree->root, function (): void {
+            try {
+                Environment::run($this->tree->root, static function (): never {
+                    throw new RuntimeException('nested failure');
+                });
+                $this->fail('Nested failure must propagate.');
+            } catch (RuntimeException $exception) {
+                $this->assertSame('nested failure', $exception->getMessage());
+                $this->assertSame('local', $_ENV['APP_SCOPE_NEW']);
+            }
+        });
+
+        $this->assertSame('caller', $_ENV['APP_SCOPE_NEW']);
+    }
+
+    #[Test]
     public function it_does_not_apply_any_values_from_a_malformed_file(): void
     {
         $this->tree->write('.env', "APP_SCOPE_NEW=secret\ninvalid secret");

@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
+use Tests\Support\TestApplication;
 
 class NamedRouteTest extends TestCase
 {
@@ -25,13 +26,14 @@ class NamedRouteTest extends TestCase
     {
         $root = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-route-scope-' . bin2hex(random_bytes(8));
         mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config', 0755, true);
+        file_put_contents($root . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"}}}');
         mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Domain');
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Domain' . DIRECTORY_SEPARATOR . 'Paths.php', '<?php declare(strict_types=1); namespace App\\Domain; class Paths { public static function about(): string { return "/about"; } }');
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', '<?php declare(strict_types=1); return ["url" => "https://myapp.com/sub"];');
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'routes.php', '<?php declare(strict_types=1); Arix\\Facades\\Route::get(App\\Domain\\Paths::about(), ["App\\\\Controllers\\\\AboutController", "show"])->name("about");');
         $alias = $root . DIRECTORY_SEPARATOR . 'current';
         symlink($root, $alias);
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::prepareCore($root);
         $program = <<<'PHP'
 require $argv[1];
 $outer = new \Arix\Container\Container();
@@ -188,6 +190,7 @@ PHP;
     {
         $root = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-routes-' . bin2hex(random_bytes(8));
         mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config', 0755, true);
+        file_put_contents($root . DIRECTORY_SEPARATOR . '.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"}}}');
 
         file_put_contents(
             $root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php',
@@ -214,6 +217,7 @@ PHP;
             $this->assertSame('https://myapp.com/sub/articles/7', $generator->to('article', ['id' => 7]));
         } finally {
             unlink($alias);
+            unlink($root . DIRECTORY_SEPARATOR . '.arix.json');
             unlink($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'routes.php');
             unlink($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php');
             rmdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config');
@@ -225,7 +229,7 @@ PHP;
     #[Test]
     public function it_exposes_route_helper_without_composer(): void
     {
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::shared()->path('core/autoload.php');
         $program = 'require ' . var_export($autoload, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
             if (! function_exists('route')) { exit(3); }

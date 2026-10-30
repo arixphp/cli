@@ -6,6 +6,7 @@ namespace Tests\Core\Views;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\TestApplication;
 
 class ApplicationViewsTest extends TestCase
 {
@@ -19,7 +20,7 @@ class ApplicationViewsTest extends TestCase
 
         mkdir($this->directory, 0755, true);
 
-        $reference = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'Fixtures' . DIRECTORY_SEPARATOR . 'ApplicationViews';
+        $reference = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'ApplicationViews';
 
         $this->assertDirectoryExists($reference . DIRECTORY_SEPARATOR . 'views');
         $this->assertDirectoryExists($reference . DIRECTORY_SEPARATOR . 'lang');
@@ -44,7 +45,7 @@ class ApplicationViewsTest extends TestCase
     #[Test]
     public function it_renders_the_reference_application_views_without_composer(): void
     {
-        $autoload = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::shared()->path('core/autoload.php');
         $program = 'require ' . var_export($autoload, true) . '; ' . <<<'PHP'
             if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
             PHP;

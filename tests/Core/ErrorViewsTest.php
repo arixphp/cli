@@ -14,6 +14,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 use Tests\Support\CoreUpdateFixture;
+use Tests\Support\TestApplication;
 
 class ErrorViewsTest extends TestCase
 {
@@ -25,6 +26,7 @@ class ErrorViewsTest extends TestCase
     {
         parent::setUp();
         $this->fixture = new CoreUpdateFixture();
+        $this->fixture->write('.arix.json', '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/"}}}');
         $this->fixture->write('app/config/app.php', <<<'PHP'
 <?php
 declare(strict_types=1);
@@ -116,7 +118,7 @@ if (class_exists('Composer\Autoload\ClassLoader', false)) { exit(2); }
 $response = \Arix\Application::create($argv[2])->kernel()->handle(\Arix\HttpFoundation\Request::create('/missing'));
 echo $response->getContent();
 PHP;
-        $process = new Process([PHP_BINARY, '-r', $program, dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php', $this->fixture->root], $this->fixture->root, ['XDEBUG_MODE' => 'off']);
+        $process = new Process([PHP_BINARY, '-r', $program, TestApplication::prepareCore($this->fixture->root), $this->fixture->root], $this->fixture->root, ['XDEBUG_MODE' => 'off']);
         $process->run();
 
         $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());

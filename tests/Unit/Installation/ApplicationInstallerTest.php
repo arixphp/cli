@@ -68,7 +68,7 @@ class ApplicationInstallerTest extends TestCase
     public function it_publishes_managed_frontend_directories_with_private_boundaries(): void
     {
         $archive = $this->fixture->archive(array_replace(NewApplicationFixture::skeleton(), [
-            'app-sha/.arix.json' => '{"format":1,"core_contract":"arix-core-v1"}',
+            'app-sha/.arix.json' => '{"version":"1.0.0","autoload":{"psr-4":{"App\\\\":"app/","Arix\\\\":"core/"}}}',
             'app-sha/index.php' => '<?php // entry',
             'app-sha/app/routes.php' => '<?php // routes',
             'app-sha/core/autoload.php' => '<?php // core',

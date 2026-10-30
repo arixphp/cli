@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Testing;
 
+use Arix\Autoload\AutoloadConfiguration;
+use Arix\Autoload\ClassLoader;
 use Pest\Kernel;
 use Pest\TestSuite;
 use RuntimeException;
@@ -30,8 +32,16 @@ class PestRunner
             }
         }
 
-        // Arix must claim its global helpers before Composer includes Laravel's.
-        require_once $root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        if (PHP_VERSION_ID < 80401 || ! extension_loaded('mbstring')) {
+            throw new RuntimeException('Arix core requires PHP >= 8.4.1 and ext-mbstring.');
+        }
+
+        // Register development before eager files, and local helpers before Composer.
+        require_once $root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Autoload' . DIRECTORY_SEPARATOR . 'AutoloadConfiguration.php';
+        require_once $root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Autoload' . DIRECTORY_SEPARATOR . 'ClassLoader.php';
+        $configuration = AutoloadConfiguration::read($root);
+        $native = new ClassLoader($configuration, development: true);
+        $native->register();
         $autoload = $distribution . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 
         if (! is_file($autoload)) {
@@ -43,8 +53,9 @@ class PestRunner
         // Pest plugins belong to the CLI's dependency installation, not the app.
         $GLOBALS['_composer_bin_dir'] = dirname($autoload) . DIRECTORY_SEPARATOR . 'bin';
         $loader->unregister();
-        spl_autoload_register(static function (string $class) use ($loader): void {
-            foreach (['App\\', 'Arix\\', 'Tests\\'] as $owned) {
+        $prefixes = array_unique(['App\\', 'Arix\\', 'Tests\\', ...array_keys($configuration->prefixes()), ...array_keys($configuration->devPrefixes())]);
+        spl_autoload_register(static function (string $class) use ($loader, $prefixes): void {
+            foreach ($prefixes as $owned) {
                 if (str_starts_with($class, $owned)) {
 
                     return;

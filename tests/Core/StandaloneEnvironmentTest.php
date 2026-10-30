@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 use Tests\Support\TempTree;
+use Tests\Support\TestApplication;
 
 class StandaloneEnvironmentTest extends TestCase
 {
@@ -15,8 +16,9 @@ class StandaloneEnvironmentTest extends TestCase
     public function it_redacts_environment_values_from_logs_when_exception_arguments_are_enabled(): void
     {
         $tree = new TempTree();
+        $tree->applicationManifest();
         $tree->write('.env', "APP_DEBUG=true\nAPP_TOKEN=\"private-token-sentinel\"invalid");
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::prepareCore($tree->root);
         $program = <<<'PHP'
 require $argv[1];
 $logs = [];
@@ -41,8 +43,9 @@ PHP;
     public function it_loads_only_the_explicit_application_environment_without_composer(): void
     {
         $tree = new TempTree();
+        $tree->applicationManifest();
         $tree->write('.env', "APP_STANDALONE_TEST=file\nAPP_DEBUG=\"false\"");
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::prepareCore($tree->root);
         $program = <<<'PHP'
 require $argv[1];
 $_ENV['APP_STANDALONE_TEST'] = 'caller';
@@ -63,6 +66,7 @@ PHP;
     public function it_bootstraps_application_configuration_and_controller_in_the_same_environment(): void
     {
         $tree = new TempTree();
+        $tree->applicationManifest();
         $tree->write('.env', 'APP_STANDALONE_TEST=from-file');
         $tree->write('app/views/.keep', '');
         $tree->write('app/lang/en.php', '<?php declare(strict_types=1); return [];');
@@ -87,7 +91,7 @@ class SiteController {
 }
 PHP);
         $tree->write('app/bootstrap.php', '<?php declare(strict_types=1); return \Arix\Application::configure(dirname(__DIR__))->create();');
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::prepareCore($tree->root);
         $program = <<<'PHP'
 require $argv[1];
 $_SERVER = ['REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/', 'HTTP_HOST' => 'localhost'];
@@ -112,8 +116,9 @@ PHP;
     public function it_rejects_the_simplified_entry_point_on_cli_without_loading_a_malformed_file(): void
     {
         $tree = new TempTree();
+        $tree->applicationManifest();
         $tree->write('.env', 'invalid secret');
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::prepareCore($tree->root);
         $script = $tree->write('index.php', '<?php declare(strict_types=1); require $argv[1]; exit((new \Arix\Runtime\HttpRuntime(applicationRoot: __DIR__))->run(static function () { echo "BOOTSTRAP"; }));');
 
         try {

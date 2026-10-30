@@ -51,7 +51,7 @@ class StandaloneExecutableTest extends TestCase
 test('executable application ownership', function () {
     expect(PHP_SAPI)->toBe('micro');
     expect(class_exists(App\Commands\Tests::class))->toBeFalse();
-    expect(class_exists(Arix\Application::class))->toBeFalse();
+    expect((new ReflectionClass(Arix\Application::class))->getFileName())->toBe(realpath(getcwd() . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'Application.php'));
     expect(class_exists(Tests\TestCase::class))->toBeFalse();
     expect(view())->toBe('application-view');
     expect(config())->toBe('application-config');

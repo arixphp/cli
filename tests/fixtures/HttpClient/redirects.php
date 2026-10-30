@@ -37,11 +37,12 @@ $client = new class($scenario['responses']) extends Http
 $client = $client->withRedirects($scenario['redirects'] ?? 3)->withToken('secret')
     ->withHeaders(['Cookie' => 'session=secret', 'X-Secret' => 'value']);
 $error = null;
+$status = null;
 
 try {
-    $client->post($scenario['url'], ['payload' => 'fixture']);
+    $status = $client->post($scenario['url'], ['payload' => 'fixture'])->status();
 } catch (HttpClientException $exception) {
     $error = $exception->getMessage();
 }
 
-echo json_encode(['error' => $error, 'sent' => $client->sent], JSON_THROW_ON_ERROR);
+echo json_encode(['error' => $error, 'status' => $status, 'sent' => $client->sent], JSON_THROW_ON_ERROR);

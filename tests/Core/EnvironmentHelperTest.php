@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
+use Tests\Support\TestApplication;
 
 class EnvironmentHelperTest extends TestCase
 {
@@ -51,7 +52,7 @@ PHP));
 
     private function evaluate(string $body): mixed
     {
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::shared()->path('core/autoload.php');
         $program = 'require $argv[1]; $result = (static function () {' . $body . '})(); echo json_encode($result, JSON_THROW_ON_ERROR);';
         $process = new Process([PHP_BINARY, '-r', $program, $autoload], env: ['XDEBUG_MODE' => 'off']);
         $process->mustRun();

@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
+use Tests\Support\TestApplication;
 
 class ClientRedirectTest extends TestCase
 {
@@ -15,7 +16,7 @@ class ClientRedirectTest extends TestCase
     #[DataProvider('sameOrigins')]
     public function it_recognizes_equivalent_origins_without_dropping_credentials(string $source, string $target): void
     {
-        $result = $this->runScenario(['url' => $source, 'responses' => [['location' => $target], []]]);
+        $result = $this->runScenario(['url' => $source, 'responses' => [['status' => 302, 'location' => $target], []]]);
 
         $this->assertNull($result['error']);
         $this->assertCount(2, $result['sent']);
@@ -60,7 +61,7 @@ class ClientRedirectTest extends TestCase
     #[Test]
     public function it_never_connects_to_an_https_downgrade_destination(): void
     {
-        $result = $this->runScenario(['url' => 'https://service.test/start', 'responses' => [['location' => 'http://service.test/final']]]);
+        $result = $this->runScenario(['url' => 'https://service.test/start', 'responses' => [['status' => 302, 'location' => 'http://service.test/final']]]);
 
         $this->assertSame('HTTPS redirects cannot downgrade to HTTP.', $result['error']);
         $this->assertCount(1, $result['sent']);
@@ -72,7 +73,7 @@ class ClientRedirectTest extends TestCase
     {
         $result = $this->runScenario([
             'url' => 'https://service.test/start',
-            'responses' => [['location' => 'https://service.test:8443/next'], ['location' => 'https://service.test/final'], []],
+            'responses' => [['status' => 302, 'location' => 'https://service.test:8443/next'], ['status' => 302, 'location' => 'https://service.test/final'], []],
         ]);
 
         $this->assertNull($result['error']);
@@ -83,12 +84,59 @@ class ClientRedirectTest extends TestCase
         $this->assertArrayNotHasKey('X-Secret', $result['sent'][2]['headers']);
     }
 
+    #[Test]
+    #[DataProvider('nonRedirectStatuses')]
+    public function it_does_not_follow_location_on_non_redirect_responses(int $status): void
+    {
+        $result = $this->runScenario(['url' => 'https://service.test/start', 'responses' => [['status' => $status, 'location' => '/created'], []]]);
+
+        $this->assertNull($result['error']);
+        $this->assertSame($status, $result['status']);
+        $this->assertCount(1, $result['sent']);
+    }
+
+    public static function nonRedirectStatuses(): array
+    {
+        return [[200], [201], [300], [304], [400]];
+    }
+
+    #[Test]
+    #[DataProvider('redirectStatuses')]
+    public function it_follows_supported_redirect_statuses(int $status): void
+    {
+        $result = $this->runScenario(['url' => 'https://service.test/start', 'responses' => [['status' => $status, 'location' => '/next'], []]]);
+
+        $this->assertNull($result['error']);
+        $this->assertSame('https://service.test/next', $result['sent'][1]['url']);
+        $this->assertCount(2, $result['sent']);
+    }
+
+    public static function redirectStatuses(): array
+    {
+        return [[301], [302], [303], [307], [308]];
+    }
+
+    #[Test]
+    #[DataProvider('unsupportedLocations')]
+    public function it_rejects_unsupported_redirect_references_without_a_second_request(string $location): void
+    {
+        $result = $this->runScenario(['url' => 'https://service.test/path/start', 'responses' => [['status' => 302, 'location' => $location], []]]);
+
+        $this->assertSame('The redirect location is not supported.', $result['error']);
+        $this->assertCount(1, $result['sent']);
+    }
+
+    public static function unsupportedLocations(): array
+    {
+        return [['next'], ['../next'], ['?page=2'], ['#fragment'], ['//other.test/path']];
+    }
+
     /** @return array<string, mixed> */
     private function runScenario(array $scenario): array
     {
         $root = dirname(__DIR__, 3);
-        $fixture = $root . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'Fixtures' . DIRECTORY_SEPARATOR . 'HttpClient' . DIRECTORY_SEPARATOR . 'redirects.php';
-        $autoload = $root . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $fixture = $root . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'HttpClient' . DIRECTORY_SEPARATOR . 'redirects.php';
+        $autoload = TestApplication::shared()->path('core/autoload.php');
         $process = new Process([PHP_BINARY, $fixture, $autoload, json_encode($scenario, JSON_THROW_ON_ERROR)], env: ['XDEBUG_MODE' => 'off']);
         $process->run();
 

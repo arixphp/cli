@@ -16,15 +16,28 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Tests\Support\TempTree;
+use Tests\Support\TestApplication;
 
 class HttpRuntimeTest extends TestCase
 {
+    #[Test]
+    public function it_does_not_register_or_replace_autoloaders_during_dispatch(): void
+    {
+        $before = spl_autoload_functions();
+        $response = (new HttpRuntime($this->tree->root, logger: static function (): void {}))->handle(static function (): never {
+            throw new RuntimeException('bootstrap failure');
+        }, 'fpm-fcgi');
+        $this->assertSame($before, spl_autoload_functions());
+        $this->assertSame(500, $response->getStatusCode());
+    }
+
     private TempTree $tree;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->tree = new TempTree();
+        $this->tree->applicationManifest();
         $this->tree->write('.env', 'APP_DEBUG=false');
     }
 
@@ -45,6 +58,7 @@ class HttpRuntimeTest extends TestCase
     public function it_loads_environment_before_bootstrap_and_keeps_it_during_dispatch(): void
     {
         $tree = new TempTree();
+        $tree->applicationManifest();
         $tree->write('.env', "APP_RUNTIME_TEST=file\nAPP_DEBUG=true");
         $before = $_ENV;
         $server = $_SERVER;
@@ -77,6 +91,7 @@ class HttpRuntimeTest extends TestCase
     public function it_resolves_debug_only_from_the_application_environment(): void
     {
         $tree = new TempTree();
+        $tree->applicationManifest();
         $file = $tree->write('.env', 'APP_DEBUG=true');
         $bootstrap = static function (): never {
             throw new RuntimeException('visible-bootstrap-detail');
@@ -98,6 +113,7 @@ class HttpRuntimeTest extends TestCase
     public function it_handles_environment_failures_without_debug_or_secret_leaks(): void
     {
         $tree = new TempTree();
+        $tree->applicationManifest();
         $tree->write('.env', "APP_DEBUG=true\nsecret-invalid-assignment");
         $original = getenv('APP_DEBUG');
         putenv('APP_DEBUG=true');
@@ -210,7 +226,7 @@ class HttpRuntimeTest extends TestCase
     #[Test]
     public function it_cli_run_writes_only_stderr_and_does_not_execute_bootstrap(): void
     {
-        $autoload = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'autoload.php';
+        $autoload = TestApplication::shared()->path('core/autoload.php');
         $program = 'require ' . var_export($autoload, true) . '; exit((new Arix\\Runtime\\HttpRuntime("invalid://root"))->run(static function () { echo "BOOTSTRAP"; }));';
         $process = proc_open([PHP_BINARY, '-r', $program], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         $stdout = stream_get_contents($pipes[1]);

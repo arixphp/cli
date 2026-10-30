@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Testing;
 
+use Arix\Autoload\AutoloadConfiguration;
 use RuntimeException;
 
 class ApplicationTarget
@@ -20,7 +21,9 @@ class ApplicationTarget
             throw new RuntimeException('Application directory does not exist.');
         }
 
-        foreach (['index.php', 'app/bootstrap.php', 'core/autoload.php', 'phpunit.xml', 'tests/autoload.php'] as $required) {
+        AutoloadConfiguration::read($root);
+
+        foreach (['index.php', 'app/bootstrap.php', 'core/autoload.php', 'core/Autoload/AutoloadConfiguration.php', 'core/Autoload/ClassLoader.php', 'phpunit.xml', 'tests/autoload.php'] as $required) {
             $file = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $required);
             self::assertUnlinked($file);
 
