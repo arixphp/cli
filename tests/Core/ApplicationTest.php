@@ -14,6 +14,8 @@ use Arix\Http\Kernel;
 use Arix\Http\MiddlewareConfiguration;
 use Arix\HttpFoundation\Request;
 use Arix\Localization\Translator;
+use Arix\Markdown\DocumentReader;
+use Arix\Markdown\Markdown;
 use Arix\Routing\RouteRegistry;
 use Arix\Scheduling\Schedule;
 use Arix\Scheduling\ScheduleReport;
@@ -453,6 +455,8 @@ PHP;
 
         $this->assertTrue($container->has(Repository::class));
         $this->assertTrue($container->has(Storage::class));
+        $this->assertTrue($container->has(Markdown::class));
+        $this->assertTrue($container->has(DocumentReader::class));
         $this->assertTrue($container->has(Translator::class));
         $this->assertSame([], $container->get(RouteRegistry::class)->methods());
     }

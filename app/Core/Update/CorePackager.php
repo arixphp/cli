@@ -104,10 +104,12 @@ class CorePackager
 
         $actual = [];
 
+        $packages = ['HttpFoundation', 'FastRoute', 'BladeOne', 'Cron', 'Parsedown'];
+
         foreach ($imports['packages'] as $metadata) {
             $destination = $metadata['destination'] ?? null;
 
-            if (! is_string($destination) || ! in_array($destination, ['HttpFoundation', 'FastRoute', 'BladeOne', 'Cron'], true)) {
+            if (! is_string($destination) || ! in_array($destination, $packages, true)) {
                 throw new RuntimeException('Invalid imported core destination.');
             }
 
@@ -121,7 +123,7 @@ class CorePackager
         foreach ($hashes as $path => $hash) {
             $component = explode('/', $path)[0];
 
-            if (in_array($component, ['HttpFoundation', 'FastRoute', 'BladeOne', 'Cron'], true) && ! isset($actual[$path])) {
+            if (in_array($component, $packages, true) && ! isset($actual[$path])) {
                 throw new RuntimeException('Imported sources are unmanaged; refusing to package.');
             }
         }

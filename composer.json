@@ -19,6 +19,7 @@
         "php": "^8.4.1",
         "dragonmantank/cron-expression": "^3.6",
         "eftec/bladeone": "^5.0",
+        "erusev/parsedown": "^1.8",
         "laravel-zero/foundation": "^13.23",
         "laravel-zero/framework": "^13.0",
         "laravel/pint": "^1.30.4",

@@ -4,7 +4,8 @@
         "core/HttpFoundation",
         "core/FastRoute",
         "core/BladeOne",
-        "core/Cron"
+        "core/Cron",
+        "core/Parsedown"
     ],
     "rules": {
         "new_with_parentheses": true,
