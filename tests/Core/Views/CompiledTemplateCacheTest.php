@@ -64,18 +64,14 @@ class CompiledTemplateCacheTest extends TestCase
     }
 
     #[Test]
-    public function it_rejects_linked_missing_and_unwritable_directories(): void
+    public function it_checks_missing_and_unwritable_directories(): void
     {
         $target = $this->directory . DIRECTORY_SEPARATOR . 'target';
         mkdir($target);
         symlink($target, $this->directory . DIRECTORY_SEPARATOR . 'linked');
         $rejected = 0;
 
-        try {
-            new CompiledTemplateCache($this->directory . DIRECTORY_SEPARATOR . 'linked', '1');
-        } catch (RuntimeException) {
-            $rejected++;
-        }
+        $this->assertSame($target, new CompiledTemplateCache($this->directory . DIRECTORY_SEPARATOR . 'linked', '1')->directory());
 
         try {
             new CompiledTemplateCache($this->directory . DIRECTORY_SEPARATOR . 'missing', '1');
@@ -86,8 +82,8 @@ class CompiledTemplateCacheTest extends TestCase
         chmod($this->directory, 0555);
 
         if (is_writable($this->directory)) {
-            $this->assertSame(2, $rejected);
-            $this->markTestSkipped('Linked and missing directories were checked; this filesystem/user does not enforce POSIX write permissions.');
+            $this->assertSame(1, $rejected);
+            $this->markTestSkipped('Missing directory was checked; this filesystem/user does not enforce POSIX write permissions.');
         }
 
         try {
@@ -96,7 +92,7 @@ class CompiledTemplateCacheTest extends TestCase
             $rejected++;
         }
 
-        $this->assertSame(3, $rejected);
+        $this->assertSame(2, $rejected);
     }
 
     #[Test]

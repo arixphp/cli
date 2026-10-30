@@ -15,6 +15,26 @@ use function uniqid;
 
 class StorageTest extends TestCase
 {
+    #[Test]
+    public function it_uses_a_storage_root_without_rejecting_linked_ancestors(): void
+    {
+        $root = $this->createRoot();
+        $link = "{$root}-link";
+        symlink($root, $link);
+
+        try {
+            $storage = new Storage($link);
+            $storage->put('example.txt', 'content');
+            $this->assertSame('content', $storage->get('example.txt'));
+        } finally {
+            unlink($link);
+            if (is_file($root . DIRECTORY_SEPARATOR . 'example.txt')) {
+                unlink($root . DIRECTORY_SEPARATOR . 'example.txt');
+            }
+            rmdir($root);
+        }
+    }
+
     private function createRoot(): string
     {
         $root = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'arix_storage_test_' . uniqid('', true);

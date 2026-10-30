@@ -50,21 +50,22 @@ class DocumentReaderTest extends TestCase
     }
 
     #[Test]
-    public function it_rejects_a_linked_document(): void
+    public function it_reads_a_document_through_a_linked_root(): void
     {
         $root = realpath(sys_get_temp_dir());
         $name = 'arix-markdown-link-' . bin2hex(random_bytes(8)) . '.md';
-        $target = $root . DIRECTORY_SEPARATOR . $name . '.target';
-        $link = $root . DIRECTORY_SEPARATOR . $name;
-        file_put_contents($target, 'secret');
-        symlink($target, $link);
+        $directory = $root . DIRECTORY_SEPARATOR . 'arix-markdown-' . bin2hex(random_bytes(8));
+        $link = "{$directory}-link";
+        mkdir($directory);
+        file_put_contents($directory . DIRECTORY_SEPARATOR . $name, 'content');
+        symlink($directory, $link);
 
         try {
-            $this->expectException(RuntimeException::class);
-            new DocumentReader($root)->read($name);
+            $this->assertSame('content', new DocumentReader($link)->read($name));
         } finally {
             unlink($link);
-            unlink($target);
+            unlink($directory . DIRECTORY_SEPARATOR . $name);
+            rmdir($directory);
         }
     }
 }
