@@ -19,6 +19,8 @@ class PublicResourceCorpus
             '/media/%252e%252e/private.webp', '/media/../core/secret.webp',
             '/media/%2e%2e/core/secret.webp', '/media/%00.webp', '/media/%zz.webp',
             '/Media/logo.webp', '/fonts/logo.png', '/media/inter.woff2',
+            '/.env', '/.env.local', '/.env.production', '/.env.bak', '/.env.example',
+            '/nested/.env', '/%2eenv', '/%2Eenv.production', '/%252eenv', '/nested/%2eenv',
         ];
     }
 }

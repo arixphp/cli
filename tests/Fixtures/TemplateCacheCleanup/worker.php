@@ -64,7 +64,7 @@ switch ($scenario) {
                 $configuration['cache']['templates'] = $invalid;
 
                 try {
-                    ViewServices::register(new Container(), $root, Request::create('/'), $configuration);
+                    ViewServices::register(new Container(), $root, $configuration);
                 } catch (InvalidArgumentException) {
                     continue;
                 }
@@ -81,7 +81,7 @@ switch ($scenario) {
 
         $old = seedOldCompilations($storageCache, ($options['policy']['cleanup'] ?? true) ? 100 : 90000);
         $container = new Container();
-        ViewServices::register($container, $root, Request::create('/'), $configuration);
+        ViewServices::register($container, $root, $configuration);
         check($container->get(TemplateEngine::class)->render('page') === 'Configured', 'Configured view failed.');
         check(remaining($old) === $options['remaining'], 'View services did not apply the requested collection policy.');
         break;

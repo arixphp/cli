@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Core;
 
 use Arix\Config\Loader;
-use Arix\HttpFoundation\Request;
 use Arix\Localization\Translator;
 use Arix\Views\ViewServicesConfig;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -144,7 +143,7 @@ class LocalizationPathTest extends TestCase
         $link = $this->root . DIRECTORY_SEPARATOR . 'views';
         symlink($this->root . DIRECTORY_SEPARATOR . 'lang', $link);
         $this->expectException(RuntimeException::class);
-        ViewServicesConfig::resolve($this->root, Request::create('/'), [
+        ViewServicesConfig::resolve($this->root, [
             'app' => ['locales' => ['en'], 'default_locale' => 'en'],
             'cache' => ['path' => $this->root . DIRECTORY_SEPARATOR . 'cache', 'version' => '1'],
             'views' => $link,

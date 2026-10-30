@@ -128,12 +128,13 @@ class RoutingHandlerTest extends RoutingTestCase
             $container->instance(RouteRegistry::class, new RouteRegistry());
             $container->bind($class, static fn (): object => new $class());
             Route::get('/articles/{slug}', [$class, 'show']);
-        }, basePath: '/site');
-        $this->assertSame('café', $kernel->handle(Request::create('/site/articles/caf%C3%A9'))->getContent());
-        $this->assertSame(400, $kernel->handle(Request::create('/site/articles/a%2Fb'))->getStatusCode());
-        $this->assertSame(400, $kernel->handle(Request::create('/site/articles/%xx'))->getStatusCode());
-        $this->assertSame(404, $kernel->handle(Request::create('/outside/articles/1'))->getStatusCode());
-        $this->assertSame(404, $kernel->handle(Request::create('/site/articles/1/'))->getStatusCode());
+        });
+        $request = static fn (string $uri): Request => Request::create($uri, server: ['SCRIPT_NAME' => '/site/index.php', 'SCRIPT_FILENAME' => '/srv/index.php']);
+        $this->assertSame('café', $kernel->handle($request('/site/articles/caf%C3%A9'))->getContent());
+        $this->assertSame(400, $kernel->handle($request('/site/articles/a%2Fb'))->getStatusCode());
+        $this->assertSame(400, $kernel->handle($request('/site/articles/%xx'))->getStatusCode());
+        $this->assertSame(404, $kernel->handle($request('/outside/articles/1'))->getStatusCode());
+        $this->assertSame(404, $kernel->handle($request('/site/articles/1/'))->getStatusCode());
     }
 
     #[Test]
@@ -242,7 +243,7 @@ class RoutingHandlerTest extends RoutingTestCase
         $kernel = new Kernel(new RoutingHandler($this->directory), configure: static function (Container $container) use ($class, $root): void {
             $container->instance(RouteRegistry::class, new RouteRegistry());
             $container->bind($class, static fn (): object => new $class());
-            ViewServices::register($container, $root, $container->get(Request::class), [
+            ViewServices::register($container, $root, [
                 'app' => ['name' => 'Site', 'base_path' => '', 'locales' => ['en'], 'default_locale' => 'en'],
                 'cache' => ['version' => '1'],
                 'views' => $root . DIRECTORY_SEPARATOR . 'views',

@@ -27,6 +27,28 @@ use function strlen;
 class ApplicationTest extends TestCase
 {
     #[Test]
+    #[DataProvider('nonBooleanDebugValues')]
+    public function it_disables_non_boolean_debug_without_stopping_the_application(mixed $debug): void
+    {
+        $this->config(['debug' => $debug]);
+        $class = $this->controller('public function show(\Arix\HttpFoundation\Request $request): Response { if ($request->query->has("fail")) { throw new \RuntimeException("private-debug-detail"); } return new Response("running"); }');
+        $this->routes('/', $class);
+        $kernel = Application::create($this->root)->kernel();
+        $response = $kernel->handle(Request::create('/'));
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('running', $response->getContent());
+        $error = $kernel->handle(Request::create('/?fail=1'));
+        $this->assertSame(500, $error->getStatusCode());
+        $this->assertStringNotContainsString('private-debug-detail', $error->getContent());
+    }
+
+    public static function nonBooleanDebugValues(): array
+    {
+
+        return [['false'], ['true'], ['invalid'], [null], [1], [0], [[]]];
+    }
+
+    #[Test]
     public function it_builds_a_kernel_with_fluent_global_middleware_configuration(): void
     {
         $class = $this->controller('public function show(): Response { return new Response("hello"); }');
@@ -489,14 +511,15 @@ PHP;
     }
 
     #[Test]
-    public function it_applies_the_configured_base_path(): void
+    public function it_detects_the_mount_instead_of_reading_legacy_base_path(): void
     {
         $class = $this->controller('public function show(): Response { return new Response("scoped"); }');
         $this->routes('/page', $class);
-        $this->config(['base_path' => '/site']);
+        $this->config(['base_path' => '/wrong']);
         $kernel = Application::create($this->root)->kernel();
-        $this->assertSame('scoped', $kernel->handle(Request::create('/site/page'))->getContent());
-        $this->assertSame(404, $kernel->handle(Request::create('/page'))->getStatusCode());
+        $this->assertSame('scoped', $kernel->handle(Request::create('/site/page', server: ['SCRIPT_NAME' => '/site/index.php', 'SCRIPT_FILENAME' => '/srv/index.php']))->getContent());
+        $this->assertSame('scoped', $kernel->handle(Request::create('/page'))->getContent());
+        $this->assertSame(404, $kernel->handle(Request::create('/wrong/page'))->getStatusCode());
     }
 
     #[Test]

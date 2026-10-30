@@ -11,7 +11,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 use Tests\Support\NewApplicationFixture;
 use Tests\Support\PublicResourceCorpus;
+use Tests\Support\UrlMountProbe;
 
+use function array_slice;
 use function in_array;
 use function strlen;
 
@@ -35,7 +37,10 @@ class ApacheResourceHttpTest extends TestCase
 
         try {
             $root = $fixture->root;
-            $fixture->write('.htaccess', file_get_contents($configuration));
+            $fixture->write('.htaccess', "RewriteEngine On\nRewriteRule ^sub(?:/|$) - [L]\n" . file_get_contents($configuration));
+            UrlMountProbe::install($fixture);
+            $subPolicy = new ServerPolicyRenderer(new AssetPolicy())->render('apache');
+            $fixture->write('sub/.htaccess', "Options -Indexes\n{$subPolicy}\nRewriteRule ^ index.php [L]\n");
             $fixture->write('index.php', '<?php header("Content-Type: text/html"); if (isset($_GET["sensitive"])) { header("Cache-Control: no-store"); } echo $_SERVER["REQUEST_METHOD"];');
             $fixture->write('fonts/inter.woff2', 'FONT');
             $fixture->write('media/nested/logo.webp', 'IMAGE');
@@ -110,6 +115,27 @@ APACHE);
             $this->assertSame('no-cache', $response[2]['cache-control'] ?? null);
             $this->assertSame('no-store', $this->request($port, '/?sensitive=1')[2]['cache-control'] ?? null);
 
+            $mounted = $this->request($port, '/sub/about');
+            $this->assertSame(200, $mounted[0], $errors() . $mounted[1]);
+            $mountedData = json_decode($mounted[1], true, flags: JSON_THROW_ON_ERROR);
+            $this->assertSame('/about', $mountedData['path']);
+            $this->assertSame('/sub/index.php', $mountedData['script']);
+            $this->assertSame($fixture->path('sub/index.php'), $mountedData['filename']);
+            $this->assertSame("http://127.0.0.1:{$port}/sub/about", $mountedData['url']);
+            $this->assertSame("http://127.0.0.1:{$port}/sub/styles/app.css", $mountedData['asset']);
+            $this->assertSame('body{}', $this->request($port, '/sub/styles/app.css')[1]);
+            $this->assertSame([200, ''], array_slice($this->request($port, '/sub/about', 'HEAD'), 0, 2));
+
+            foreach (['/.env', '/.env.bak', '/%2eenv', '/core/secret.php'] as $path) {
+
+                foreach (['GET', 'HEAD'] as $method) {
+                    $denied = $this->request($port, "/sub{$path}", $method);
+                    $this->assertTrue(in_array($denied[0], [400, 403, 404], true));
+                    $this->assertStringNotContainsString('PRIVATE', $denied[1]);
+                }
+
+            }
+
             foreach (['/fonts/inter.woff2' => ['FONT', 'font/woff2'], '/media/nested/logo.webp' => ['IMAGE', 'image/webp']] as $path => [$body, $mime]) {
                 $response = $this->request($port, $path);
                 $this->assertSame(200, $response[0], $errors());
@@ -120,9 +146,13 @@ APACHE);
             }
 
             foreach (PublicResourceCorpus::deniedPaths() as $path) {
-                [$status, $body] = $this->request($port, $path);
-                $this->assertTrue(in_array($status, [400, 403, 404], true), "{$path}: {$status}");
-                $this->assertStringNotContainsString('PRIVATE', $body);
+
+                foreach (['GET', 'HEAD'] as $method) {
+                    [$status, $body] = $this->request($port, $path, $method);
+                    $this->assertTrue(in_array($status, [400, 403, 404], true), "{$method} {$path}: {$status}");
+                    $this->assertStringNotContainsString('PRIVATE', $body);
+                }
+
             }
 
             foreach (['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as $method) {

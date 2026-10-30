@@ -27,7 +27,7 @@ class NamedRouteTest extends TestCase
         mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config', 0755, true);
         mkdir($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Domain');
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Domain' . DIRECTORY_SEPARATOR . 'Paths.php', '<?php declare(strict_types=1); namespace App\\Domain; class Paths { public static function about(): string { return "/about"; } }');
-        file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', '<?php declare(strict_types=1); return ["base_path" => "/sub"];');
+        file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php', '<?php declare(strict_types=1); return ["url" => "https://myapp.com/sub"];');
         file_put_contents($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'routes.php', '<?php declare(strict_types=1); Arix\\Facades\\Route::get(App\\Domain\\Paths::about(), ["App\\\\Controllers\\\\AboutController", "show"])->name("about");');
         $alias = $root . DIRECTORY_SEPARATOR . 'current';
         symlink($root, $alias);
@@ -47,7 +47,7 @@ PHP;
         try {
             $process->run();
             $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-            $this->assertSame('/sub/about', $process->getOutput());
+            $this->assertSame('https://myapp.com/sub/about', $process->getOutput());
         } finally {
             (new Filesystem())->remove($root);
         }
@@ -111,11 +111,11 @@ PHP;
         $registry = new RouteRegistry();
         $registry->get('/about', ['App\\Controllers\\UnloadedController', 'show'])->name('about');
         $registry->get('/articles/{id:\d+}', ['App\\Controllers\\UnloadedController', 'show'])->name('article');
-        $generator = new RouteUrlGenerator($registry, new UrlGenerator('/sub', '/'));
+        $generator = new RouteUrlGenerator($registry, UrlGenerator::fromApplicationUrl('https://myapp.com/sub'));
 
-        $this->assertSame('/sub/about', $generator->to('about'));
+        $this->assertSame('https://myapp.com/sub/about', $generator->to('about'));
         $this->assertSame('/about', $generator->to('about', [], false));
-        $this->assertSame('/sub/articles/5', $generator->to('article', ['id' => 5]));
+        $this->assertSame('https://myapp.com/sub/articles/5', $generator->to('article', ['id' => 5]));
     }
 
     #[Test]
@@ -123,10 +123,10 @@ PHP;
     {
         $registry = new RouteRegistry();
         $registry->get('/archive[/{year:\d+}]', ['App\\Controllers\\UnloadedController', 'show'])->name('archive');
-        $generator = new RouteUrlGenerator($registry, new UrlGenerator('', '/'));
+        $generator = new RouteUrlGenerator($registry, UrlGenerator::fromApplicationUrl('https://myapp.com'));
 
-        $this->assertSame('/archive', $generator->to('archive'));
-        $this->assertSame('/archive/2026', $generator->to('archive', ['year' => 2026]));
+        $this->assertSame('https://myapp.com/archive', $generator->to('archive'));
+        $this->assertSame('https://myapp.com/archive/2026', $generator->to('archive', ['year' => 2026]));
     }
 
     #[Test]
@@ -134,7 +134,7 @@ PHP;
     {
         $registry = new RouteRegistry();
         $registry->get('/articles/{id:\d+}', ['App\\Controllers\\UnloadedController', 'show'])->name('article');
-        $generator = new RouteUrlGenerator($registry, new UrlGenerator('', '/'));
+        $generator = new RouteUrlGenerator($registry, UrlGenerator::fromApplicationUrl('https://myapp.com'));
         $caught = 0;
 
         foreach ([[], ['id' => 5, 'extra' => 1], ['id' => 'abc']] as $params) {
@@ -160,7 +160,7 @@ PHP;
         $registry = new RouteRegistry();
         $registry->get('/one', ['App\\Controllers\\UnloadedController', 'show'])->name('same');
         $registry->get('/two', ['App\\Controllers\\UnloadedController', 'show'])->name('same');
-        $generator = new RouteUrlGenerator($registry, new UrlGenerator('', '/'));
+        $generator = new RouteUrlGenerator($registry, UrlGenerator::fromApplicationUrl('https://myapp.com'));
 
         $this->expectException(LogicException::class);
         $generator->to('same');
@@ -178,9 +178,9 @@ PHP;
         });
 
         $this->assertTrue($registry->has('about'));
-        $generator = new RouteUrlGenerator($registry, new UrlGenerator('', '/'));
+        $generator = new RouteUrlGenerator($registry, UrlGenerator::fromApplicationUrl('https://myapp.com'));
 
-        $this->assertSame('/about', $generator->to('about'));
+        $this->assertSame('https://myapp.com/about', $generator->to('about'));
     }
 
     #[Test]
@@ -191,7 +191,7 @@ PHP;
 
         file_put_contents(
             $root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'app.php',
-            "<?php declare(strict_types=1); return ['base_path' => '/sub'];"
+            "<?php declare(strict_types=1); return ['url' => 'https://myapp.com/sub'];"
         );
         file_put_contents(
             $root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'routes.php',
@@ -209,9 +209,9 @@ PHP;
         try {
             $generator = RouteResolver::fromRoot($alias);
 
-            $this->assertSame('/sub/about', $generator->to('about'));
+            $this->assertSame('https://myapp.com/sub/about', $generator->to('about'));
             $this->assertSame('/about', $generator->to('about', [], false));
-            $this->assertSame('/sub/articles/7', $generator->to('article', ['id' => 7]));
+            $this->assertSame('https://myapp.com/sub/articles/7', $generator->to('article', ['id' => 7]));
         } finally {
             unlink($alias);
             unlink($root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'routes.php');
@@ -232,7 +232,7 @@ PHP;
             $container = new Arix\Container\Container;
             $registry = new Arix\Routing\RouteRegistry;
             $container->instance(Arix\Routing\RouteRegistry::class, $registry);
-            $container->instance(Arix\Routing\UrlGenerator::class, new Arix\Routing\UrlGenerator('/sub', '/'));
+            $container->instance(Arix\Routing\UrlGenerator::class, Arix\Routing\UrlGenerator::fromApplicationUrl('https://myapp.com/sub'));
             echo Arix\Container\ContainerContext::run($container, static function (): string {
                 Arix\Facades\Route::get('/articles/{id:\d+}', ['App\Controllers\AboutController', 'index'])->name('article');
                 return route('article', ['id' => 9]) . '|' . route('article', ['id' => 9], false);
@@ -245,6 +245,6 @@ PHP;
         fclose($pipes[2]);
 
         $this->assertSame(0, proc_close($process), $errors);
-        $this->assertSame('/sub/articles/9|/articles/9', $output);
+        $this->assertSame('https://myapp.com/sub/articles/9|/articles/9', $output);
     }
 }

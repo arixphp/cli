@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Core\Views;
 
+use Arix\Assets\AssetServices;
 use Arix\Config\ConfigServices;
 use Arix\Config\Repository;
 use Arix\Container\Container;
 use Arix\Container\ContainerContext;
+use Arix\Http\RequestUrlContext;
 use Arix\HttpFoundation\Request;
 use Arix\Localization\Translator;
+use Arix\Routing\ApplicationUrl;
 use Arix\Routing\UrlGenerator;
 use Arix\Views\TemplateEngine;
 use Arix\Views\ViewServices;
@@ -93,12 +96,12 @@ class ViewHelpersTest extends TestCase
     }
 
     #[Test]
-    public function it_builds_urls_assets_and_current_paths_with_base_path(): void
+    public function it_builds_absolute_urls_and_current_paths(): void
     {
-        $urls = new UrlGenerator('/site', '/about');
+        $urls = new UrlGenerator(ApplicationUrl::fromString('https://myapp.com/site'), '/about');
 
-        $this->assertSame('/site/about', $urls->to('/about'));
-        $this->assertSame('/site/about', $urls->current());
+        $this->assertSame('https://myapp.com/site/about', $urls->to('/about'));
+        $this->assertSame('https://myapp.com/site/about', $urls->current());
         $this->assertSame('/about', $urls->currentPath());
     }
 
@@ -106,7 +109,7 @@ class ViewHelpersTest extends TestCase
     #[DataProvider('invalidPaths')]
     public function it_rejects_unsafe_url_and_asset_paths(string $path): void
     {
-        $urls = new UrlGenerator('', '/');
+        $urls = UrlGenerator::fromApplicationUrl('https://myapp.com');
 
         try {
             $urls->to($path);
@@ -138,7 +141,7 @@ class ViewHelpersTest extends TestCase
         $container = new Container();
         $repository = new Repository(['custom' => ['enabled' => true]]);
         $container->instance(Repository::class, $repository);
-        ViewServices::register($container, $this->directory, Request::create('/'), [
+        ViewServices::register($container, $this->directory, [
             'app' => ['locales' => ['en'], 'default_locale' => 'en'],
             'cache' => [],
             'views' => $this->directory . DIRECTORY_SEPARATOR . 'views',
@@ -157,7 +160,7 @@ class ViewHelpersTest extends TestCase
         $this->assertSame('Test Site', $container->get(Repository::class)->get('app.name'));
         $this->assertSame('en', $container->get(Repository::class)->get('app.locale'));
         $this->assertSame('Welcome', $container->get(Translator::class)->get('home.title'));
-        $this->assertSame('/site/about', $container->get(UrlGenerator::class)->current());
+        $this->assertSame('http://localhost/site/about', $container->get(UrlGenerator::class)->current());
     }
 
     #[Test]
@@ -167,8 +170,8 @@ class ViewHelpersTest extends TestCase
         $second = $this->container('/two');
 
         $this->assertNotSame($first->get(UrlGenerator::class), $second->get(UrlGenerator::class));
-        $this->assertSame('/site/one', $first->get(UrlGenerator::class)->current());
-        $this->assertSame('/site/two', $second->get(UrlGenerator::class)->current());
+        $this->assertSame('http://localhost/site/one', $first->get(UrlGenerator::class)->current());
+        $this->assertSame('http://localhost/site/two', $second->get(UrlGenerator::class)->current());
 
         $this->expectException(LogicException::class);
         ContainerContext::current();
@@ -195,11 +198,11 @@ class ViewHelpersTest extends TestCase
         foreach ([
             [],
             ['app' => [], 'cache' => [], 'views' => '', 'lang' => ''],
-            ['app' => ['locales' => ['en'], 'default_locale' => 'en', 'base_path' => ['/site']], 'cache' => ['version' => '1'], 'views' => $this->directory . DIRECTORY_SEPARATOR . 'views', 'lang' => $this->directory . DIRECTORY_SEPARATOR . 'lang'],
+            ['app' => ['locales' => ['en'], 'default_locale' => []], 'cache' => ['version' => '1'], 'views' => $this->directory . DIRECTORY_SEPARATOR . 'views', 'lang' => $this->directory . DIRECTORY_SEPARATOR . 'lang'],
             ['app' => ['locales' => ['en'], 'default_locale' => 'en'], 'cache' => ['version' => '1'], 'views' => $this->directory . DIRECTORY_SEPARATOR . 'missing', 'lang' => $this->directory . DIRECTORY_SEPARATOR . 'lang'],
         ] as $configuration) {
             try {
-                ViewServices::register(new Container(), $this->directory, $request, $configuration);
+                ViewServices::register(new Container(), $this->directory, $configuration);
                 $this->fail('Misconfigured view services must be rejected.');
             } catch (InvalidArgumentException) {
             }
@@ -220,10 +223,14 @@ class ViewHelpersTest extends TestCase
             PHP;
         $program .= '$root = ' . var_export($this->directory, true) . '; ' . <<<'PHP'
             $request = Arix\HttpFoundation\Request::create('/site/about');
+            $request->server->set('SCRIPT_NAME', '/site/index.php');
+            $request->server->set('SCRIPT_FILENAME', '/srv/index.php');
             $request->attributes->set('_arix_path', '/about');
             $container = new Arix\Container\Container;
             Arix\Config\ConfigServices::register($container, $root.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'config');
-            Arix\Views\ViewServices::register($container, $root, $request, [
+            $context = Arix\Http\RequestUrlContext::fromRequest($request);
+            Arix\Assets\AssetServices::register($container, $root, Arix\Routing\UrlGenerator::fromRequest($request, $context), Arix\Routing\UrlGenerator::fromRequest($request, $context, assets: true));
+            Arix\Views\ViewServices::register($container, $root, [
                 'app' => ['name' => 'Test Site', 'base_path' => '/site', 'locales' => ['en'], 'default_locale' => 'en'],
                 'cache' => ['version' => '1'],
                 'views' => $root . '/views',
@@ -245,7 +252,7 @@ class ViewHelpersTest extends TestCase
         fclose($pipes[1]);
         fclose($pipes[2]);
         $this->assertSame(0, proc_close($process), $errors);
-        $this->assertSame('Welcome|Test Site|/site/about|/site/styles/app.css?v=7c98040a541657584690ae2a1cc3b42a8b53b159cc60c5d3abbfecbaeac6c94a|/site/about|/about', $output);
+        $this->assertSame('Welcome|Test Site|http://localhost/site/about|http://localhost/site/styles/app.css?v=7c98040a541657584690ae2a1cc3b42a8b53b159cc60c5d3abbfecbaeac6c94a|http://localhost/site/about|/about', $output);
     }
 
     private function views(): string
@@ -256,10 +263,14 @@ class ViewHelpersTest extends TestCase
     private function container(string $path): Container
     {
         $request = Request::create('/site' . $path);
+        $request->server->set('SCRIPT_NAME', '/site/index.php');
+        $request->server->set('SCRIPT_FILENAME', '/srv/index.php');
         $request->attributes->set('_arix_path', $path);
         $container = new Container();
         ConfigServices::register($container, $this->directory . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config');
-        ViewServices::register($container, $this->directory, $request, [
+        $context = RequestUrlContext::fromRequest($request);
+        AssetServices::register($container, $this->directory, UrlGenerator::fromRequest($request, $context), UrlGenerator::fromRequest($request, $context, assets: true));
+        ViewServices::register($container, $this->directory, [
             'app' => ['name' => 'Test Site', 'base_path' => '/site', 'locales' => ['en', 'es'], 'default_locale' => 'en'],
             'cache' => ['version' => '1'],
             'views' => $this->directory . DIRECTORY_SEPARATOR . 'views',
