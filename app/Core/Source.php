@@ -19,6 +19,7 @@ class Source
         'nikic/fast-route' => ['FastRoute', 'FastRoute', 'Arix\\FastRoute', 'src'],
         'eftec/bladeone' => ['BladeOne', 'eftec\\bladeone', 'Arix\\BladeOne', 'lib'],
         'dragonmantank/cron-expression' => ['Cron', 'Cron', 'Arix\\Cron', 'src/Cron'],
+        'erusev/parsedown' => ['Parsedown', '', 'Arix\\Parsedown', ''],
     ];
 
     public function import(string $vendor, string $core): array
@@ -58,15 +59,15 @@ class Source
             $directory = $vendor . DIRECTORY_SEPARATOR . $package;
             $this->assertUnlinkedPath($directory);
 
-            if (! $this->packageIsAvailable($directory, self::PACKAGES[$package][3])) {
+            if (! $this->packageIsAvailable($directory, self::PACKAGES[$package][3], $package === 'erusev/parsedown' ? 'LICENSE.txt' : 'LICENSE')) {
                 throw new RuntimeException("Missing package or license: {$package}");
             }
         }
     }
 
-    private function packageIsAvailable(string $directory, string $sourceRoot): bool
+    private function packageIsAvailable(string $directory, string $sourceRoot, string $license): bool
     {
-        if (! is_dir($directory) || ! is_file($directory . DIRECTORY_SEPARATOR . 'LICENSE')) {
+        if (! is_dir($directory) || ! is_file($directory . DIRECTORY_SEPARATOR . $license)) {
             return false;
         }
 
@@ -151,8 +152,30 @@ class Source
             $source = $sourceRoot === '' ? $root : $root . DIRECTORY_SEPARATOR . $sourceRoot;
             // The standalone core autoloader replaces FastRoute's bootstrap.
             $excluded = $package === 'nikic/fast-route' ? [$source . DIRECTORY_SEPARATOR . 'bootstrap.php'] : [];
-            $this->copy($source, $stage . DIRECTORY_SEPARATOR . $destination, $from, $to, $excluded);
-            $this->copy($root . DIRECTORY_SEPARATOR . 'LICENSE', $stage . DIRECTORY_SEPARATOR . $destination . DIRECTORY_SEPARATOR . 'LICENSE', null, null);
+            if ($package === 'erusev/parsedown') {
+                $file = $root . DIRECTORY_SEPARATOR . 'Parsedown.php';
+                $this->assertUnlinkedPath($file);
+                $content = file_get_contents($file);
+
+                if ($content === false || ! str_starts_with($content, "<?php\n")) {
+                    throw new RuntimeException('Invalid Parsedown source.');
+                }
+
+                mkdir($stage . DIRECTORY_SEPARATOR . $destination, 0755, true);
+                $this->write($stage . DIRECTORY_SEPARATOR . $destination . DIRECTORY_SEPARATOR . 'Parsedown.php', "<?php\n\nnamespace Arix\\Parsedown;\n" . substr($content, 6));
+                $license = $root . DIRECTORY_SEPARATOR . 'LICENSE.txt';
+                $this->assertUnlinkedPath($license);
+                $licenseContent = file_get_contents($license);
+
+                if ($licenseContent === false) {
+                    throw new RuntimeException('Cannot read Parsedown license.');
+                }
+
+                $this->write($stage . DIRECTORY_SEPARATOR . $destination . DIRECTORY_SEPARATOR . 'LICENSE', $licenseContent);
+            } else {
+                $this->copy($source, $stage . DIRECTORY_SEPARATOR . $destination, $from, $to, $excluded);
+                $this->copy($root . DIRECTORY_SEPARATOR . 'LICENSE', $stage . DIRECTORY_SEPARATOR . $destination . DIRECTORY_SEPARATOR . 'LICENSE', null, null);
+            }
 
             $manifest['packages'][$package] = [
                 'version' => $versions[$package] ?? 'unknown',

@@ -16,6 +16,17 @@ class CorePackagerTest extends TestCase
 {
     private CoreUpdateFixture $fixture;
 
+    #[Test]
+    public function it_packages_managed_parsedown_sources(): void
+    {
+        $contents = "<?php\nnamespace Arix\\Parsedown; class Parsedown {}\n";
+        $manifest = ['format' => 1, 'packages' => ['erusev/parsedown' => ['destination' => 'Parsedown']], 'files' => ['Parsedown/Parsedown.php' => hash('sha256', $contents)]];
+        $source = $this->fixture->core('source', ['Parsedown/Parsedown.php' => $contents, 'imports.json' => json_encode($manifest, JSON_THROW_ON_ERROR)]);
+        $distribution = new CorePackager($source, $this->fixture->path('core.bundle'))->build();
+
+        $this->assertSame($contents, $distribution->contents('Parsedown/Parsedown.php'));
+    }
+
     protected function setUp(): void
     {
         $this->fixture = new CoreUpdateFixture();
