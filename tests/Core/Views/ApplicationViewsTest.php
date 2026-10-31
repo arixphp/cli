@@ -20,11 +20,12 @@ class ApplicationViewsTest extends TestCase
 
         mkdir($this->directory, 0755, true);
 
-        $reference = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'ApplicationViews';
+        $reference = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'app';
+        $views = $reference . DIRECTORY_SEPARATOR . 'views';
 
-        $this->assertDirectoryExists($reference . DIRECTORY_SEPARATOR . 'views');
+        $this->assertDirectoryExists($views);
         $this->assertDirectoryExists($reference . DIRECTORY_SEPARATOR . 'lang');
-        $this->copy($reference . DIRECTORY_SEPARATOR . 'views', $this->directory . DIRECTORY_SEPARATOR . 'views');
+        $this->copy($views, $this->directory . DIRECTORY_SEPARATOR . 'views');
         $this->copy($reference . DIRECTORY_SEPARATOR . 'lang', $this->directory . DIRECTORY_SEPARATOR . 'lang');
 
         mkdir($this->directory . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'cache', 0755, true);
