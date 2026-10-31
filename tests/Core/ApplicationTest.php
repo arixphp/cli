@@ -392,7 +392,6 @@ PHP;
         unlink($this->fixture->path('app/routes.php'));
         unlink($this->fixture->path('app/services.php'));
         $this->remove($this->fixture->path('app/Middleware'));
-        $this->remove($this->fixture->path('app/views/home.php'));
         $this->config([]);
         $this->loader = new ClassLoader(AutoloadConfiguration::read($this->root));
         $this->loader->register();

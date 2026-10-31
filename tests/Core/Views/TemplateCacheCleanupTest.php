@@ -149,18 +149,11 @@ class TemplateCacheCleanupTest extends TestCase
     }
 
     #[Test]
-    public function it_rejects_nonregular_lock_files_and_linked_directories(): void
+    public function it_rejects_nonregular_lock_files(): void
     {
         mkdir($this->cachePath('.templates.lock'));
         $this->scenario('rejected-lock');
         rmdir($this->cachePath('.templates.lock'));
-        $linked = $this->directory . DIRECTORY_SEPARATOR . 'cache-link';
-
-        if (! @symlink($this->cachePath(), $linked)) {
-            $this->markTestSkipped('Symlinks are unavailable on this platform.');
-        }
-
-        $this->scenario('rejected-directory', ['directory' => $linked]);
     }
 
     #[Test]

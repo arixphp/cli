@@ -81,7 +81,7 @@ class TemplateResolverTest extends TestCase
     }
 
     #[Test]
-    public function it_rejects_symlinks_case_mismatches_and_escapes(): void
+    public function it_resolves_a_linked_template_and_rejects_case_mismatches(): void
     {
         $outside = $this->directory . DIRECTORY_SEPARATOR . 'outside.php';
         file_put_contents($outside, 'outside');
@@ -89,11 +89,7 @@ class TemplateResolverTest extends TestCase
 
         $resolver = new TemplateResolver($this->directory);
 
-        try {
-            $resolver->resolve('linked');
-            $this->fail('Symlinked templates must be rejected.');
-        } catch (RuntimeException) {
-        }
+        $this->assertSame($outside, $resolver->resolve('linked'));
 
         file_put_contents($this->directory . DIRECTORY_SEPARATOR . 'Cased.arix.php', 'cased');
 

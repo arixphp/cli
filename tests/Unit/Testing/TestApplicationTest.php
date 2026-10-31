@@ -64,6 +64,42 @@ class TestApplicationTest extends TestCase
     }
 
     #[Test]
+    public function it_isolates_the_common_application_views_and_translations(): void
+    {
+        $first = new TestApplication();
+        $second = new TestApplication();
+
+        try {
+            $view = 'app/views/index.arix.php';
+            $source = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'index.arix.php';
+            $this->assertFileExists($source);
+            $this->assertFileExists($second->path($view));
+            $original = file_get_contents($source);
+            $this->assertSame($original, file_get_contents($second->path($view)));
+
+            $first->write($view, 'private view');
+
+            $this->assertSame($original, file_get_contents($second->path($view)));
+            $this->assertSame($original, file_get_contents($source));
+
+            $catalog = 'app/lang/en.php';
+            $catalogSource = dirname($source, 2) . DIRECTORY_SEPARATOR . 'lang' . DIRECTORY_SEPARATOR . 'en.php';
+            $this->assertFileExists($catalogSource);
+            $this->assertFileExists($second->path($catalog));
+            $originalCatalog = file_get_contents($catalogSource);
+            $this->assertSame($originalCatalog, file_get_contents($second->path($catalog)));
+
+            $first->write($catalog, '<?php return [];');
+
+            $this->assertSame($originalCatalog, file_get_contents($second->path($catalog)));
+            $this->assertSame($originalCatalog, file_get_contents($catalogSource));
+        } finally {
+            $first->cleanup();
+            $second->cleanup();
+        }
+    }
+
+    #[Test]
     public function it_boots_the_application_without_composer_and_keeps_requests_isolated(): void
     {
         $app = new TestApplication();
