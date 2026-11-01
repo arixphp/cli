@@ -7,6 +7,7 @@ namespace Tests\Core;
 use Arix\Application;
 use Arix\Config\Repository;
 use Arix\Container\Container;
+use Arix\Exceptions\CoreRuntimeException;
 use Arix\Routing\RouteResolver;
 use Arix\Runtime\ConsoleRuntime;
 use Arix\Runtime\Environment;
@@ -26,13 +27,12 @@ class EnvironmentEntryPointsTest extends TestCase
         $this->tree = new TempTree();
         $this->tree->applicationManifest();
         $this->env = $_ENV;
-        $_ENV['APP_SITE_NAME'] = 'caller';
-        $_ENV['APP_URL'] = 'https://caller.test';
+        unset($_ENV['APP_SITE_NAME'], $_ENV['APP_URL']);
         $this->tree->write('.env', "APP_SITE_NAME=local\nAPP_URL=https://myapp.com/local");
         $this->tree->write('app/config/app.php', <<<'PHP'
 <?php
 declare(strict_types=1);
-return ['debug' => \Arix\Runtime\Environment::debug(), 'url' => env('APP_URL'), 'name' => env('APP_SITE_NAME'), 'locales' => ['en'], 'default_locale' => 'en'];
+return ['debug' => \Arix\Runtime\Environment::debug(), 'url' => env('APP_URL', 'http://localhost'), 'name' => env('APP_SITE_NAME'), 'locales' => ['en'], 'default_locale' => 'en'];
 PHP);
         $this->tree->write('app/views/.keep', '');
         $this->tree->write('app/lang/en.php', '<?php declare(strict_types=1); return [];');
@@ -71,15 +71,15 @@ PHP);
 
         $this->assertSame(0, new ConsoleRuntime()->run($this->tree->root));
         $this->assertSame('local', $GLOBALS['arix_environment_task']);
-        $this->assertSame('caller', $_ENV['APP_SITE_NAME']);
+        $this->assertSame('local', $_ENV['APP_SITE_NAME']);
     }
 
     #[Test]
-    public function it_loads_route_configuration_and_restores_after_registration_failures(): void
+    public function it_loads_route_configuration_and_propagates_registration_failures(): void
     {
         $this->assertSame('https://myapp.com/local/about', RouteResolver::fromRoot($this->tree->root)->to('about'));
         $this->assertSame('/about', RouteResolver::fromRoot($this->tree->root)->to('about', [], false));
-        $this->assertSame('https://caller.test', $_ENV['APP_URL']);
+        $this->assertSame('https://myapp.com/local', $_ENV['APP_URL']);
         $this->tree->write('app/routes.php', '<?php declare(strict_types=1); throw new \RuntimeException("registration failed");');
 
         try {
@@ -87,17 +87,16 @@ PHP);
             $this->fail('Registration failure must propagate.');
         } catch (\RuntimeException $exception) {
             $this->assertSame('registration failed', $exception->getMessage());
-            $this->assertSame('caller', $_ENV['APP_SITE_NAME']);
+            $this->assertSame('local', $_ENV['APP_SITE_NAME']);
         }
     }
 
     #[Test]
-    public function it_reuses_the_outer_scope_for_nested_route_resolution(): void
+    public function it_rejects_a_malformed_environment_during_route_resolution(): void
     {
-        Environment::run($this->tree->root, function (): void {
-            $this->tree->write('.env', 'malformed');
-            $this->assertSame('https://myapp.com/local/about', RouteResolver::fromRoot($this->tree->root)->to('about'));
-        });
+        $this->tree->write('.env', 'malformed');
+        $this->expectException(CoreRuntimeException::class);
+        RouteResolver::fromRoot($this->tree->root);
     }
 
     #[Test]
@@ -110,7 +109,7 @@ throw new \RuntimeException('services were loaded');
 PHP);
 
         $this->assertSame('https://myapp.com/local/about', RouteResolver::fromRoot($this->tree->root)->to('about'));
-        $this->assertSame('caller', $_ENV['APP_SITE_NAME']);
+        $this->assertSame('local', $_ENV['APP_SITE_NAME']);
     }
 
     #[Test]
@@ -118,12 +117,10 @@ PHP);
     {
         $container = new Container();
         Application::create($this->tree->root)->registerConsole($container);
-        $this->assertSame('caller', $container->get(Repository::class)->get('app.name'));
-        $this->assertSame('local', Environment::run($this->tree->root, function (): string {
-            $container = new Container();
-            Application::create($this->tree->root)->registerConsole($container);
-
-            return $container->get(Repository::class)->get('app.name');
-        }));
+        $this->assertNull($container->get(Repository::class)->get('app.name'));
+        Environment::load($this->tree->root);
+        $container = new Container();
+        Application::create($this->tree->root)->registerConsole($container);
+        $this->assertSame('local', $container->get(Repository::class)->get('app.name'));
     }
 }

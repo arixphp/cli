@@ -20,7 +20,9 @@ class RouteResolver
     {
         $paths = RuntimePaths::fromApplicationRoot($root);
 
-        return Environment::run($paths->root, static fn (): RouteUrlGenerator => self::load($paths));
+        Environment::load($paths->root);
+
+        return self::load($paths);
     }
 
     private static function load(RuntimePaths $paths): RouteUrlGenerator

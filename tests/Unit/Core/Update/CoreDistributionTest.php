@@ -14,6 +14,23 @@ class CoreDistributionTest extends TestCase
 {
     private CoreUpdateFixture $fixture;
 
+    #[Test]
+    public function it_keeps_the_development_compatibility_contract(): void
+    {
+        $manifest = CoreDistribution::manifest(['autoload.php' => hash('sha256', 'autoload')]);
+        $this->assertSame('arix-core-v1', $manifest['contract']);
+    }
+
+    #[Test]
+    public function it_rejects_an_unknown_installed_contract(): void
+    {
+        $manifest = CoreDistribution::manifest(['autoload.php' => hash('sha256', 'autoload')]);
+        $manifest['contract'] = 'arix-core-unknown';
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unsupported core distribution manifest');
+        CoreDistribution::validateInstalledManifest($manifest);
+    }
+
     protected function setUp(): void
     {
         $this->fixture = new CoreUpdateFixture();
