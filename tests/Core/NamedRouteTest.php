@@ -22,6 +22,27 @@ use Tests\Support\TestApplication;
 class NamedRouteTest extends TestCase
 {
     #[Test]
+    public function it_requires_an_active_container_even_inside_an_application_directory(): void
+    {
+        $app = TestApplication::shared();
+        $program = <<<'PHP'
+            require $argv[1];
+            try {
+                route('about');
+            } catch (LogicException $exception) {
+                echo $exception->getMessage();
+                exit(0);
+            }
+            exit(1);
+            PHP;
+        $process = new Process([PHP_BINARY, '-r', $program, $app->path('core/autoload.php')], $app->root);
+        $process->run();
+
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $this->assertSame('No active container.', $process->getOutput());
+    }
+
+    #[Test]
     public function it_autoloads_route_dependencies_through_a_root_alias_without_composer(): void
     {
         $root = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-route-scope-' . bin2hex(random_bytes(8));

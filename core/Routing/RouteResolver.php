@@ -12,8 +12,6 @@ use Arix\Support\RuntimePaths;
 use LogicException;
 use RuntimeException;
 
-use function is_string;
-
 class RouteResolver
 {
     public static function fromRoot(string $root): RouteUrlGenerator
@@ -55,16 +53,5 @@ class RouteResolver
         }
 
         return new RouteUrlGenerator($registry, UrlGenerator::fromApplicationUrl($url->url));
-    }
-
-    public static function fromCwd(): RouteUrlGenerator
-    {
-        $cwd = getcwd();
-
-        if (! is_string($cwd) || $cwd === '') {
-            throw new LogicException('No active container.');
-        }
-
-        return self::fromRoot($cwd);
     }
 }
