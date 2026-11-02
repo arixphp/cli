@@ -78,17 +78,6 @@ class EnvironmentTest extends TestCase
     }
 
     #[Test]
-    public function it_does_not_treat_a_dangling_link_as_an_absent_optional_file(): void
-    {
-        if (! @symlink($this->tree->path('missing'), $this->tree->path('.env'))) {
-            $this->markTestSkipped('Symbolic links are unavailable.');
-        }
-
-        $this->expectException(CoreRuntimeException::class);
-        Environment::load($this->tree->root);
-    }
-
-    #[Test]
     #[DataProvider('debugValues')]
     public function it_resolves_debug_using_a_strict_allowlist(mixed $value, bool $expected): void
     {

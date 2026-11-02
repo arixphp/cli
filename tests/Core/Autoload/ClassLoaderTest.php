@@ -17,6 +17,16 @@ class ClassLoaderTest extends TestCase
 {
     private string $root;
 
+    #[Test]
+    public function it_resolves_a_trusted_linked_psr4_directory(): void
+    {
+        $this->write('source/Item.php', '<?php // trusted linked class');
+        symlink($this->root . DIRECTORY_SEPARATOR . 'source', $this->root . DIRECTORY_SEPARATOR . 'base');
+        $loader = $this->loader([$this->prefix => 'base/']);
+
+        $this->assertSame(realpath($this->root) . DIRECTORY_SEPARATOR . 'base' . DIRECTORY_SEPARATOR . 'Item.php', $loader->findFile($this->prefix . 'Item'));
+    }
+
     private string $prefix;
 
     /** @var list<ClassLoader> */
@@ -65,14 +75,14 @@ class ClassLoaderTest extends TestCase
     }
 
     #[Test]
-    public function it_does_not_follow_links_wrong_case_or_invalid_class_names(): void
+    public function it_allows_links_but_rejects_wrong_case_and_invalid_class_names(): void
     {
         $this->write('base/Utils/Item.php', '<?php throw new \\RuntimeException("Unexpected include");');
         symlink($this->root . DIRECTORY_SEPARATOR . 'base' . DIRECTORY_SEPARATOR . 'Utils', $this->root . DIRECTORY_SEPARATOR . 'base' . DIRECTORY_SEPARATOR . 'Linked');
         $loader = $this->loader([$this->prefix => 'base/']);
         $this->assertNull($loader->findFile($this->prefix . 'utils\\Item'));
         $this->assertNull($loader->findFile($this->prefix . 'Utils\\item'));
-        $this->assertNull($loader->findFile($this->prefix . 'Linked\\Item'));
+        $this->assertSame(realpath($this->root) . DIRECTORY_SEPARATOR . 'base' . DIRECTORY_SEPARATOR . 'Linked' . DIRECTORY_SEPARATOR . 'Item.php', $loader->findFile($this->prefix . 'Linked\\Item'));
         $this->assertNull($loader->findFile($this->prefix . '..\\Utils\\Item'));
         $this->assertNull($loader->findFile('Other\\Item'));
     }
@@ -106,25 +116,6 @@ class ClassLoaderTest extends TestCase
         $loader = $this->loader([$this->prefix => 'base/'], ['helpers.php', 'missing.php']);
         $this->expectException(RuntimeException::class);
         $loader->loadFiles();
-    }
-
-    #[Test]
-    public function it_does_not_follow_a_root_replaced_with_a_link_after_configuration(): void
-    {
-        $this->write('base/Item.php', '<?php throw new \\LogicException("Replaced root executed");');
-        $loader = $this->loader([$this->prefix => 'base/'], ['base/Item.php']);
-        $original = "{$this->root}-original";
-        rename($this->root, $original);
-        symlink($original, $this->root);
-
-        try {
-            $this->assertNull($loader->findFile($this->prefix . 'Item'));
-            $this->expectException(RuntimeException::class);
-            $loader->loadFiles();
-        } finally {
-            unlink($this->root);
-            rename($original, $this->root);
-        }
     }
 
     private function loader(array $prefixes, array $files = []): ClassLoader

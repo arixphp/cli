@@ -81,7 +81,7 @@ class ViewServicesConfig
             throw new InvalidArgumentException($missing);
         }
 
-        return RuntimePaths::fromStrictRoot($path)->root;
+        return $real;
     }
 
     private static function cache(array $cache, string $base): array
@@ -94,6 +94,6 @@ class ViewServicesConfig
 
         // The compiled template cache is framework-owned: compiled templates
         // are PHP files and must never land in a published directory.
-        return [RuntimePaths::fromStrictRoot($base)->cacheDirectory(), $version];
+        return [RuntimePaths::fromApplicationRoot($base)->cacheDirectory(), $version];
     }
 }

@@ -43,7 +43,7 @@ class Environment
     {
         clearstatcache(true, $this->envFilePath);
 
-        if (! file_exists($this->envFilePath) && ! Path::isLink($this->envFilePath)) {
+        if (! file_exists($this->envFilePath)) {
 
             return null;
         }
