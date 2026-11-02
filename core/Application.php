@@ -315,6 +315,10 @@ class Application
         $container->instance(Markdown::class, new Markdown($reader));
 
         if ($routes) {
+            $container->singleton(RouteUrlGenerator::class, static fn (Container $container): RouteUrlGenerator => new RouteUrlGenerator(
+                $container->get(RouteRegistry::class),
+                $container->get(UrlGenerator::class),
+            ));
             require $this->routesFile();
         }
     }
