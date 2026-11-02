@@ -23,7 +23,7 @@ class Loader
         if (! file_exists($directory)) {
             $parent = dirname($directory);
 
-            if (is_dir($parent) && ! is_executable($parent)) {
+            if (PHP_OS_FAMILY !== 'Windows' && is_dir($parent) && ! is_executable($parent)) {
                 throw new RuntimeException("Configuration directory is not accessible: {$directory}");
             }
 

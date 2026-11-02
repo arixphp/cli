@@ -33,6 +33,10 @@ class LocalizationPathTest extends TestCase
     #[DataProvider('optionalDirectoryConsumers')]
     public function it_fails_closed_for_unsearchable_optional_resource_ancestors(string $consumer): void
     {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $this->markTestSkipped('POSIX directory search permissions are not available on Windows.');
+        }
+
         $parent = $this->root . DIRECTORY_SEPARATOR . 'lang';
         chmod($parent, 0000);
 
@@ -64,5 +68,13 @@ class LocalizationPathTest extends TestCase
     public function it_preserves_missing_catalogue_fallback(): void
     {
         $this->assertSame('hello', (new Translator($this->root . DIRECTORY_SEPARATOR . 'lang', ['es'], 'es', 'es'))->get('hello'));
+    }
+
+    #[Test]
+    public function it_preserves_fallback_for_a_missing_catalogue_directory(): void
+    {
+        $directory = $this->root . DIRECTORY_SEPARATOR . 'missing';
+
+        $this->assertSame('hello', (new Translator($directory, ['en'], 'en', 'en'))->get('hello'));
     }
 }

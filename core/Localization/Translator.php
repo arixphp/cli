@@ -58,7 +58,7 @@ class Translator
         if (! isset($this->catalogues[$locale])) {
             $parent = dirname($this->directory);
 
-            if (! is_dir($this->directory) && is_dir($parent) && ! is_executable($parent)) {
+            if (PHP_OS_FAMILY !== 'Windows' && ! is_dir($this->directory) && is_dir($parent) && ! is_executable($parent)) {
                 throw new RuntimeException('Translation directory is not accessible.');
             }
 

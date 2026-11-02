@@ -72,7 +72,7 @@ class RuntimePathsTest extends TestCase
         NativeLink::create($target, $link, $directory);
         $paths = RuntimePaths::fromApplicationRoot($release);
         if (! file_exists($target)) {
-            $this->assertNull($paths->resolve($segments));
+            $this->assertSame(file_exists($link) ? $link : null, $paths->resolve($segments));
 
             return;
         }
