@@ -91,23 +91,8 @@ class AutoloadConfigurationTest extends TestCase
     }
 
     #[Test]
-    public function it_rejects_linked_and_oversized_manifests(): void
+    public function it_rejects_oversized_manifests(): void
     {
-        $target = $this->root . DIRECTORY_SEPARATOR . 'target.json';
-        file_put_contents($target, '{"version":"1.0.0","autoload":{"psr-4":{}}}');
-        symlink($target, $this->root . DIRECTORY_SEPARATOR . '.arix.json');
-
-        $failure = null;
-
-        try {
-            AutoloadConfiguration::read($this->root);
-        } catch (RuntimeException $exception) {
-            $failure = $exception;
-        }
-
-        $this->assertInstanceOf(RuntimeException::class, $failure, 'Linked manifest accepted.');
-
-        unlink($this->root . DIRECTORY_SEPARATOR . '.arix.json');
         file_put_contents($this->root . DIRECTORY_SEPARATOR . '.arix.json', str_repeat(' ', 65537));
         $this->expectException(RuntimeException::class);
         AutoloadConfiguration::read($this->root);

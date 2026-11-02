@@ -49,14 +49,15 @@ PHP;
         $program = <<<'PHP'
 require $argv[1];
 $_ENV['APP_STANDALONE_TEST'] = 'caller';
-$during = \Arix\Runtime\Environment::run($argv[2], static fn () => [env('APP_STANDALONE_TEST'), env('APP_DEBUG'), \Arix\Runtime\Environment::debug()]);
-echo json_encode([$during, env('APP_STANDALONE_TEST'), class_exists('Illuminate\Container\Container', false)], JSON_THROW_ON_ERROR);
+unset($_ENV['APP_DEBUG']);
+\Arix\Runtime\Environment::load($argv[2]);
+echo json_encode([env('APP_STANDALONE_TEST'), env('APP_DEBUG'), \Arix\Runtime\Environment::debug(), class_exists('Illuminate\Container\Container', false)], JSON_THROW_ON_ERROR);
 PHP;
 
         try {
             $process = new Process([PHP_BINARY, '-r', $program, $autoload, $tree->root], dirname(__DIR__, 2), ['XDEBUG_MODE' => 'off']);
             $process->mustRun();
-            $this->assertSame([['file', 'false', false], 'caller', false], json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR));
+            $this->assertSame(['caller', 'false', false, false], json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR));
         } finally {
             $tree->cleanup();
         }

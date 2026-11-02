@@ -17,6 +17,24 @@ class RuntimePathsTest extends TestCase
 {
     private string $directory;
 
+    #[Test]
+    public function it_does_not_expose_strict_root_factories(): void
+    {
+        $this->assertFalse(method_exists(RuntimePaths::class, 'fromStrictRoot'));
+        $this->assertFalse(method_exists(RuntimePaths::class, 'fromOptionalStrictRoot'));
+    }
+
+    #[Test]
+    public function it_resolves_trusted_internal_directory_links(): void
+    {
+        $release = $this->directory . DIRECTORY_SEPARATOR . 'release';
+        $alias = $release . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Alias';
+        symlink($release . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Controllers', $alias);
+        $paths = RuntimePaths::fromApplicationRoot($release);
+
+        $this->assertSame($alias . DIRECTORY_SEPARATOR . 'Home.php', $paths->resolve(['app', 'Alias', 'Home.php']));
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -46,16 +64,20 @@ class RuntimePathsTest extends TestCase
 
     #[Test]
     #[DataProvider('internalLinks')]
-    public function it_rejects_internal_links_before_resolving_their_destinations(string $link, string $target, array $segments, bool $directory): void
+    public function it_resolves_internal_links_to_existing_targets(string $link, string $target, array $segments, bool $directory): void
     {
         $release = $this->directory . DIRECTORY_SEPARATOR . 'release';
         $link = $release . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $link);
         $target = $this->directory . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $target);
         NativeLink::create($target, $link, $directory);
         $paths = RuntimePaths::fromApplicationRoot($release);
-        $this->expectException(RuntimeException::class);
+        if (! file_exists($target)) {
+            $this->assertSame(file_exists($link) ? $link : null, $paths->resolve($segments));
 
-        $paths->resolve($segments);
+            return;
+        }
+
+        $this->assertSame($release . DIRECTORY_SEPARATOR . implode(DIRECTORY_SEPARATOR, $segments), $paths->resolve($segments));
     }
 
     public static function internalLinks(): array
@@ -90,47 +112,15 @@ class RuntimePathsTest extends TestCase
     }
 
     #[Test]
-    public function it_returns_null_for_missing_or_wrong_case_descendants(): void
+    public function it_returns_null_for_missing_descendants(): void
     {
         $paths = RuntimePaths::fromApplicationRoot($this->directory . DIRECTORY_SEPARATOR . 'release');
 
         $this->assertNull($paths->resolve(['app', 'services.php']));
-        $this->assertNull($paths->resolve(['app', 'controllers', 'Home.php']));
-        $this->assertNull($paths->resolve(['app', 'Controllers', 'home.php']));
     }
 
     #[Test]
-    public function it_keeps_strict_roots_strict(): void
-    {
-        $alias = $this->directory . DIRECTORY_SEPARATOR . 'current';
-        symlink($this->directory . DIRECTORY_SEPARATOR . 'release', $alias);
-        $this->expectException(RuntimeException::class);
-
-        RuntimePaths::fromStrictRoot($alias);
-    }
-
-    #[Test]
-    public function it_allows_linked_root_ancestors_only_at_the_application_boundary(): void
-    {
-        $alias = $this->directory . DIRECTORY_SEPARATOR . 'deployments';
-        symlink($this->directory, $alias);
-        $root = $alias . DIRECTORY_SEPARATOR . 'release';
-        $this->assertSame($this->directory . DIRECTORY_SEPARATOR . 'release', RuntimePaths::fromApplicationRoot($root)->root);
-        $this->expectException(RuntimeException::class);
-        RuntimePaths::fromStrictRoot($root);
-    }
-
-    #[Test]
-    public function it_rejects_linked_strict_roots_with_a_trailing_separator(): void
-    {
-        $alias = $this->directory . DIRECTORY_SEPARATOR . 'current';
-        symlink($this->directory . DIRECTORY_SEPARATOR . 'release', $alias);
-        $this->expectException(RuntimeException::class);
-        RuntimePaths::fromStrictRoot($alias . DIRECTORY_SEPARATOR);
-    }
-
-    #[Test]
-    public function it_rejects_a_native_windows_descendant_junction(): void
+    public function it_resolves_a_native_windows_descendant_junction(): void
     {
 
         if (PHP_OS_FAMILY !== 'Windows') {
@@ -144,31 +134,9 @@ class RuntimePathsTest extends TestCase
 
         try {
             $paths = RuntimePaths::fromApplicationRoot($this->directory . DIRECTORY_SEPARATOR . 'release');
-            $this->expectException(RuntimeException::class);
-            $paths->resolve(['redirect']);
+            $this->assertSame($link, $paths->resolve(['redirect']));
         } finally {
             $this->removeJunction($link);
-        }
-    }
-
-    #[Test]
-    public function it_rejects_a_native_windows_junction_as_a_strict_root_ancestor(): void
-    {
-
-        if (PHP_OS_FAMILY !== 'Windows') {
-            $this->markTestSkipped('Requires native Windows junction semantics; not verified on this platform.');
-        }
-
-        $alias = $this->directory . DIRECTORY_SEPARATOR . 'alias';
-        $release = $this->directory . DIRECTORY_SEPARATOR . 'release';
-        $this->createJunction($alias, $release);
-
-        try {
-            $this->assertSame($release, RuntimePaths::fromApplicationRoot($alias)->root);
-            $this->expectException(RuntimeException::class);
-            RuntimePaths::fromStrictRoot($alias . DIRECTORY_SEPARATOR . 'app');
-        } finally {
-            $this->removeJunction($alias);
         }
     }
 
@@ -206,16 +174,14 @@ class RuntimePathsTest extends TestCase
     }
 
     #[Test]
-    public function it_rechecks_components_replaced_after_initialization(): void
+    public function it_resolves_trusted_components_replaced_with_links(): void
     {
         $release = $this->directory . DIRECTORY_SEPARATOR . 'release';
         $paths = RuntimePaths::fromApplicationRoot($release);
         $this->assertNotNull($paths->resolve(['app', 'Controllers', 'Home.php']));
         rename($release . DIRECTORY_SEPARATOR . 'app', $release . DIRECTORY_SEPARATOR . 'saved');
         symlink($release . DIRECTORY_SEPARATOR . 'saved', $release . DIRECTORY_SEPARATOR . 'app');
-        $this->expectException(RuntimeException::class);
-
-        $paths->resolve(['app', 'Controllers', 'Home.php']);
+        $this->assertNotNull($paths->resolve(['app', 'Controllers', 'Home.php']));
     }
 
     #[Test]
@@ -232,7 +198,7 @@ class RuntimePathsTest extends TestCase
     }
 
     #[Test]
-    public function it_fails_closed_when_a_directory_cannot_be_inspected(): void
+    public function it_returns_null_when_a_path_cannot_be_accessed(): void
     {
         $app = $this->directory . DIRECTORY_SEPARATOR . 'release' . DIRECTORY_SEPARATOR . 'app';
         $paths = RuntimePaths::fromApplicationRoot($this->directory . DIRECTORY_SEPARATOR . 'release');
@@ -244,8 +210,7 @@ class RuntimePathsTest extends TestCase
                 $this->markTestSkipped('This user/filesystem bypasses directory read permissions.');
             }
 
-            $this->expectException(RuntimeException::class);
-            $paths->resolve(['app', 'Controllers', 'Home.php']);
+            $this->assertNull($paths->resolve(['app', 'Controllers', 'Home.php']));
         } finally {
             chmod($app, 0755);
         }

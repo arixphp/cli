@@ -154,18 +154,6 @@ class ControllerDispatcherTest extends RoutingTestCase
     }
 
     #[Test]
-    public function it_rejects_linked_controller_files(): void
-    {
-        $class = $this->controller('public function show(): Response { return new Response; }');
-        $file = $this->directory . DIRECTORY_SEPARATOR . str_replace('App\\Controllers\\', '', str_replace('\\SampleController', '', $class)) . DIRECTORY_SEPARATOR . 'SampleController.php';
-        $outside = $this->directory . DIRECTORY_SEPARATOR . 'outside.php';
-        rename($file, $outside);
-        symlink($outside, $file);
-        $this->expectException(RuntimeException::class);
-        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container());
-    }
-
-    #[Test]
     public function it_rejects_a_preloaded_class_from_a_different_file(): void
     {
         $class = $this->controller('public function show(): Response { return new Response; }');
@@ -174,19 +162,6 @@ class ControllerDispatcherTest extends RoutingTestCase
         $other = $this->directory . DIRECTORY_SEPARATOR . 'conflicting.php';
         copy($file, $other);
         require $other;
-        $this->expectException(RuntimeException::class);
-        new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container());
-    }
-
-    #[Test]
-    public function it_rejects_linked_nested_namespace_directories(): void
-    {
-        $class = $this->controller('public function show(): Response { return new Response; }');
-        $namespace = substr($class, strlen('App\\Controllers\\'), -strlen('\\SampleController'));
-        $nested = $this->directory . DIRECTORY_SEPARATOR . $namespace;
-        $other = $this->directory . DIRECTORY_SEPARATOR . 'other';
-        rename($nested, $other);
-        symlink($other, $nested);
         $this->expectException(RuntimeException::class);
         new ControllerDispatcher($this->directory)->dispatch(new RouteDefinition(['GET'], '/', $class, 'show'), Request::create('/'), new Container());
     }

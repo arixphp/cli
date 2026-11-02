@@ -33,9 +33,13 @@ class HttpRuntimeTest extends TestCase
 
     private TempTree $tree;
 
+    private array $environment;
+
     protected function setUp(): void
     {
         parent::setUp();
+        $this->environment = $_ENV;
+        unset($_ENV['APP_DEBUG'], $_ENV['APP_RUNTIME_TEST']);
         $this->tree = new TempTree();
         $this->tree->applicationManifest();
         $this->tree->write('.env', 'APP_DEBUG=false');
@@ -43,6 +47,7 @@ class HttpRuntimeTest extends TestCase
 
     protected function tearDown(): void
     {
+        $_ENV = $this->environment;
         $this->tree->cleanup();
         parent::tearDown();
     }
@@ -60,7 +65,6 @@ class HttpRuntimeTest extends TestCase
         $tree = new TempTree();
         $tree->applicationManifest();
         $tree->write('.env', "APP_RUNTIME_TEST=file\nAPP_DEBUG=true");
-        $before = $_ENV;
         $server = $_SERVER;
 
         try {
@@ -80,7 +84,7 @@ class HttpRuntimeTest extends TestCase
             }, 'fpm-fcgi');
             $this->assertSame(200, $response->getStatusCode());
             $this->assertSame('file', $response->getContent());
-            $this->assertSame($before, $_ENV);
+            $this->assertSame('file', $_ENV['APP_RUNTIME_TEST']);
         } finally {
             $_SERVER = $server;
             $tree->cleanup();
@@ -101,8 +105,10 @@ class HttpRuntimeTest extends TestCase
             $runtime = new HttpRuntime(logger: static function (): void {}, applicationRoot: $tree->root);
             $this->assertStringContainsString('visible-bootstrap-detail', $runtime->handle($bootstrap, 'fpm-fcgi')->getContent());
             file_put_contents($file, 'APP_DEBUG=invalid');
+            unset($_ENV['APP_DEBUG']);
             $this->assertStringNotContainsString('visible-bootstrap-detail', $runtime->handle($bootstrap, 'fpm-fcgi')->getContent());
             file_put_contents($file, 'APP_DEBUG=false');
+            unset($_ENV['APP_DEBUG']);
             $this->assertStringNotContainsString('visible-bootstrap-detail', $runtime->handle($bootstrap, 'fpm-fcgi')->getContent());
         } finally {
             $tree->cleanup();

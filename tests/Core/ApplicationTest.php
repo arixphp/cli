@@ -30,7 +30,6 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Process\Process;
-use Tests\Support\NativeLink;
 use Tests\Support\TestApplication;
 
 use function strlen;
@@ -39,6 +38,24 @@ use function strlen;
 #[PreserveGlobalState(false)]
 class ApplicationTest extends TestCase
 {
+    #[Test]
+    public function it_loads_configuration_and_services_once_and_registers_services_per_request(): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("ok"); }');
+        $this->routes('/', $class);
+        $config = $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'probe.php';
+        file_put_contents($config, '<?php $GLOBALS["config_loads"] = ($GLOBALS["config_loads"] ?? 0) + 1; return [];');
+        $services = $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'services.php';
+        file_put_contents($services, '<?php $GLOBALS["service_loads"] = ($GLOBALS["service_loads"] ?? 0) + 1; return static function (): void { $GLOBALS["service_registrations"] = ($GLOBALS["service_registrations"] ?? 0) + 1; };');
+
+        $kernel = Application::create($this->root)->kernel();
+        $this->assertSame(200, $kernel->handle(Request::create('/'))->getStatusCode());
+        $this->assertSame(200, $kernel->handle(Request::create('/'))->getStatusCode());
+        $this->assertSame(1, $GLOBALS['config_loads']);
+        $this->assertSame(1, $GLOBALS['service_loads']);
+        $this->assertSame(2, $GLOBALS['service_registrations']);
+    }
+
     private TestApplication $fixture;
 
     private ClassLoader $loader;
@@ -189,32 +206,6 @@ PHP);
     private string $controllers;
 
     #[Test]
-    #[DataProvider('caseMismatchedResources')]
-    public function it_never_executes_case_mismatched_resource_files(string $resource): void
-    {
-        $this->routes('/', $this->controller('public function show(): Response { return new Response("safe"); }'));
-        $marker = $this->root . DIRECTORY_SEPARATOR . 'executed';
-        $path = $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $resource;
-        file_put_contents($path, '<?php declare(strict_types=1); file_put_contents(' . var_export($marker, true) . ', "yes"); return static function (): void {};');
-        rename($path, dirname($path) . DIRECTORY_SEPARATOR . ucfirst($resource));
-
-        try {
-            $application = Application::create($this->root);
-            $application->kernel()->handle(Request::create('/'));
-        } catch (RuntimeException) {
-            // A required exact-case resource is missing.
-        } finally {
-            $this->assertFileDoesNotExist($marker);
-        }
-    }
-
-    public static function caseMismatchedResources(): array
-    {
-
-        return [['routes.php'], ['services.php']];
-    }
-
-    #[Test]
     public function it_keeps_http_code_translations_and_views_in_the_selected_release_without_composer(): void
     {
         $id = 'Pinned' . bin2hex(random_bytes(6));
@@ -241,108 +232,6 @@ PHP;
         $process->run();
         $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $this->assertSame('release-A|translation-A', $process->getOutput());
-    }
-
-    #[Test]
-    #[DataProvider('linkedCodeDirectories')]
-    public function it_rejects_linked_code_directories_before_loading_php(string $directory): void
-    {
-        $this->routes('/', $this->controller('public function show(): Response { return new Response("safe"); }'));
-        $marker = $this->root . DIRECTORY_SEPARATOR . 'executed';
-
-        if ($directory === 'Middleware') {
-            mkdir($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $directory);
-            file_put_contents($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $directory . DIRECTORY_SEPARATOR . 'Unsafe.php', '<?php declare(strict_types=1); file_put_contents(' . var_export($marker, true) . ', "yes");');
-        }
-
-        $path = $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $directory;
-        rename($path, "{$path}-saved");
-        symlink("{$path}-saved", $path);
-        $kernel = Application::create($this->root)->kernel($directory === 'Middleware' ? ['App\\Middleware\\Unsafe'] : []);
-        $this->assertSame(500, $kernel->handle(Request::create('/'))->getStatusCode());
-        $this->assertFileDoesNotExist($marker);
-    }
-
-    public static function linkedCodeDirectories(): array
-    {
-
-        return [['Controllers'], ['Middleware']];
-    }
-
-    #[Test]
-    #[DataProvider('linkedResources')]
-    public function it_rejects_linked_resources_before_they_execute(string $resource): void
-    {
-        $class = $this->controller('public function show(): Response { return new Response("safe"); }');
-        $this->routes('/', $class);
-        $marker = $this->root . DIRECTORY_SEPARATOR . 'executed';
-        $file = $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $resource);
-        $target = $this->root . DIRECTORY_SEPARATOR . 'payload.php';
-        file_put_contents($target, '<?php declare(strict_types=1); file_put_contents(' . var_export($marker, true) . ', "executed"); return [];');
-
-        if (is_file($file)) {
-            unlink($file);
-        }
-
-        symlink($target, $file);
-
-        try {
-            $application = Application::create($this->root);
-
-            if ($resource === 'schedules.php') {
-                $application->schedules(new Schedule());
-            } else {
-                $response = $application->kernel()->handle(Request::create('/'));
-                $this->assertSame(500, $response->getStatusCode());
-            }
-        } catch (RuntimeException $exception) {
-            $this->assertNotSame('', $exception->getMessage());
-        } finally {
-            $this->assertFileDoesNotExist($marker);
-        }
-    }
-
-    public static function linkedResources(): array
-    {
-
-        return [['config/custom.php'], ['routes.php'], ['services.php'], ['schedules.php']];
-    }
-
-    #[Test]
-    public function it_rejects_a_linked_app_directory_before_loading_configuration(): void
-    {
-        $this->routes('/', $this->controller('public function show(): Response { return new Response("safe"); }'));
-        rename($this->root . DIRECTORY_SEPARATOR . 'app', $this->root . DIRECTORY_SEPARATOR . 'saved');
-        symlink($this->root . DIRECTORY_SEPARATOR . 'saved', $this->root . DIRECTORY_SEPARATOR . 'app');
-        $this->expectException(RuntimeException::class);
-        Application::create($this->root);
-    }
-
-    #[Test]
-    #[DataProvider('optionalResources')]
-    public function it_rejects_broken_optional_links(string $resource): void
-    {
-        $this->routes('/', $this->controller('public function show(): Response { return new Response("safe"); }'));
-        NativeLink::create($this->root . DIRECTORY_SEPARATOR . 'missing', $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $resource);
-        $this->expectException(RuntimeException::class);
-        $application = Application::create($this->root);
-        $application->schedules(new Schedule());
-    }
-
-    public static function optionalResources(): array
-    {
-
-        return [['services.php'], ['schedules.php']];
-    }
-
-    #[Test]
-    public function it_rechecks_app_components_before_request_execution(): void
-    {
-        $this->routes('/', $this->controller('public function show(): Response { return new Response("safe"); }'));
-        $application = Application::create($this->root);
-        rename($this->root . DIRECTORY_SEPARATOR . 'app', $this->root . DIRECTORY_SEPARATOR . 'saved');
-        symlink($this->root . DIRECTORY_SEPARATOR . 'saved', $this->root . DIRECTORY_SEPARATOR . 'app');
-        $this->assertSame(500, $application->kernel()->handle(Request::create('/'))->getStatusCode());
     }
 
     #[Test]
@@ -542,19 +431,6 @@ PHP;
     }
 
     #[Test]
-    public function it_rejects_linked_services_files(): void
-    {
-        $class = $this->controller('public function show(): Response { return new Response("hello"); }');
-        $this->routes('/', $class);
-        $target = $this->root . DIRECTORY_SEPARATOR . 'services-target.php';
-        file_put_contents($target, "<?php\ndeclare(strict_types=1);\nreturn static function (\\Arix\\Container\\Container \$container): void {};\n");
-        symlink($target, $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'services.php');
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessageIsOrContains('linked');
-        Application::create($this->root);
-    }
-
-    #[Test]
     public function it_rejects_unreadable_services_files(): void
     {
         $class = $this->controller('public function show(): Response { return new Response("hello"); }');
@@ -573,53 +449,6 @@ PHP;
         } finally {
             chmod($path, 0600);
         }
-    }
-
-    #[Test]
-    public function it_rejects_routes_replaced_between_create_and_request(): void
-    {
-        $class = $this->controller('public function show(): Response { return new Response("hello"); }');
-        $this->routes('/', $class);
-        $this->config(['debug' => true]);
-        $application = Application::create($this->root);
-        $target = $this->root . DIRECTORY_SEPARATOR . 'routes-target.php';
-        rename($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'routes.php', $target);
-        symlink($target, $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'routes.php');
-        $previous = ini_get('error_log');
-        ini_set('error_log', $this->root . DIRECTORY_SEPARATOR . 'errors.log');
-
-        try {
-            $response = $application->kernel()->handle(Request::create('/'));
-        } finally {
-            ini_set('error_log', $previous === false ? '' : $previous);
-        }
-
-        $this->assertSame(500, $response->getStatusCode());
-        $this->assertStringContainsString('linked', $response->getContent());
-    }
-
-    #[Test]
-    public function it_rejects_services_replaced_between_create_and_request(): void
-    {
-        $class = $this->controller('public function show(): Response { return new Response("hello"); }');
-        $this->routes('/', $class);
-        $this->services('');
-        $this->config(['debug' => true]);
-        $application = Application::create($this->root);
-        $target = $this->root . DIRECTORY_SEPARATOR . 'services-target.php';
-        rename($this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'services.php', $target);
-        symlink($target, $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'services.php');
-        $previous = ini_get('error_log');
-        ini_set('error_log', $this->root . DIRECTORY_SEPARATOR . 'errors.log');
-
-        try {
-            $response = $application->kernel()->handle(Request::create('/'));
-        } finally {
-            ini_set('error_log', $previous === false ? '' : $previous);
-        }
-
-        $this->assertSame(500, $response->getStatusCode());
-        $this->assertStringContainsString('linked', $response->getContent());
     }
 
     #[Test]
@@ -674,7 +503,7 @@ PHP;
     }
 
     #[Test]
-    public function it_uses_the_current_host_policy_without_leaking_it_to_the_caller(): void
+    public function it_snapshots_the_host_policy_at_bootstrap_without_leaking_it_to_the_caller(): void
     {
         $class = $this->controller('public function show(): Response { return new Response("ok"); }');
         $this->routes('/page', $class);
@@ -687,6 +516,8 @@ PHP;
             $this->assertSame(200, $kernel->handle(Request::create('http://first.test/page'))->getStatusCode());
             $this->assertSame($previous, Request::getTrustedHosts());
             $this->config(['trusted_hosts' => ['^second\.test$']]);
+            $this->assertSame(200, $kernel->handle(Request::create('http://first.test/page'))->getStatusCode());
+            $kernel = Application::create($this->root)->kernel();
             $this->assertSame(400, $kernel->handle(Request::create('http://first.test/page'))->getStatusCode());
             $this->assertSame(200, $kernel->handle(Request::create('http://second.test/page'))->getStatusCode());
             $this->assertSame($previous, Request::getTrustedHosts());

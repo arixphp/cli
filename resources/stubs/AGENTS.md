@@ -29,13 +29,13 @@ Run every command from the application root.
   exposure rules.
 - Environment: the root `.env` is optional in development and production. The HTTP entry
   point must instantiate `HttpRuntime(applicationRoot: __DIR__)`; the runtime loads `.env`.
-  Its `APP_` assignments take precedence over existing `$_ENV` and process variables through
-  `env()`. Direct `getenv()` is unchanged.
+  All valid assignments are loaded when absent from `$_ENV` and process variables;
+  existing values take precedence through `env()`. Direct `getenv()` is unchanged.
   Do not add environment loading or debug parsing to `index.php`; the runtime owns it.
 - Debugging: `APP_DEBUG=true|1` enables debug; use `Arix\Runtime\Environment::debug()` for
   boolean `app.debug`. Invalid values do not enable debug. Keep debug disabled in production.
-  Direct application/test bootstraps needing `.env` must explicitly wrap the complete operation
-  in `Environment::run($root, $callback)`; plain `Application::create()` does not discover it.
+  Direct application bootstraps needing `.env` must call `Environment::load($root)` first;
+  plain `Application::create()` does not discover it.
 - Protect `.env` and all variants/backups with the generated Apache/Caddy/IIS dot-file deny
   rules before static serving. Ignore `.env` and `.env.*` in Git (only non-secret `.env.example`
   may be versioned), restrict filesystem permissions and never log secrets. Linked environment
@@ -49,9 +49,13 @@ Run every command from the application root.
 syntax (`it()`/`test()` and `expect()`). The framework's own test suite lives in the CLI
 project and is not part of this application. `tests/autoload.php` loads the local core and the
 application and test classes without Composer or the HTTP entry point. `tests/Pest.php` binds
-the framework `Arix\Testing\TestCase`, so `$this->get('/path')` dispatches in-process and
-returns an `Arix\Testing\TestResponse` with chainable `assertStatus()`, `assertOk()`, and
-`assertSee()` assertions. Run the suite through the CLI; do not reintroduce `tests/run.php` or
+the local `Tests\TestCase`, which extends `Arix\Testing\TestCase`. HTTP tests load `.env` before
+`app/bootstrap.php` and its middleware; loaded values remain in the process environment array.
+`$this->get('/path')` dispatches in-process and returns an
+`Arix\Testing\TestResponse` with chainable `assertStatus()`, `assertOk()`, and `assertSee()`
+assertions. `assertStatus()` accepts an `Arix\Constants\HttpStatusCode` case, not an integer.
+These tests do not exercise the HTTP runtime or web-server configuration.
+Run the suite through the CLI; do not reintroduce `tests/run.php` or
 install Pest in the application. XML and tests are trusted developer code, not a sandbox.
 `phpunit.xml` and `phpunit.xml.dist` must stay protected in Apache, Caddy and IIS.
 

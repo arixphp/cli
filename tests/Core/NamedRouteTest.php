@@ -22,6 +22,27 @@ use Tests\Support\TestApplication;
 class NamedRouteTest extends TestCase
 {
     #[Test]
+    public function it_requires_an_active_container_even_inside_an_application_directory(): void
+    {
+        $app = TestApplication::shared();
+        $program = <<<'PHP'
+            require $argv[1];
+            try {
+                route('about');
+            } catch (LogicException $exception) {
+                echo $exception->getMessage();
+                exit(0);
+            }
+            exit(1);
+            PHP;
+        $process = new Process([PHP_BINARY, '-r', $program, $app->path('core/autoload.php')], $app->root);
+        $process->run();
+
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $this->assertSame('No active container.', $process->getOutput());
+    }
+
+    #[Test]
     public function it_autoloads_route_dependencies_through_a_root_alias_without_composer(): void
     {
         $root = realpath(sys_get_temp_dir()) . DIRECTORY_SEPARATOR . 'arix-route-scope-' . bin2hex(random_bytes(8));
@@ -237,6 +258,7 @@ PHP;
             $registry = new Arix\Routing\RouteRegistry;
             $container->instance(Arix\Routing\RouteRegistry::class, $registry);
             $container->instance(Arix\Routing\UrlGenerator::class, Arix\Routing\UrlGenerator::fromApplicationUrl('https://myapp.com/sub'));
+            $container->instance(Arix\Routing\RouteUrlGenerator::class, new Arix\Routing\RouteUrlGenerator($registry, $container->get(Arix\Routing\UrlGenerator::class)));
             echo Arix\Container\ContainerContext::run($container, static function (): string {
                 Arix\Facades\Route::get('/articles/{id:\d+}', ['App\Controllers\AboutController', 'index'])->name('article');
                 return route('article', ['id' => 9]) . '|' . route('article', ['id' => 9], false);

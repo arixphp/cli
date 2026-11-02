@@ -9,7 +9,6 @@ use Arix\Runtime\Environment;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use Tests\Support\TempTree;
 
 class EnvironmentTest extends TestCase
@@ -33,87 +32,35 @@ class EnvironmentTest extends TestCase
     }
 
     #[Test]
-    public function it_overlays_only_app_keys_and_restores_original_values(): void
+    public function it_loads_all_keys_without_overwriting_existing_environment(): void
     {
-        $_ENV['APP_SCOPE_TEST'] = null;
-        unset($_ENV['APP_SCOPE_NEW']);
-        $this->tree->write('.env', "APP_SCOPE_TEST=file\nAPP_SCOPE_NEW=created\nPATH=forbidden\nAPP_SCOPE_TEST=last");
-        $before = $_ENV;
-        $process = getenv('APP_SCOPE_TEST');
-
-        $result = Environment::run($this->tree->root, function () use ($process): string {
-            $this->assertSame('last', $_ENV['APP_SCOPE_TEST']);
-            $this->assertSame('created', $_ENV['APP_SCOPE_NEW']);
-            $this->assertNotSame('forbidden', $_ENV['PATH'] ?? null);
-            $this->assertSame($process, getenv('APP_SCOPE_TEST'));
-
-            return 'result';
-        });
-
-        $this->assertSame('result', $result);
-        $this->assertSame($before, $_ENV);
-    }
-
-    #[Test]
-    public function it_restores_on_failure_and_rereads_later_changes_and_removal(): void
-    {
-        unset($_ENV['APP_SCOPE_NEW']);
-        $file = $this->tree->write('.env', 'APP_SCOPE_NEW=first');
+        $this->tree->write('.env', "ARIX_ENV_NEW=from-file\nARIX_ENV_EXISTING=file\nARIX_ENV_PROCESS=file\nARIX_ENV_EMPTY=file\n");
+        unset($_ENV['ARIX_ENV_NEW'], $_ENV['ARIX_ENV_PROCESS']);
+        $_ENV['ARIX_ENV_EXISTING'] = 'existing';
+        $_ENV['ARIX_ENV_EMPTY'] = '';
+        putenv('ARIX_ENV_PROCESS=process');
 
         try {
-            Environment::run($this->tree->root, static function (): never {
-                throw new RuntimeException('callback failed');
-            });
-            $this->fail('Callback failure must propagate.');
-        } catch (RuntimeException $exception) {
-            $this->assertSame('callback failed', $exception->getMessage());
+            Environment::load($this->tree->root);
+            $this->assertSame('from-file', $_ENV['ARIX_ENV_NEW']);
+            $this->assertSame('existing', $_ENV['ARIX_ENV_EXISTING']);
+            $this->assertSame('', $_ENV['ARIX_ENV_EMPTY']);
+            $this->assertArrayNotHasKey('ARIX_ENV_PROCESS', $_ENV);
+            $this->assertSame('process', getenv('ARIX_ENV_PROCESS'));
+        } finally {
+            putenv('ARIX_ENV_PROCESS');
         }
-
-        $this->assertArrayNotHasKey('APP_SCOPE_NEW', $_ENV);
-        file_put_contents($file, 'APP_SCOPE_NEW=second');
-        $this->assertSame('second', Environment::run($this->tree->root, static fn () => $_ENV['APP_SCOPE_NEW']));
-        unlink($file);
-        $this->assertNull(Environment::run($this->tree->root, static fn () => $_ENV['APP_SCOPE_NEW'] ?? null));
     }
 
     #[Test]
-    public function it_reuses_same_root_scopes_without_reloading_and_rejects_other_roots(): void
+    public function it_keeps_an_existing_null_value_and_loads_an_optional_missing_file(): void
     {
-        $file = $this->tree->write('.env', 'APP_SCOPE_NEW=first');
-        mkdir($this->tree->path('other'));
-
-        Environment::run($this->tree->root, function () use ($file): void {
-            file_put_contents($file, 'invalid assignment');
-            $this->assertSame('first', Environment::run($this->tree->root, static fn () => $_ENV['APP_SCOPE_NEW']));
-
-            try {
-                Environment::run($this->tree->path('other'), static fn () => null);
-                $this->fail('Overlapping applications must be rejected.');
-            } catch (CoreRuntimeException) {
-                $this->assertSame('first', $_ENV['APP_SCOPE_NEW']);
-            }
-        });
-    }
-
-    #[Test]
-    public function it_keeps_the_outer_environment_after_a_nested_failure(): void
-    {
-        $_ENV['APP_SCOPE_NEW'] = 'caller';
-        $this->tree->write('.env', 'APP_SCOPE_NEW=local');
-
-        Environment::run($this->tree->root, function (): void {
-            try {
-                Environment::run($this->tree->root, static function (): never {
-                    throw new RuntimeException('nested failure');
-                });
-                $this->fail('Nested failure must propagate.');
-            } catch (RuntimeException $exception) {
-                $this->assertSame('nested failure', $exception->getMessage());
-                $this->assertSame('local', $_ENV['APP_SCOPE_NEW']);
-            }
-        });
-
-        $this->assertSame('caller', $_ENV['APP_SCOPE_NEW']);
+        Environment::load($this->tree->root);
+        $_ENV['ARIX_ENV_NULL'] = null;
+        $this->tree->write('.env', 'ARIX_ENV_NULL=file');
+        Environment::load($this->tree->root);
+        $this->assertArrayHasKey('ARIX_ENV_NULL', $_ENV);
+        $this->assertNull($_ENV['ARIX_ENV_NULL']);
     }
 
     #[Test]
@@ -123,22 +70,11 @@ class EnvironmentTest extends TestCase
         $before = $_ENV;
 
         try {
-            Environment::run($this->tree->root, static fn () => null);
+            Environment::load($this->tree->root);
             $this->fail('Malformed files must fail before callback execution.');
         } catch (CoreRuntimeException) {
             $this->assertSame($before, $_ENV);
         }
-    }
-
-    #[Test]
-    public function it_does_not_treat_a_dangling_link_as_an_absent_optional_file(): void
-    {
-        if (! @symlink($this->tree->path('missing'), $this->tree->path('.env'))) {
-            $this->markTestSkipped('Symbolic links are unavailable.');
-        }
-
-        $this->expectException(CoreRuntimeException::class);
-        Environment::run($this->tree->root, static fn () => null);
     }
 
     #[Test]

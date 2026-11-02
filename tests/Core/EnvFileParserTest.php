@@ -107,31 +107,6 @@ ENV);
     }
 
     #[Test]
-    public function it_rejects_symbolic_links_including_dangling_links(): void
-    {
-        $target = $this->tree->write('target', 'APP_KEY=secret');
-        $link = $this->tree->path('.env');
-
-        if (! @symlink($target, $link)) {
-            $this->markTestSkipped('Symbolic links are unavailable.');
-        }
-
-        foreach ([true, false] as $exists) {
-
-            if (! $exists) {
-                unlink($target);
-            }
-
-            try {
-                new EnvFileParser($link)->parse();
-                $this->fail('Linked environment files must be rejected.');
-            } catch (CoreRuntimeException $exception) {
-                $this->assertStringNotContainsString('secret', $exception->getMessage());
-            }
-        }
-    }
-
-    #[Test]
     public function it_rejects_unreadable_files_when_permissions_are_enforced(): void
     {
         $file = $this->tree->write('.env', 'APP_KEY=secret');
