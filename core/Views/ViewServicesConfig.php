@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Arix\Views;
 
-use Arix\Support\RuntimePaths;
+use Arix\Support\Path;
 use InvalidArgumentException;
 
 use function is_array;
@@ -94,6 +94,6 @@ class ViewServicesConfig
 
         // The compiled template cache is framework-owned: compiled templates
         // are PHP files and must never land in a published directory.
-        return [RuntimePaths::fromApplicationRoot($base)->cacheDirectory(), $version];
+        return [Path::join($base, 'storage', 'cache'), $version];
     }
 }

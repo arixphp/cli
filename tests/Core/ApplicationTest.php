@@ -38,6 +38,24 @@ use function strlen;
 #[PreserveGlobalState(false)]
 class ApplicationTest extends TestCase
 {
+    #[Test]
+    public function it_loads_configuration_and_services_once_and_registers_services_per_request(): void
+    {
+        $class = $this->controller('public function show(): Response { return new Response("ok"); }');
+        $this->routes('/', $class);
+        $config = $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'probe.php';
+        file_put_contents($config, '<?php $GLOBALS["config_loads"] = ($GLOBALS["config_loads"] ?? 0) + 1; return [];');
+        $services = $this->root . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'services.php';
+        file_put_contents($services, '<?php $GLOBALS["service_loads"] = ($GLOBALS["service_loads"] ?? 0) + 1; return static function (): void { $GLOBALS["service_registrations"] = ($GLOBALS["service_registrations"] ?? 0) + 1; };');
+
+        $kernel = Application::create($this->root)->kernel();
+        $this->assertSame(200, $kernel->handle(Request::create('/'))->getStatusCode());
+        $this->assertSame(200, $kernel->handle(Request::create('/'))->getStatusCode());
+        $this->assertSame(1, $GLOBALS['config_loads']);
+        $this->assertSame(1, $GLOBALS['service_loads']);
+        $this->assertSame(2, $GLOBALS['service_registrations']);
+    }
+
     private TestApplication $fixture;
 
     private ClassLoader $loader;
@@ -485,7 +503,7 @@ PHP;
     }
 
     #[Test]
-    public function it_uses_the_current_host_policy_without_leaking_it_to_the_caller(): void
+    public function it_snapshots_the_host_policy_at_bootstrap_without_leaking_it_to_the_caller(): void
     {
         $class = $this->controller('public function show(): Response { return new Response("ok"); }');
         $this->routes('/page', $class);
@@ -498,6 +516,8 @@ PHP;
             $this->assertSame(200, $kernel->handle(Request::create('http://first.test/page'))->getStatusCode());
             $this->assertSame($previous, Request::getTrustedHosts());
             $this->config(['trusted_hosts' => ['^second\.test$']]);
+            $this->assertSame(200, $kernel->handle(Request::create('http://first.test/page'))->getStatusCode());
+            $kernel = Application::create($this->root)->kernel();
             $this->assertSame(400, $kernel->handle(Request::create('http://first.test/page'))->getStatusCode());
             $this->assertSame(200, $kernel->handle(Request::create('http://second.test/page'))->getStatusCode());
             $this->assertSame($previous, Request::getTrustedHosts());

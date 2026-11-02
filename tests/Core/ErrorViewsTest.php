@@ -256,7 +256,7 @@ PHP;
         $this->assertStringContainsString('<title>400 — ArixPHP</title>', $response->getContent());
 
         $this->fixture->write('app/config/app.php', '<?php declare(strict_types=1); throw new \RuntimeException("config secret");');
-        $response = $application->kernel()->handle(Request::create('/'));
+        $response = new HttpRuntime($this->fixture->root, logger: static function (): void {})->handle(fn () => Application::create($this->fixture->root)->kernel(), 'fpm-fcgi');
         $this->assertSame(500, $response->getStatusCode());
         $this->assertStringContainsString('<title>500 — ArixPHP</title>', $response->getContent());
 
@@ -279,7 +279,8 @@ PHP;
 
         file_put_contents($template, "@yield('label', 'Fresh') {{ \$name }}");
         $this->fixture->write('app/config/app.php', "<?php declare(strict_types=1); return ['name' => 'Second site', 'debug' => false, 'locales' => ['en'], 'default_locale' => 'en'];");
-        $this->assertSame('Fresh Second site', $kernel->handle(Request::create('/two'))->getContent());
+        $this->assertSame('Fresh &lt;Site&gt;', $kernel->handle(Request::create('/two'))->getContent());
+        $this->assertSame('Fresh Second site', Application::create($this->fixture->root)->kernel()->handle(Request::create('/two'))->getContent());
 
         $this->expectException(LogicException::class);
         ContainerContext::current();
