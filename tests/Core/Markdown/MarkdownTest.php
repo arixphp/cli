@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Core\Markdown;
 
 use Arix\Markdown\DocumentReader;
+use Arix\Markdown\HeadingParser;
 use Arix\Markdown\Markdown;
+use Arix\Markdown\Yaml;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -13,6 +15,64 @@ use Tests\Support\TestApplication;
 
 class MarkdownTest extends TestCase
 {
+    #[Test]
+    public function it_renders_frontmatter_as_metadata_instead_of_html(): void
+    {
+        $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('arix-markdown-', true);
+        mkdir($directory);
+        file_put_contents($directory . DIRECTORY_SEPARATOR . 'article.md', "---\ntitle: My article\ntags: [php, arix]\n---\n# Hello\n");
+
+        try {
+            $document = (new Markdown(new DocumentReader($directory)))->render('article.md');
+            $this->assertSame(['title' => 'My article', 'tags' => ['php', 'arix']], $document->frontmatter);
+            $this->assertSame('<h1 id="hello">Hello</h1>', $document->html);
+            $this->assertSame('hello', $document->headings[0]->id);
+        } finally {
+            unlink($directory . DIRECTORY_SEPARATOR . 'article.md');
+            rmdir($directory);
+        }
+    }
+
+    #[Test]
+    public function it_handles_optional_empty_multiline_and_invalid_frontmatter(): void
+    {
+        $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('arix-markdown-', true);
+        mkdir($directory);
+        $path = $directory . DIRECTORY_SEPARATOR . 'article.md';
+        $markdown = new Markdown(new DocumentReader($directory));
+
+        try {
+            file_put_contents($path, "# Hello\n");
+            $this->assertNull($markdown->render('article.md')->frontmatter);
+
+            file_put_contents($path, "---\n---\n# Hello\n");
+            $this->assertSame([], $markdown->render('article.md')->frontmatter);
+
+            file_put_contents($path, "---\r\ntitle: Hello\r\ntags:\r\n  - php\r\n  - arix\r\n---\r\n# Hello\r\n");
+            $document = $markdown->render('article.md');
+            $this->assertSame(['title' => 'Hello', 'tags' => ['php', 'arix']], $document->frontmatter);
+            $this->assertSame('<h1 id="hello">Hello</h1>', $document->html);
+
+            foreach (["---\ntitle: Missing close\n# Hello", "---\ntags: [unclosed\n---\n# Hello"] as $source) {
+                file_put_contents($path, $source);
+                $document = $markdown->render('article.md');
+                $this->assertNull($document->frontmatter);
+                $this->assertSame((new HeadingParser())->renderDocument($source)->html, $document->html);
+            }
+        } finally {
+            unlink($path);
+            rmdir($directory);
+        }
+    }
+
+    #[Test]
+    public function it_preserves_quoted_values_in_inline_sequences(): void
+    {
+        $yaml = new Yaml();
+
+        $this->assertSame(['tags' => ['true', 'a,b', 'it\'s', true]], $yaml->parse('tags: ["true", "a,b", \'it\'\'s\', true]'));
+    }
+
     #[Test]
     public function it_reads_and_renders_a_document_using_the_new_api(): void
     {
