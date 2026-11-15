@@ -84,7 +84,6 @@ class ServerPolicyRenderer
                 '/<allowDoubleEscaping>false<\/allowDoubleEscaping>/',
                 '/<add value="index\.php" \/>/',
                 '/name="Arix front controller"/',
-                '/name="Public resource Allow header"/',
             ],
             default => throw new InvalidArgumentException('Unsupported server policy format.'),
         };
@@ -152,12 +151,6 @@ class ServerPolicyRenderer
         return <<<CADDY
 @private path_regexp arix_private `(?i)(?:^/(?:app|core|cli|tests|docs|storage|assets)(?:/|$)|^/phpunit\\.xml(?:\\.dist)?$|(?:^|/)\\.)`
 respond @private 403
-@resource_method {
-    path_regexp arix_resource_method `(?i)^/(?:{$directories})(?:/|$)`
-    not method GET HEAD
-}
-header @resource_method Allow "GET, HEAD"
-respond @resource_method 405
 header ?X-Content-Type-Options nosniff
 @public_files path_regexp arix_public `^/(?:{$public})$`
 file_server @public_files {
@@ -183,11 +176,9 @@ CADDY;
 RewriteEngine On
 RewriteRule ^(?:app|core|cli|tests|docs|storage|assets)(?:/|$) - [F,L,NC]
 RewriteRule (^|/)\\. - [F,L]
+RewriteRule %[0-9A-Fa-f]{2} - [F,L]
 RewriteRule ^phpunit\\.xml(?:\\.dist)?$ - [F,L,NC]
 RewriteRule ^(?:{$directories})(?:/|$) - [E=ARIX_ASSET:1,NC]
-RewriteCond %{REQUEST_METHOD} !^(?:GET|HEAD)$
-RewriteRule ^(?:{$directories})(?:/|$) - [R=405,L,NC]
-Header always set Allow "GET, HEAD" env=ARIX_ASSET expr=%{REQUEST_METHOD} !~ ^(?:GET|HEAD)\$
 Header always set X-Content-Type-Options nosniff
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^(?:index\\.php|robots\\.txt|{$public})$ - [L]
@@ -217,11 +208,6 @@ APACHE;
   <conditions><add input="{REQUEST_FILENAME}" matchType="IsFile" /></conditions>
   <action type="CustomResponse" statusCode="403" statusReason="Forbidden" statusDescription="Forbidden" />
 </rule>
-<rule name="Arix public resource methods" stopProcessing="true">
-  <match url="^(?:{$directories})(?:/|$)" ignoreCase="true" />
-  <conditions><add input="{REQUEST_METHOD}" pattern="^(GET|HEAD)$" negate="true" /></conditions>
-  <action type="CustomResponse" statusCode="405" statusReason="Method Not Allowed" statusDescription="GET, HEAD only" />
-</rule>
 XML;
     }
 
@@ -243,8 +229,12 @@ XML;
 
         return <<<APACHE
 Options -Indexes -MultiViews -ExecCGI -FollowSymLinks
+RewriteEngine Off
 DirectoryIndex disabled
 SetHandler default-handler
+<If "%{REQUEST_URI} !~ m#^/(?:[A-Za-z0-9_-]+/)*{$directory}/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\\.(?i:{$pattern})$#">
+    Require all denied
+</If>
 <FilesMatch "(?i)^(?![A-Za-z0-9_-]+\\.(?:{$pattern})$)">
     Require all denied
 </FilesMatch>

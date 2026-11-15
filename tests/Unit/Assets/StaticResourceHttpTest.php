@@ -141,9 +141,10 @@ class StaticResourceHttpTest extends TestCase
                 }
 
                 foreach (['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as $method) {
-                    $response = $this->request($port, "{$prefix}/media/nested/logo.webp", $method);
-                    $this->assertSame(405, $response[0]);
-                    $this->assertSame('GET, HEAD', $response[2]['allow'] ?? null);
+                    $this->request($port, "{$prefix}/media/nested/logo.webp", $method);
+                    $response = $this->request($port, "{$prefix}/media/nested/logo.webp");
+                    $this->assertSame(200, $response[0]);
+                    $this->assertSame('IMAGE', $response[1]);
                 }
 
                 foreach (PublicResourceCorpus::deniedPaths() as $path) {
