@@ -46,7 +46,7 @@ class ServerPolicyRendererTest extends TestCase
     }
 
     #[Test]
-    public function it_renders_typed_roots_and_method_restrictions(): void
+    public function it_renders_typed_roots_without_forcing_method_responses(): void
     {
         $renderer = new ServerPolicyRenderer(new AssetPolicy());
 
@@ -54,7 +54,7 @@ class ServerPolicyRendererTest extends TestCase
             $block = $renderer->render($server);
             $this->assertStringContainsString('styles|scripts|fonts|media', $block);
             $this->assertStringContainsString('assets', $block);
-            $this->assertStringContainsString('405', $block);
+            $this->assertStringNotContainsString('405', $block);
             $this->assertStringNotContainsString('assets/fonts/', $block);
         }
 
@@ -72,6 +72,7 @@ class ServerPolicyRendererTest extends TestCase
             $this->assertStringContainsString('-FollowSymLinks', $block);
             $this->assertStringContainsString('SetHandler default-handler', $block);
             $this->assertStringContainsString('Require all denied', $block);
+            $this->assertStringNotContainsString('Redirect 405', $block);
             $this->assertStringNotContainsString('+SymLinksIfOwnerMatch', $block);
         }
     }

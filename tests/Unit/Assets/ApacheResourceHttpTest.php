@@ -26,6 +26,7 @@ class ApacheResourceHttpTest extends TestCase
         $modules = getenv('ARIX_APACHE_TEST_MODULES');
         $cgi = getenv('ARIX_APACHE_TEST_PHP_CGI');
         $configuration = getenv('ARIX_APACHE_TEST_HTACCESS');
+        $application = getenv('ARIX_APACHE_TEST_APPLICATION');
 
         if (! $runtime || ! $modules || ! $cgi || ! $configuration) {
             $this->markTestSkipped('Set ARIX_APACHE_TEST_RUNTIME, MODULES, PHP_CGI and HTACCESS for native Apache checks.');
@@ -43,8 +44,12 @@ class ApacheResourceHttpTest extends TestCase
             $fixture->write('sub/.htaccess', "Options -Indexes\n{$subPolicy}\nRewriteRule ^ index.php [L]\n");
             $fixture->write('index.php', '<?php header("Content-Type: text/html"); if (isset($_GET["sensitive"])) { header("Cache-Control: no-store"); } echo $_SERVER["REQUEST_METHOD"];');
             $fixture->write('fonts/inter.woff2', 'FONT');
+            $fixture->write('styles/app.css', 'CSS');
+            $fixture->write('scripts/app.js', 'JS');
             $fixture->write('media/nested/logo.webp', 'IMAGE');
             $fixture->write('media/movie.mp4', '0123456789');
+            symlink($fixture->path('media/nested/logo.webp'), $fixture->path('media/linked.webp'));
+            symlink($fixture->path('media/nested'), $fixture->path('media/linked'));
 
             foreach (PublicResourceCorpus::deniedPaths() as $path) {
 
@@ -53,8 +58,12 @@ class ApacheResourceHttpTest extends TestCase
                 }
             }
 
-            foreach (['fonts', 'media'] as $directory) {
-                $fixture->write("{$directory}/.htaccess", new ServerPolicyRenderer(new AssetPolicy())->renderDirectory($directory));
+            foreach (['styles', 'scripts', 'fonts', 'media'] as $directory) {
+                $policy = $application
+                    ? file_get_contents($application . DIRECTORY_SEPARATOR . $directory . DIRECTORY_SEPARATOR . '.htaccess')
+                    : new ServerPolicyRenderer(new AssetPolicy())->renderDirectory($directory);
+                $this->assertIsString($policy);
+                $fixture->write("{$directory}/.htaccess", $policy);
             }
 
             $socket = stream_socket_server('tcp://127.0.0.1:0');
@@ -68,7 +77,7 @@ class ApacheResourceHttpTest extends TestCase
             $php = new Process([$cgi, '-b', "127.0.0.1:{$phpPort}"], $root, ['XDEBUG_MODE' => 'off'], timeout: null);
             $php->start();
 
-            foreach (['mpm_prefork', 'authz_core', 'authz_host', 'unixd', 'mime', 'dir', 'rewrite', 'headers', 'proxy', 'proxy_fcgi'] as $module) {
+            foreach (['mpm_prefork', 'authz_core', 'authz_host', 'unixd', 'mime', 'dir', 'rewrite', 'headers', 'alias', 'proxy', 'proxy_fcgi'] as $module) {
                 $loads .= "LoadModule {$module}_module \"{$modules}/mod_{$module}.so\"\n";
             }
 
@@ -125,6 +134,8 @@ APACHE);
             $this->assertSame("http://127.0.0.1:{$port}/sub/styles/app.css", $mountedData['asset']);
             $this->assertSame('body{}', $this->request($port, '/sub/styles/app.css')[1]);
             $this->assertSame([200, ''], array_slice($this->request($port, '/sub/about', 'HEAD'), 0, 2));
+            $this->request($port, '/sub/styles/app.css', 'POST');
+            $this->assertSame('body{}', $this->request($port, '/sub/styles/app.css')[1]);
 
             foreach (['/.env', '/.env.bak', '/%2eenv', '/core/secret.php'] as $path) {
 
@@ -136,7 +147,7 @@ APACHE);
 
             }
 
-            foreach (['/fonts/inter.woff2' => ['FONT', 'font/woff2'], '/media/nested/logo.webp' => ['IMAGE', 'image/webp']] as $path => [$body, $mime]) {
+            foreach (['/styles/app.css' => ['CSS', 'text/css'], '/scripts/app.js' => ['JS', 'text/javascript'], '/fonts/inter.woff2' => ['FONT', 'font/woff2'], '/media/nested/logo.webp' => ['IMAGE', 'image/webp']] as $path => [$body, $mime]) {
                 $response = $this->request($port, $path);
                 $this->assertSame(200, $response[0], $errors());
                 $this->assertSame($body, $response[1]);
@@ -155,11 +166,17 @@ APACHE);
 
             }
 
+            foreach (['/media/linked.webp', '/media/linked/logo.webp'] as $path) {
+                $response = $this->request($port, $path);
+                $this->assertTrue(in_array($response[0], [403, 404], true), "{$path}: {$response[0]}");
+                $this->assertStringNotContainsString('IMAGE', $response[1]);
+            }
+
             foreach (['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as $method) {
-                $response = $this->request($port, '/media/nested/logo.webp', $method);
-                $this->assertSame(405, $response[0], $errors());
-                // RFC list parsing ignores empty elements (Apache adds an empty default Allow).
-                $this->assertSame(['GET', 'HEAD'], array_values(array_filter(array_map('trim', explode(',', $response[2]['allow'] ?? '')))), json_encode($response[2]));
+                $this->request($port, '/media/nested/logo.webp', $method);
+                $response = $this->request($port, '/media/nested/logo.webp');
+                $this->assertSame(200, $response[0], $errors());
+                $this->assertSame('IMAGE', $response[1]);
             }
 
             $this->assertSame('POST', $this->request($port, '/article', 'POST')[1]);
